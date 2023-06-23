@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "outDir": "build",
+    "declaration": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": false,
+    "jsx": "react-jsx" // For Testing Only (currently)
+  },
+  // Technically speaking, a Jest config wouldn't be in a production build
+  "include": ["src/**/*", "jest.config.ts"]
+}
