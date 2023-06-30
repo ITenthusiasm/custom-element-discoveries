@@ -1,0 +1,56 @@
+[data-custom-select-container] {
+  --blocks: 10; /* Number of option blocks to display before needing to scroll */
+
+  position: relative;
+  display: inline-block;
+  box-sizing: border-box;
+  width: inherit;
+  height: inherit;
+
+  /* @media only screen and (min-width: 600px) {
+    --blocks: 5;
+  } */
+
+  > [role="combobox"] {
+    box-sizing: border-box;
+    width: 100%;
+
+    + ul[role="listbox"] {
+      --listbox-border: 2px;
+      --option-height: 38px;
+      --option-padding: 8px;
+
+      list-style: none;
+      position: absolute;
+      z-index: 2;
+
+      box-sizing: border-box;
+      width: 100%;
+      max-height: calc(var(--option-height) * var(--blocks) + var(--listbox-border) * 2);
+      padding: 0;
+      border: var(--listbox-border) solid #cecece;
+      border-radius: 5px;
+      margin: 0;
+
+      overflow: auto;
+      background-color: white;
+
+      /* TODO: Use a more specific selector */
+      > ::slotted(*) {
+        box-sizing: border-box;
+        height: var(--option-height);
+        padding: var(--option-padding);
+        cursor: pointer;
+      }
+
+      > ::slotted([data-active="true"]:not([aria-selected="true"])) {
+        background-color: #bddaff; /* `background-color` for `selected` items, brightened by 70% */
+      }
+
+      > ::slotted([aria-selected="true"]) {
+        color: white;
+        background-color: #2684ff;
+      }
+    }
+  }
+}

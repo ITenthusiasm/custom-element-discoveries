@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Testing Custom Select</title>
+  </head>
+
+  <body>
+    <form>
+      <label for="component">Options</label>
+      <!-- TODO: Can we automatically supply option ids? Or should we `querySelector` by `value`? -->
+      <custom-select id="component" name="my-option" value="7">
+        <li data-value="" disabled>Select Something</li>
+        <li data-value="100">1</li>
+        <li>2</li>
+        <li>3</li>
+        <li>4</li>
+        <li>5</li>
+        <li>6</li>
+        <li>7</li>
+        <li>8</li>
+        <li>9</li>
+        <li>10</li>
+      </custom-select>
+
+      <button type="submit">Submit</button>
+    </form>
+
+    <!-- Use this to make sure we don't accidentally scroll user during combobox interaction -->
+    <div style="height: 110vh; background-color: red">Test for Scrolling</div>
+
+    <script src="./build/CustomSelect.js"></script>
+    <style>
+      custom-select {
+        width: 250px;
+      }
+    </style>
+  </body>
+</html>

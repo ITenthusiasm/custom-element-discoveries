@@ -1,9 +1,12 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "module": "NodeNext",
+    // "module": "NodeNext",
+    "module": "CommonJS",
     "moduleResolution": "NodeNext",
     "strict": true,
+    "allowJs": true,
+    "checkJs": true,
     "outDir": "build",
     "declaration": true,
     "esModuleInterop": true,
