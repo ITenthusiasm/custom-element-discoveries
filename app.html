@@ -33,8 +33,9 @@
     <div style="height: 110vh; background-color: red">Test for Scrolling</div>
 
     <script src="./build/CustomSelect.js"></script>
-    <script src="./build/ComboboxContainer.js"></script>
+    <!-- Note: `ComboboxSingle` MUST come first -->
     <script src="./build/ComboboxSingle.js"></script>
+    <script src="./build/ComboboxContainer.js"></script>
     <style>
       :is(custom-select, combobox-container) {
         width: 250px;

@@ -9,6 +9,7 @@ const localAttrs = Object.freeze({
 
 class ComboboxContainer extends HTMLElement {
   // Internals
+  #mounted = false;
   /** The ID used as a base for the IDs of all important elements belonging to the `ComboboxContainer` */
   #baseId?: string; // TODO: Do we want to use this? Also improve JSDoc. Or we can create a custom `root-id` attribute.
 
@@ -21,56 +22,64 @@ class ComboboxContainer extends HTMLElement {
     // Note: If we generated unique IDs, we wouldn't need this check. We can address this later.
     if (!this.id) throw new TypeError("An `id` attribute is required for `custom-select` for accessibility purposes.");
 
-    /* -------------------- Setup Elements -------------------- */
-    // Root Element
-    this.setAttribute("role", "none");
-
-    // Combobox
-    // TODO: We need to figure out how to properly transfer the valid `name` to the `combobox`
     this.#combobox = document.createElement("combobox-single") as ComboboxSingle;
-    this.#combobox.setAttribute("id", `${this.id}-combobox`);
-    this.#combobox.setAttribute("aria-controls", `${this.id}-listbox`);
-
-    // Listbox
     this.#listbox = document.createElement("ul");
-    this.#listbox.setAttribute("id", `${this.id}-listbox`);
-    this.#listbox.setAttribute("role", "listbox");
-    this.#listbox.setAttribute("hidden", "");
-
-    /* -------------------- Render Elements -------------------- */
-    // Setup Children (Aggressively)
-    while (this.childNodes.length > 0) {
-      const node = this.childNodes[0];
-
-      // Only Allow Valid Elements | TODO: Require "valid `ComboboxOption` elements"
-      if (!(node instanceof HTMLElement)) {
-        node.remove();
-        continue;
-      }
-
-      this.#listbox.appendChild(node);
-
-      /*
-       * TODO: We should take "Option Requirements" from
-       * https://developer.mozilla.org/en-US/docs/Web/API/HTMLOptionElement
-       */
-      // TODO: If we use a custom element, can we just do node.value?
-      const optionValue = node.getAttribute(localAttrs.value) ?? (node.textContent as string);
-      node.setAttribute("id", `${this.#listbox.id}-option-${optionValue}`);
-      node.setAttribute("role", "option");
-      node.setAttribute("aria-selected", String(false));
-    }
-
-    // Setup Primary Elements
-    this.appendChild(this.#listbox);
-    this.#listbox.insertAdjacentElement("beforebegin", this.#combobox);
   }
 
   // "On Mount" for Custom Elements
   connectedCallback() {
     if (!this.isConnected) return;
 
-    // Setup Event Listeners
+    if (!this.#mounted) {
+      /* -------------------- Setup Elements -------------------- */
+      // Root Element
+      this.setAttribute("role", "none");
+
+      // Combobox
+      // TODO: We need to figure out how to properly transfer the valid `name` to the `combobox`
+      this.#combobox.setAttribute("id", `${this.id}-combobox`);
+      this.#combobox.setAttribute("aria-controls", `${this.id}-listbox`);
+
+      // Listbox
+      this.#listbox.setAttribute("id", `${this.id}-listbox`);
+      this.#listbox.setAttribute("role", "listbox");
+      this.#listbox.setAttribute("hidden", "");
+
+      /* -------------------- Render Elements -------------------- */
+      // Setup Children (Aggressively)
+      while (this.childNodes.length > 0) {
+        const node = this.childNodes[0];
+
+        // Only Allow Valid Elements | TODO: Require "valid `ComboboxOption` elements"
+        if (!(node instanceof HTMLElement)) {
+          node.remove();
+          continue;
+        }
+
+        this.#listbox.appendChild(node);
+
+        /*
+         * TODO: We should take "Option Requirements" from
+         * https://developer.mozilla.org/en-US/docs/Web/API/HTMLOptionElement
+         */
+        // TODO: If we use a custom element, can we just do node.value?
+        const optionValue = node.getAttribute(localAttrs.value) ?? (node.textContent as string);
+        node.setAttribute("id", `${this.#listbox.id}-option-${optionValue}`);
+        node.setAttribute("role", "option");
+        node.setAttribute("aria-selected", String(false));
+      }
+
+      // Setup Primary Elements
+      this.appendChild(this.#listbox);
+      this.#listbox.insertAdjacentElement("beforebegin", this.#combobox);
+
+      // Initialize Data
+      this.#combobox.value = this.getAttribute("value") ?? "";
+      this.removeAttribute("value");
+      this.#mounted = true;
+    }
+
+    /* -------------------- Setup Event Listeners -------------------- */
     this.#listbox.addEventListener("mouseover", handleDelegatedOptionHover);
     this.#listbox.addEventListener("click", handleDelegatedOptionClick);
     this.addEventListener("mousedown", handleDelegatedMousedown);
@@ -86,13 +95,6 @@ class ComboboxContainer extends HTMLElement {
 
 // export default ComboboxContainer; // For anyone using ES Modules
 customElements.define("combobox-container", ComboboxContainer); // For anyone NOT using ES Modules
-
-customElements.whenDefined("combobox-single").then(console.log);
-customElements.whenDefined("combobox-single").then(() => {
-  const box = document.createElement("combobox-single") as ComboboxSingle;
-  console.log(box.value);
-});
-customElements.whenDefined("combobox-container").then(console.log);
 
 /* -------------------- Listbox Handlers -------------------- */
 function handleDelegatedOptionHover(event: MouseEvent): void {

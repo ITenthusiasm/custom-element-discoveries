@@ -12,6 +12,7 @@ class ComboboxSingle extends HTMLElement implements Pick<ElementInternals, Expos
   static formAssociated = true;
 
   // Internals
+  #mounted = false;
   #internals: ElementInternals;
   #searchString = "";
   #searchTimeout: number | undefined;
@@ -27,19 +28,6 @@ class ComboboxSingle extends HTMLElement implements Pick<ElementInternals, Expos
   constructor() {
     super();
     this.#internals = this.attachInternals();
-
-    /* -------------------- Initialize Element + Data -------------------- */
-    // Combobox
-    this.setAttribute("role", "combobox");
-    this.setAttribute("tabindex", String(0));
-    this.setAttribute("aria-haspopup", "listbox");
-    this.setAttribute(attrs["aria-expanded"], String(false));
-    this.setAttribute(attrs["aria-activedescendant"], "");
-    this.insertAdjacentText("afterbegin", "");
-
-    this.value = this.getAttribute("value") ?? "";
-
-    // Observers
     this.#expansionObserver = new MutationObserver(watchExpansion);
     this.#activeOptionObserver = new MutationObserver(watchActiveDescendant);
   }
@@ -47,6 +35,18 @@ class ComboboxSingle extends HTMLElement implements Pick<ElementInternals, Expos
   // "On Mount" for Custom Elements
   connectedCallback() {
     if (!this.isConnected) return;
+
+    if (!this.#mounted) {
+      // Setup Attributes
+      this.setAttribute("role", "combobox");
+      this.setAttribute("tabindex", String(0));
+      this.setAttribute("aria-haspopup", "listbox");
+      this.setAttribute(attrs["aria-expanded"], String(false));
+      this.setAttribute(attrs["aria-activedescendant"], "");
+      this.insertAdjacentText("afterbegin", "");
+
+      this.#mounted = true;
+    }
 
     // Require a Corresponding `listbox`
     const expectedListbox = this.nextElementSibling;
