@@ -1,5 +1,4 @@
-/** The attributes _commonly_ used by the `CustomSelect` component. (These are declared to help avoid typos.) */
-const attrs = {
+const oldAttrs = {
   "aria-activedescendant": "aria-activedescendant",
   "aria-expanded": "aria-expanded",
   "aria-selected": "aria-selected",
@@ -46,8 +45,8 @@ class CustomSelect extends HTMLElement {
     this.#combobox.setAttribute("tabindex", String(0));
     this.#combobox.setAttribute("aria-haspopup", "listbox");
     this.#combobox.setAttribute("aria-controls", `${this.id}-listbox`);
-    this.#combobox.setAttribute(attrs["aria-expanded"], String(false));
-    this.#combobox.setAttribute(attrs["aria-activedescendant"], "");
+    this.#combobox.setAttribute(oldAttrs["aria-expanded"], String(false));
+    this.#combobox.setAttribute(oldAttrs["aria-activedescendant"], "");
     this.#combobox.appendChild(document.createTextNode(""));
 
     this.#listbox = document.createElement("ul");
@@ -71,7 +70,7 @@ class CustomSelect extends HTMLElement {
     slot.assignedNodes().forEach((option) => {
       if (!(option instanceof HTMLElement)) return option.parentNode?.removeChild(option); // Only allow valid elements
 
-      const optionValue = option.getAttribute(attrs["data-value"]) ?? (option.textContent as string);
+      const optionValue = option.getAttribute(oldAttrs["data-value"]) ?? (option.textContent as string);
       option.setAttribute("id", `${this.id}-option-${optionValue}`);
       option.setAttribute("role", "option");
       option.setAttribute("aria-selected", String(false));
@@ -80,8 +79,8 @@ class CustomSelect extends HTMLElement {
     this.value = this.getAttribute("value") ?? "";
 
     // TODO: Figure out how to handle our observers
-    this.#expansionObserver = new MutationObserver(watchExpansion);
-    this.#activeOptionObserver = new MutationObserver(watchActiveDescendant);
+    this.#expansionObserver = new MutationObserver(watchExpansionOld);
+    this.#activeOptionObserver = new MutationObserver(watchActiveDescendantOld);
   }
 
   // "On Mount" for Custom Elements
@@ -95,20 +94,20 @@ class CustomSelect extends HTMLElement {
     this.#combobox.setAttribute("aria-labelledby", labels.map(({ id }) => id).join(""));
 
     // Setup Mutation Observers
-    this.#expansionObserver.observe(this.#combobox, { attributes: true, attributeFilter: [attrs["aria-expanded"]] });
+    this.#expansionObserver.observe(this.#combobox, { attributes: true, attributeFilter: [oldAttrs["aria-expanded"]] });
     this.#activeOptionObserver.observe(this.#combobox, {
       attributes: true,
-      attributeFilter: [attrs["aria-activedescendant"]],
+      attributeFilter: [oldAttrs["aria-activedescendant"]],
       attributeOldValue: true,
     });
 
     // Setup Event Listeners
-    this.#combobox.addEventListener("click", handleComboboxClick);
-    this.#combobox.addEventListener("blur", handleComboboxBlur);
-    this.#combobox.addEventListener("keydown", handleComboboxKeydown);
+    this.#combobox.addEventListener("click", handleOldComboboxClick);
+    this.#combobox.addEventListener("blur", handleOldComboboxBlur);
+    this.#combobox.addEventListener("keydown", handleOldComboboxKeydown);
 
-    this.#listbox.addEventListener("mouseover", handleDelegatedOptionHover);
-    this.#listbox.addEventListener("click", handleDelegatedOptionClick);
+    this.#listbox.addEventListener("mouseover", handleOldDelegatedOptionHover);
+    this.#listbox.addEventListener("click", handleOldDelegatedOptionClick);
   }
 
   // "On Unmount" for Custom Elements
@@ -116,12 +115,12 @@ class CustomSelect extends HTMLElement {
     this.#expansionObserver.disconnect();
     this.#activeOptionObserver.disconnect();
 
-    this.#combobox.removeEventListener("click", handleComboboxClick);
-    this.#combobox.removeEventListener("blur", handleComboboxBlur);
-    this.#combobox.removeEventListener("keydown", handleComboboxKeydown);
+    this.#combobox.removeEventListener("click", handleOldComboboxClick);
+    this.#combobox.removeEventListener("blur", handleOldComboboxBlur);
+    this.#combobox.removeEventListener("keydown", handleOldComboboxKeydown);
 
-    this.#listbox.removeEventListener("mouseover", handleDelegatedOptionHover);
-    this.#listbox.removeEventListener("click", handleDelegatedOptionClick);
+    this.#listbox.removeEventListener("mouseover", handleOldDelegatedOptionHover);
+    this.#listbox.removeEventListener("click", handleOldDelegatedOptionClick);
   }
 
   /** Retrieves the Custom Element's internal value (`this.#value`). */
@@ -135,7 +134,7 @@ class CustomSelect extends HTMLElement {
 
     // Unselect previous option
     const { host } = this.#combobox.getRootNode() as ShadowRoot;
-    host.querySelector(`[${attrs["aria-selected"]}="${true}"]`)?.removeAttribute(attrs["aria-selected"]);
+    host.querySelector(`[${oldAttrs["aria-selected"]}="${true}"]`)?.removeAttribute(oldAttrs["aria-selected"]);
 
     // Operate on new option
     const selectedOption = document.getElementById(`${this.id}-option-${v}`);
@@ -150,9 +149,9 @@ class CustomSelect extends HTMLElement {
 
     this.#value = v;
     this.#internals.setFormValue(this.#value);
-    selectedOption.setAttribute(attrs["aria-selected"], String(true));
+    selectedOption.setAttribute(oldAttrs["aria-selected"], String(true));
     this.#combobox.childNodes[0].textContent =
-      selectedOption.getAttribute(attrs["aria-label"]) ?? selectedOption.textContent;
+      selectedOption.getAttribute(oldAttrs["aria-label"]) ?? selectedOption.textContent;
   }
 
   // Note: This getter SHOULD NOT be used within the class
@@ -180,78 +179,78 @@ class CustomSelect extends HTMLElement {
 customElements.define("custom-select", CustomSelect); // For anyone NOT using ES Modules
 
 /* -------------------- Combobox Handlers -------------------- */
-function handleComboboxClick(event: MouseEvent): void {
+function handleOldComboboxClick(event: MouseEvent): void {
   const combobox = event.target as HTMLButtonElement;
   const expanded = combobox.getAttribute("aria-expanded") === String(true);
-  combobox.setAttribute(attrs["aria-expanded"], String(!expanded));
+  combobox.setAttribute(oldAttrs["aria-expanded"], String(!expanded));
 }
 
-function handleComboboxBlur(event: FocusEvent): void {
+function handleOldComboboxBlur(event: FocusEvent): void {
   const combobox = event.target as HTMLButtonElement;
-  combobox.setAttribute(attrs["aria-expanded"], String(false));
+  combobox.setAttribute(oldAttrs["aria-expanded"], String(false));
 }
 
 // TODO: How to handle the `CustomSelect` component being disabled?
-function handleComboboxKeydown(event: KeyboardEvent): void {
+function handleOldComboboxKeydown(event: KeyboardEvent): void {
   const combobox = event.target as HTMLButtonElement;
   const host = (combobox.getRootNode() as ShadowRoot).host as CustomSelect;
   const activeOption = host.querySelector<HTMLElement>("[data-active='true']");
 
   if (event.altKey && event.key === "ArrowDown") {
     event.preventDefault(); // Don't scroll
-    return setAttributeFor(combobox, attrs["aria-expanded"], String(true));
+    return setAttributeFor(combobox, oldAttrs["aria-expanded"], String(true));
   }
 
   if (event.key === "ArrowDown") {
     event.preventDefault(); // Don't scroll
-    if (combobox.getAttribute(attrs["aria-expanded"]) !== String(true)) {
-      return combobox.setAttribute(attrs["aria-expanded"], String(true));
+    if (combobox.getAttribute(oldAttrs["aria-expanded"]) !== String(true)) {
+      return combobox.setAttribute(oldAttrs["aria-expanded"], String(true));
     }
 
     const nextActiveOption = activeOption?.nextElementSibling;
-    if (nextActiveOption) combobox.setAttribute(attrs["aria-activedescendant"], nextActiveOption.id);
+    if (nextActiveOption) combobox.setAttribute(oldAttrs["aria-activedescendant"], nextActiveOption.id);
     return;
   }
 
   if (event.key === "End") {
     event.preventDefault(); // Don't scroll
-    setAttributeFor(combobox, attrs["aria-expanded"], String(true));
-    setAttributeFor(combobox, attrs["aria-activedescendant"], host.lastElementChild?.id as string);
+    setAttributeFor(combobox, oldAttrs["aria-expanded"], String(true));
+    setAttributeFor(combobox, oldAttrs["aria-activedescendant"], host.lastElementChild?.id as string);
     return;
   }
 
   if ((event.altKey && event.key === "ArrowUp") || event.key === "Escape") {
     event.preventDefault(); // Don't scroll
-    return setAttributeFor(combobox, attrs["aria-expanded"], String(false));
+    return setAttributeFor(combobox, oldAttrs["aria-expanded"], String(false));
   }
 
   if (event.key === "ArrowUp") {
     event.preventDefault(); // Don't scroll
-    if (combobox.getAttribute(attrs["aria-expanded"]) !== String(true)) {
-      return combobox.setAttribute(attrs["aria-expanded"], String(true));
+    if (combobox.getAttribute(oldAttrs["aria-expanded"]) !== String(true)) {
+      return combobox.setAttribute(oldAttrs["aria-expanded"], String(true));
     }
 
     const nextActiveOption = activeOption?.previousElementSibling;
-    if (nextActiveOption) combobox.setAttribute(attrs["aria-activedescendant"], nextActiveOption.id);
+    if (nextActiveOption) combobox.setAttribute(oldAttrs["aria-activedescendant"], nextActiveOption.id);
     return;
   }
 
   if (event.key === "Home") {
     event.preventDefault(); // Don't scroll
-    setAttributeFor(combobox, attrs["aria-expanded"], String(true));
-    setAttributeFor(combobox, attrs["aria-activedescendant"], host.firstElementChild?.id as string);
+    setAttributeFor(combobox, oldAttrs["aria-expanded"], String(true));
+    setAttributeFor(combobox, oldAttrs["aria-activedescendant"], host.firstElementChild?.id as string);
     return;
   }
 
   if (event.key === "Tab") {
-    if (combobox.getAttribute(attrs["aria-expanded"]) === String(true)) return activeOption?.click();
+    if (combobox.getAttribute(oldAttrs["aria-expanded"]) === String(true)) return activeOption?.click();
     return;
   }
 
   if (event.key === " ") {
     event.preventDefault(); // Don't scroll
-    if (combobox.getAttribute(attrs["aria-expanded"]) === String(true)) return activeOption?.click();
-    return combobox.setAttribute(attrs["aria-expanded"], String(true));
+    if (combobox.getAttribute(oldAttrs["aria-expanded"]) === String(true)) return activeOption?.click();
+    return combobox.setAttribute(oldAttrs["aria-expanded"], String(true));
   }
 
   /*
@@ -262,7 +261,7 @@ function handleComboboxKeydown(event: KeyboardEvent): void {
    * in their `FormData`, which is rare).
    */
   if (event.key === "Enter") {
-    if (combobox.getAttribute(attrs["aria-expanded"]) === String(true)) return activeOption?.click();
+    if (combobox.getAttribute(oldAttrs["aria-expanded"]) === String(true)) return activeOption?.click();
     return host.form?.requestSubmit();
   }
 
@@ -272,70 +271,67 @@ function handleComboboxKeydown(event: KeyboardEvent): void {
   }
 }
 
-let searchString = "";
-let searchTimeout: number | undefined;
-
 /* -------------------- Combobox Mutation Observer Details -------------------- */
-function watchExpansion(mutations: MutationRecord[]): void {
-  mutations.forEach(handleExpansionChange);
+function watchExpansionOld(mutations: MutationRecord[]): void {
+  mutations.forEach(handleOldExpansionChange);
 }
 
-function handleExpansionChange(mutation: MutationRecord): void {
+function handleOldExpansionChange(mutation: MutationRecord): void {
   const combobox = mutation.target as HTMLButtonElement;
   const listbox = combobox.nextElementSibling as HTMLUListElement;
   const { host } = combobox.getRootNode() as ShadowRoot;
-  const expanded = combobox.getAttribute(attrs["aria-expanded"]) === String(true);
+  const expanded = combobox.getAttribute(oldAttrs["aria-expanded"]) === String(true);
 
   // Open Combobox
   if (expanded) {
     listbox.removeAttribute("hidden");
     const activeOption = host.querySelector("[aria-selected='true']") ?? (host.firstElementChild as HTMLElement);
-    combobox.setAttribute(attrs["aria-activedescendant"], activeOption.id);
+    combobox.setAttribute(oldAttrs["aria-activedescendant"], activeOption.id);
   }
   // Close Combobox
   else {
     listbox.setAttribute("hidden", "");
-    combobox.setAttribute(attrs["aria-activedescendant"], "");
+    combobox.setAttribute(oldAttrs["aria-activedescendant"], "");
   }
 }
 
-function watchActiveDescendant(mutations: MutationRecord[]): void {
-  mutations.forEach(handleActiveDescendantChange);
+function watchActiveDescendantOld(mutations: MutationRecord[]): void {
+  mutations.forEach(handleOldActiveDescendantChange);
 }
 
-function handleActiveDescendantChange(mutation: MutationRecord): void {
+function handleOldActiveDescendantChange(mutation: MutationRecord): void {
   const combobox = mutation.target as HTMLButtonElement;
 
   const lastOptionId = mutation.oldValue;
   const lastOption = lastOptionId ? document.getElementById(lastOptionId) : null;
   lastOption?.removeAttribute("data-active");
 
-  const activeOptionId = combobox.getAttribute(attrs["aria-activedescendant"]) as string;
+  const activeOptionId = combobox.getAttribute(oldAttrs["aria-activedescendant"]) as string;
   const activeOption = document.getElementById(activeOptionId);
   activeOption?.setAttribute("data-active", String(true));
 }
 
 /* -------------------- Listbox Handlers -------------------- */
-function handleDelegatedOptionHover(event: MouseEvent): void {
+function handleOldDelegatedOptionHover(event: MouseEvent): void {
   const listbox = event.currentTarget as HTMLUListElement;
   const option = event.target as HTMLElement;
   if (option === listbox) return; // We hovered the `listbox`, not an `option`
 
   const combobox = listbox.previousElementSibling as HTMLButtonElement;
-  setAttributeFor(combobox, attrs["aria-activedescendant"], option.id);
+  setAttributeFor(combobox, oldAttrs["aria-activedescendant"], option.id);
 }
 
-function handleDelegatedOptionClick(event: MouseEvent): void {
+function handleOldDelegatedOptionClick(event: MouseEvent): void {
   const listbox = event.currentTarget as HTMLUListElement;
   const option = event.target as HTMLElement;
   if (option === listbox) return; // We clicked the `listbox`, not an `option`
   if (option.hasAttribute("aria-disabled")) return;
 
   const { host } = listbox.getRootNode() as ShadowRoot;
-  (host as CustomSelect).value = option.getAttribute(attrs["data-value"]) ?? (option.textContent as string);
+  (host as CustomSelect).value = option.getAttribute(oldAttrs["data-value"]) ?? (option.textContent as string);
 
   const combobox = listbox.previousElementSibling as HTMLButtonElement;
-  combobox.setAttribute(attrs["aria-expanded"], String(false));
+  combobox.setAttribute(oldAttrs["aria-expanded"], String(false));
 }
 
 /*
@@ -343,24 +339,3 @@ function handleDelegatedOptionClick(event: MouseEvent): void {
  * If we do this, we'd have to avoid causing an infinite loop though.
  */
 // TODO: Would adjusting scroll during `aria-activedescendant` updates be easier if we used `box-sizing: content-box`?
-
-/* -------------------- Local Helpers -------------------- */
-/**
- * Sets the `attribute` of an `element` to the specified `value` _if_ the element's attribute
- * did not already have that value
- */
-function setAttributeFor(element: HTMLElement, attribute: string, value: string): void {
-  if (element.getAttribute(attribute) === value) return;
-  element.setAttribute(attribute, value);
-}
-
-/* -------------------- DELETE THESE LINES -------------------- */
-document.querySelector("custom-select")?.addEventListener("click", console.log); // eslint-disable-line no-console
-document.querySelector("form")?.addEventListener("submit", handleSubmit);
-
-function handleSubmit(event: SubmitEvent) {
-  event.preventDefault();
-  const form = event.currentTarget as HTMLFormElement;
-  console.log(Object.fromEntries(new FormData(form))); // eslint-disable-line no-console
-  console.log(event); // eslint-disable-line no-console
-}

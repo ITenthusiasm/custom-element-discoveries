@@ -3,15 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <title>Testing Custom Select</title>
+    <link rel="stylesheet" href="./src/Combobox.css" />
   </head>
 
   <body>
-    <form>
-      <label for="component">Options</label>
+    <form id="my-form">
+      <label for="component-combobox">Options</label>
       <!-- TODO: Can we automatically supply option ids? Or should we `querySelector` by `value`? -->
-      <custom-select id="component" name="my-option" value="7">
-        <li data-value="" disabled>Select Something</li>
-        <li data-value="100">1</li>
+      <!-- <custom-select id="component" name="my-name" value="7"> -->
+      <combobox-container id="component" name="my-option" value="7">
+        <li value="" disabled>Select Something</li>
+        <li value="100">1</li>
         <li>2</li>
         <li>3</li>
         <li>4</li>
@@ -21,7 +23,8 @@
         <li>8</li>
         <li>9</li>
         <li>10</li>
-      </custom-select>
+      </combobox-container>
+      <!-- </custom-select> -->
 
       <button type="submit">Submit</button>
     </form>
@@ -30,8 +33,10 @@
     <div style="height: 110vh; background-color: red">Test for Scrolling</div>
 
     <script src="./build/CustomSelect.js"></script>
+    <script src="./build/ComboboxContainer.js"></script>
+    <script src="./build/ComboboxSingle.js"></script>
     <style>
-      custom-select {
+      :is(custom-select, combobox-container) {
         width: 250px;
       }
     </style>
