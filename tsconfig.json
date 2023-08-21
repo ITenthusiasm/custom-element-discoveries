@@ -1,19 +1,26 @@
 {
   "compilerOptions": {
     "target": "ES2020",
+    "module": "ESNext",
     // "module": "NodeNext",
-    "module": "CommonJS",
-    "moduleResolution": "NodeNext",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+
     "strict": true,
     "allowJs": true,
     "checkJs": true,
-    "outDir": "build",
-    "declaration": true,
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
     "skipLibCheck": false,
-    "jsx": "react-jsx" // For Testing Only (currently)
+
+    /* Bundler Mode */
+    "moduleResolution": "bundler",
+    // "moduleResolution": "NodeNext",
+
+    "noEmit": true,
+    "isolatedModules": true,
+    // "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "useDefineForClassFields": true,
+    "allowImportingTsExtensions": true,
+    "forceConsistentCasingInFileNames": true
   },
-  // Technically speaking, a Jest config wouldn't be in a production build
-  "include": ["src/**/*", "jest.config.ts"]
+  "include": ["src"]
 }

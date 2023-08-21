@@ -1,5 +1,7 @@
+import type ComboboxSingle from "./ComboboxSingle";
+
 /** The attributes _commonly_ used by the `CustomSelect` component. (These are declared to help avoid typos.) */
-const localAttrs = Object.freeze({
+export const attrs = Object.freeze({
   "aria-activedescendant": "aria-activedescendant",
   "aria-expanded": "aria-expanded",
   "aria-selected": "aria-selected",
@@ -63,7 +65,7 @@ class ComboboxContainer extends HTMLElement {
          * https://developer.mozilla.org/en-US/docs/Web/API/HTMLOptionElement
          */
         // TODO: If we use a custom element, can we just do node.value?
-        const optionValue = node.getAttribute(localAttrs.value) ?? (node.textContent as string);
+        const optionValue = node.getAttribute(attrs.value) ?? (node.textContent as string);
         node.setAttribute("id", `${this.#listbox.id}-option-${optionValue}`);
         node.setAttribute("role", "option");
         node.setAttribute("aria-selected", String(false));
@@ -93,9 +95,6 @@ class ComboboxContainer extends HTMLElement {
   }
 }
 
-// export default ComboboxContainer; // For anyone using ES Modules
-customElements.define("combobox-container", ComboboxContainer); // For anyone NOT using ES Modules
-
 /* -------------------- Listbox Handlers -------------------- */
 function handleDelegatedOptionHover(event: MouseEvent): void {
   const listbox = event.currentTarget as HTMLUListElement;
@@ -103,7 +102,7 @@ function handleDelegatedOptionHover(event: MouseEvent): void {
   if (option === listbox) return; // We hovered the `listbox`, not an `option`
 
   const combobox = listbox.previousElementSibling as ComboboxSingle;
-  setAttributeFor(combobox, localAttrs["aria-activedescendant"], option.id);
+  setAttributeFor(combobox, attrs["aria-activedescendant"], option.id);
 }
 
 function handleDelegatedOptionClick(event: MouseEvent): void {
@@ -113,8 +112,8 @@ function handleDelegatedOptionClick(event: MouseEvent): void {
   if (option.hasAttribute("aria-disabled")) return;
 
   const combobox = listbox.previousElementSibling as ComboboxSingle;
-  combobox.value = option.getAttribute(localAttrs.value) ?? (option.textContent as string);
-  combobox.setAttribute(localAttrs["aria-expanded"], String(false));
+  combobox.value = option.getAttribute(attrs.value) ?? (option.textContent as string);
+  combobox.setAttribute(attrs["aria-expanded"], String(false));
 }
 
 /* -------------------- Container Handlers -------------------- */
@@ -129,12 +128,14 @@ function handleDelegatedMousedown(event: MouseEvent): void {
  * EDIT: Frankly, this is probably too much work.
  */
 
-/* -------------------- DELETE THESE LINES -------------------- */
-document.querySelector("form")?.addEventListener("submit", handleSubmit);
-
-function handleSubmit(event: SubmitEvent) {
-  event.preventDefault();
-  const form = event.currentTarget as HTMLFormElement;
-  console.log(Object.fromEntries(new FormData(form))); // eslint-disable-line no-console
-  console.log(event); // eslint-disable-line no-console
+/* -------------------- Local Helpers -------------------- */
+/**
+ * Sets the `attribute` of an `element` to the specified `value` _if_ the element's attribute
+ * did not already have that value. Used to avoid redundantly triggering `MutationObserver`s.
+ */
+export function setAttributeFor(element: HTMLElement, attribute: string, value: string): void {
+  if (element.getAttribute(attribute) === value) return;
+  element.setAttribute(attribute, value);
 }
+
+export default ComboboxContainer;

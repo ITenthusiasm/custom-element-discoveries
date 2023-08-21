@@ -1,11 +1,4 @@
-/** The attributes _commonly_ used by the `Combobox` component. (These are declared to help avoid typos.) */
-const attrs = Object.freeze({
-  "aria-activedescendant": "aria-activedescendant",
-  "aria-expanded": "aria-expanded",
-  "aria-selected": "aria-selected",
-  "aria-label": "aria-label",
-  value: "value",
-});
+import { attrs, setAttributeFor } from "./ComboboxContainer";
 
 type ExposedInternals = keyof Pick<ElementInternals, "labels" | "form" | "validity" | "validationMessage">;
 class ComboboxSingle extends HTMLElement implements Pick<ElementInternals, ExposedInternals> {
@@ -131,9 +124,6 @@ class ComboboxSingle extends HTMLElement implements Pick<ElementInternals, Expos
     return this.#internals.validationMessage;
   }
 }
-
-// export default CustomSingle; // For anyone using ES Modules
-customElements.define("combobox-single", ComboboxSingle); // For anyone NOT using ES Modules
 
 /* -------------------- Combobox Handlers -------------------- */
 function handleComboboxClick(event: MouseEvent): void {
@@ -274,12 +264,4 @@ function handleActiveDescendantChange(mutation: MutationRecord): void {
   activeOption?.setAttribute("data-active", String(true));
 }
 
-/* -------------------- Local Helpers -------------------- */
-/**
- * Sets the `attribute` of an `element` to the specified `value` _if_ the element's attribute
- * did not already have that value. Used to avoid redundantly triggering `MutationObserver`s.
- */
-function setAttributeFor(element: HTMLElement, attribute: string, value: string): void {
-  if (element.getAttribute(attribute) === value) return;
-  element.setAttribute(attribute, value);
-}
+export default ComboboxSingle;

@@ -175,9 +175,6 @@ class CustomSelect extends HTMLElement {
   }
 }
 
-// export default CustomSelect; // For anyone using ES Modules
-customElements.define("custom-select", CustomSelect); // For anyone NOT using ES Modules
-
 /* -------------------- Combobox Handlers -------------------- */
 function handleOldComboboxClick(event: MouseEvent): void {
   const combobox = event.target as HTMLButtonElement;
@@ -198,7 +195,7 @@ function handleOldComboboxKeydown(event: KeyboardEvent): void {
 
   if (event.altKey && event.key === "ArrowDown") {
     event.preventDefault(); // Don't scroll
-    return setAttributeFor(combobox, oldAttrs["aria-expanded"], String(true));
+    return oldSetAttributeFor(combobox, oldAttrs["aria-expanded"], String(true));
   }
 
   if (event.key === "ArrowDown") {
@@ -214,14 +211,14 @@ function handleOldComboboxKeydown(event: KeyboardEvent): void {
 
   if (event.key === "End") {
     event.preventDefault(); // Don't scroll
-    setAttributeFor(combobox, oldAttrs["aria-expanded"], String(true));
-    setAttributeFor(combobox, oldAttrs["aria-activedescendant"], host.lastElementChild?.id as string);
+    oldSetAttributeFor(combobox, oldAttrs["aria-expanded"], String(true));
+    oldSetAttributeFor(combobox, oldAttrs["aria-activedescendant"], host.lastElementChild?.id as string);
     return;
   }
 
   if ((event.altKey && event.key === "ArrowUp") || event.key === "Escape") {
     event.preventDefault(); // Don't scroll
-    return setAttributeFor(combobox, oldAttrs["aria-expanded"], String(false));
+    return oldSetAttributeFor(combobox, oldAttrs["aria-expanded"], String(false));
   }
 
   if (event.key === "ArrowUp") {
@@ -237,8 +234,8 @@ function handleOldComboboxKeydown(event: KeyboardEvent): void {
 
   if (event.key === "Home") {
     event.preventDefault(); // Don't scroll
-    setAttributeFor(combobox, oldAttrs["aria-expanded"], String(true));
-    setAttributeFor(combobox, oldAttrs["aria-activedescendant"], host.firstElementChild?.id as string);
+    oldSetAttributeFor(combobox, oldAttrs["aria-expanded"], String(true));
+    oldSetAttributeFor(combobox, oldAttrs["aria-activedescendant"], host.firstElementChild?.id as string);
     return;
   }
 
@@ -318,7 +315,7 @@ function handleOldDelegatedOptionHover(event: MouseEvent): void {
   if (option === listbox) return; // We hovered the `listbox`, not an `option`
 
   const combobox = listbox.previousElementSibling as HTMLButtonElement;
-  setAttributeFor(combobox, oldAttrs["aria-activedescendant"], option.id);
+  oldSetAttributeFor(combobox, oldAttrs["aria-activedescendant"], option.id);
 }
 
 function handleOldDelegatedOptionClick(event: MouseEvent): void {
@@ -339,3 +336,15 @@ function handleOldDelegatedOptionClick(event: MouseEvent): void {
  * If we do this, we'd have to avoid causing an infinite loop though.
  */
 // TODO: Would adjusting scroll during `aria-activedescendant` updates be easier if we used `box-sizing: content-box`?
+
+/* -------------------- Local Helpers -------------------- */
+/**
+ * Sets the `attribute` of an `element` to the specified `value` _if_ the element's attribute
+ * did not already have that value. Used to avoid redundantly triggering `MutationObserver`s.
+ */
+function oldSetAttributeFor(element: HTMLElement, attribute: string, value: string): void {
+  if (element.getAttribute(attribute) === value) return;
+  element.setAttribute(attribute, value);
+}
+
+export default CustomSelect;
