@@ -1,6 +1,6 @@
 import type ComboboxSingle from "./ComboboxSingle";
 
-/** The attributes _commonly_ used by the `CustomSelect` component. (These are declared to help avoid typos.) */
+/** The attributes _commonly_ used by the `Combobox` component. (These are declared to help avoid typos.) */
 export const attrs = Object.freeze({
   "aria-activedescendant": "aria-activedescendant",
   "aria-expanded": "aria-expanded",
@@ -21,8 +21,6 @@ class ComboboxContainer extends HTMLElement {
 
   constructor() {
     super();
-    // Note: If we generated unique IDs, we wouldn't need this check. We can address this later.
-    if (!this.id) throw new TypeError("An `id` attribute is required for `custom-select` for accessibility purposes.");
 
     this.#combobox = document.createElement("combobox-single") as ComboboxSingle;
     this.#listbox = document.createElement("ul");
@@ -34,6 +32,9 @@ class ComboboxContainer extends HTMLElement {
 
     if (!this.#mounted) {
       /* -------------------- Setup Elements -------------------- */
+      // Note: If we generated unique IDs, we wouldn't need this check. We can address this later.
+      if (!this.id) throw new TypeError("An `id` attribute is required for accessibility purposes.");
+
       // Root Element
       this.setAttribute("role", "none");
 
@@ -76,7 +77,8 @@ class ComboboxContainer extends HTMLElement {
       this.#listbox.insertAdjacentElement("beforebegin", this.#combobox);
 
       // Initialize Data
-      this.#combobox.value = this.getAttribute("value") ?? "";
+      // TODO: Need a cleaner way to get default value. (Explicit, then first child VALUE (not text), then "".)
+      this.#combobox.value = (this.getAttribute("value") || this.#listbox.firstElementChild.textContent) ?? "";
       this.removeAttribute("value");
       this.#mounted = true;
     }

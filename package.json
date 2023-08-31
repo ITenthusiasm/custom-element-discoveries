@@ -12,6 +12,7 @@
     "format": "prettier --ignore-path .gitignore --write ."
   },
   "devDependencies": {
+    "@playwright/test": "^1.37.1",
     "@typescript-eslint/eslint-plugin": "^6.4.1",
     "@typescript-eslint/parser": "^6.4.1",
     "eslint": "^8.47.0",
@@ -19,6 +20,7 @@
     "eslint-config-prettier": "^9.0.0",
     "eslint-plugin-testing-library": "^6.0.0",
     "prettier": "^3.0.2",
+    "sass": "^1.66.1",
     "typescript": "^5.1.6",
     "vite": "^4.4.9"
   },

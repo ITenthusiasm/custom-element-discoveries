@@ -4,7 +4,7 @@ import ComboboxContainer from "./Combobox/ComboboxContainer";
 import CustomSelect from "./deprecated/CustomSelect/CustomSelect";
 
 // Styles
-import "./Combobox/Combobox.css";
+import "./Combobox/Combobox.scss";
 import "./deprecated/CustomSelect/CustomSelect.css";
 import "./app.css";
 
