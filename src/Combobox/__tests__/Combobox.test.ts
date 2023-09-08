@@ -24,20 +24,23 @@ it.describe("Combobox Web Component", () => {
   const testOptions = ["First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eigth", "Ninth", "Tenth"];
 
   /* -------------------- Helper Functions -------------------- */
-  async function renderComponent(page: Page): Promise<void> {
+  async function renderComponent(page: Page, initialValue?: string): Promise<void> {
     await page.goto(url);
-    return page.evaluate((options) => {
-      const app = document.getElementById("app") as HTMLDivElement;
+    return page.evaluate(
+      ([options, initialValue]) => {
+        const app = document.getElementById("app") as HTMLDivElement;
 
-      app.innerHTML = `
-        <combobox-container id="component" name="my-name">
+        app.innerHTML = `
+        <combobox-container id="component" name="my-name"${initialValue ? ` value="${initialValue}"` : ""}>
           ${options.map((o) => `<li>${o}</li>`).join("")}
         </combobox-container>
         <div style="font-size: 3rem; font-weight: bold; text-align: right; background-color: red; height: 500vh;">
           Container for testing scroll prevention
         </div>
       `;
-    }, testOptions);
+      },
+      [testOptions, initialValue] as const,
+    );
   }
 
   function getRandomOption<T extends string[]>(options: T = testOptions as T): T[number] {
@@ -201,20 +204,6 @@ it.describe("Combobox Web Component", () => {
         await expectOptionToBeActive(page, { label: initialValue });
       });
 
-      it("Shows the `option`s when `Alt`+`ArrowDown` is pressed (selected `option` is `active`)", async ({ page }) => {
-        // Setup
-        const initialValue = testOptions[0];
-        await renderComponent(page);
-        await expectComboboxToBeClosed(page);
-        await expectOptionToBeSelected(page, { label: initialValue });
-
-        // Assertions
-        await page.keyboard.press("Tab");
-        await page.keyboard.press("Alt+ArrowDown");
-        await expectOptionsToBeVisible(page);
-        await expectOptionToBeActive(page, { label: initialValue });
-      });
-
       it("Marks the next `option` as `active` when `ArrowDown` is pressed", async ({ page }) => {
         /* ---------- Setup ---------- */
         const initialValue = testOptions[0];
@@ -225,6 +214,7 @@ it.describe("Combobox Web Component", () => {
         await page.keyboard.press("Tab");
         await page.keyboard.press("ArrowDown");
         await expectOptionToBeActive(page, { label: initialValue });
+        await expectOptionToBeActive(page, { label: testOptions.at(-1) as string }, false);
 
         /* ---------- Assertions ---------- */
         const activeOption = page.getByRole("option", { name: initialValue });
@@ -260,6 +250,20 @@ it.describe("Combobox Web Component", () => {
         await expectOptionToBeActive(page, { label: testOptions.at(-1) as string });
       });
 
+      it("Shows the `option`s when `Alt`+`ArrowDown` is pressed (selected `option` is `active`)", async ({ page }) => {
+        // Setup
+        const initialValue = testOptions[0];
+        await renderComponent(page);
+        await expectComboboxToBeClosed(page);
+        await expectOptionToBeSelected(page, { label: initialValue });
+
+        // Assertions
+        await page.keyboard.press("Tab");
+        await page.keyboard.press("Alt+ArrowDown");
+        await expectOptionsToBeVisible(page);
+        await expectOptionToBeActive(page, { label: initialValue });
+      });
+
       it("DOES NOT update the `active` `option` when `Alt`+`ArrowDown` is pressed", async ({ page }) => {
         /* ---------- Setup ---------- */
         const initialValue = testOptions[0];
@@ -270,6 +274,7 @@ it.describe("Combobox Web Component", () => {
         await page.keyboard.press("Tab");
         await page.keyboard.press("Alt+ArrowDown");
         await expectOptionToBeActive(page, { label: initialValue });
+        await expectOptionToBeActive(page, { label: testOptions.at(-1) as string }, false);
 
         /* ---------- Assertions ---------- */
         // Initial `option` is still active after keypress
@@ -352,7 +357,205 @@ it.describe("Combobox Web Component", () => {
     });
 
     it.describe("ArrowUp", () => {
-      //
+      it("Shows the `option`s when `ArrowUp` is pressed (selected `option` is `active`)", async ({ page }) => {
+        // Setup
+        const initialValue = testOptions.at(-1) as string;
+        await renderComponent(page, initialValue);
+        await expectComboboxToBeClosed(page);
+        await expectOptionToBeSelected(page, { label: initialValue });
+
+        // Assertions
+        await page.keyboard.press("Tab");
+        await page.keyboard.press("ArrowUp");
+        await expectOptionsToBeVisible(page);
+        await expectOptionToBeActive(page, { label: initialValue });
+      });
+
+      it("Marks the previous `option` as `active` when `ArrowUp` is pressed", async ({ page }) => {
+        /* ---------- Setup ---------- */
+        const initialValue = testOptions.at(-1) as string;
+        await renderComponent(page, initialValue);
+        await expectComboboxToBeClosed(page);
+        await expectOptionToBeSelected(page, { label: initialValue });
+
+        // Display Options
+        await page.keyboard.press("Tab");
+        await page.keyboard.press("ArrowUp");
+        await expectOptionToBeActive(page, { label: initialValue });
+        await expectOptionToBeActive(page, { label: testOptions[0] }, false);
+
+        /* ---------- Assertions ---------- */
+        const activeOption = page.getByRole("option", { name: initialValue });
+        const previousActiveOption = page.locator(`[role='option']:has(+ #${await activeOption.getAttribute("id")})`);
+
+        // Previous `option` activates
+        await page.keyboard.press("ArrowUp");
+        await expect(previousActiveOption).toHaveText(testOptions.at(-2) as string);
+        await expectOptionToBeActive(page, { label: testOptions.at(-2) as string });
+        await expectOptionToBeActive(page, { label: initialValue }, false);
+      });
+
+      it("DOES NOT update the `active` `option` when `ArrowUp` is pressed on the first `option`", async ({ page }) => {
+        /* ---------- Setup ---------- */
+        const initialValue = testOptions.at(-1) as string;
+        await renderComponent(page, initialValue);
+        await expectComboboxToBeClosed(page);
+
+        // Display Options
+        await page.keyboard.press("Tab");
+        await page.keyboard.press("ArrowUp");
+        await expectOptionToBeActive(page, { label: initialValue });
+
+        /* ---------- Assertions ---------- */
+        // Activate First `option`
+        for (let i = 0; i < testOptions.length - 1; i++) await page.keyboard.press("ArrowUp");
+        await expect(page.getByRole("option").first()).toHaveText(testOptions[0]);
+        await expectOptionToBeActive(page, { label: testOptions[0] });
+        await expectOptionToBeActive(page, { label: initialValue }, false);
+
+        // Nothing changes when `ArrowUp` is pressed again
+        await page.keyboard.press("ArrowUp");
+        await expectOptionToBeActive(page, { label: testOptions[0] });
+      });
+
+      it("Hides the `option`s when `Alt`+`ArrowUp` is pressed", async ({ page }) => {
+        /* ---------- Setup ---------- */
+        const initialValue = testOptions.at(-1) as string;
+        await renderComponent(page, initialValue);
+        await expectComboboxToBeClosed(page);
+        await expectOptionToBeSelected(page, { label: initialValue });
+
+        // Display Options
+        await page.keyboard.press("Tab");
+        await page.keyboard.press("ArrowUp");
+        await expectOptionsToBeVisible(page);
+        await expectOptionToBeActive(page, { label: initialValue });
+        await expectOptionToBeActive(page, { label: testOptions[0] }, false);
+
+        /* ---------- Assertions ---------- */
+        const previousOptionValue = testOptions.at(-2) as string;
+
+        // Activate new `option`
+        await page.keyboard.press("ArrowUp");
+        await expectOptionToBeActive(page, { label: initialValue }, false);
+        await expectOptionToBeActive(page, { label: previousOptionValue });
+
+        // Close `combobox`. INITIAL value should still be `selected`.
+        await page.keyboard.press("Alt+ArrowUp");
+        await expectComboboxToBeClosed(page);
+        await expectOptionToBeSelected(page, { label: initialValue });
+        await expectOptionToBeSelected(page, { label: previousOptionValue }, false);
+      });
+
+      it("Prevents unwanted page scrolling when `ArrowUp` or `Alt`+`ArrowUp` is pressed", async ({ page }) => {
+        /* ---------- Setup ---------- */
+        await renderComponent(page);
+        await expectComboboxToBeClosed(page);
+
+        // Focus `combobox`
+        await page.keyboard.press("Tab");
+        await expect(page.getByRole("combobox")).toBeFocused();
+
+        // Scroll to bottom of page AFTER tabbing
+        await page.evaluate(() => window.scrollTo({ top: document.body.scrollHeight }));
+        const initialScrollDistance = await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }) as const);
+
+        /* ---------- Assertions ---------- */
+        // No scrolling should occur when `ArrowUp` or `Alt`+`ArrowUp` is pressed
+        await page.keyboard.press("ArrowUp");
+        await new Promise((resolve) => setTimeout(resolve, 250)); // Wait for **possible** scrolling to finish
+
+        await page.keyboard.press("Alt+ArrowUp");
+        await new Promise((resolve) => setTimeout(resolve, 250)); // Wait for **possible** scrolling to finish
+
+        const newScrollDistance = await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }) as const);
+        expect(newScrollDistance).toStrictEqual(initialScrollDistance);
+      });
+    });
+
+    it.describe("Home", () => {
+      it("Shows the `option`s AND marks the first `option` as `active` when `Home` is pressed", async ({ page }) => {
+        /* ---------- Setup ---------- */
+        const initialValue = testOptions.at(-1) as string;
+        const firstOption = testOptions[0];
+
+        await renderComponent(page, initialValue);
+        await expectComboboxToBeClosed(page);
+        await expectOptionToBeSelected(page, { label: initialValue });
+        await expectOptionToBeSelected(page, { label: firstOption }, false);
+
+        /* ---------- Assertions ---------- */
+        // Press `Home` when the `combobox` is collapsed
+        await page.keyboard.press("Tab");
+        await page.keyboard.press("Home");
+        await expectOptionsToBeVisible(page);
+        await expectOptionToBeActive(page, { label: firstOption });
+        await expectOptionToBeActive(page, { label: initialValue }, false);
+
+        // Press `Home` while the `combobox` is already expanded
+        for (let i = 0; i < Math.ceil(testOptions.length * 0.5); i++) await page.keyboard.press("ArrowDown");
+        await expectOptionToBeActive(page, { label: firstOption }, false);
+
+        await page.keyboard.press("Home");
+        await expectOptionToBeActive(page, { label: firstOption });
+      });
+
+      it("Prevents unwanted page scrolling when `Home` is pressed", async ({ page }) => {
+        /* ---------- Setup ---------- */
+        await renderComponent(page);
+        await expectComboboxToBeClosed(page);
+
+        // Focus `combobox`
+        await page.keyboard.press("Tab");
+        await expect(page.getByRole("combobox")).toBeFocused();
+
+        // Scroll to bottom of page AFTER tabbing
+        await page.evaluate(() => window.scrollTo({ top: document.body.scrollHeight }));
+        const initialScrollDistance = await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }) as const);
+
+        /* ---------- Assertions ---------- */
+        // No scrolling should occur when `Home` is pressed
+        await page.keyboard.press("Home");
+        await new Promise((resolve) => setTimeout(resolve, 250)); // Wait for **possible** scrolling to finish
+
+        // For sanity's sake, press `Home` again while the `combobox` is already expanded
+        await page.keyboard.press("Home");
+        await new Promise((resolve) => setTimeout(resolve, 250)); // Wait for **possible** scrolling to finish
+
+        const newScrollDistance = await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }) as const);
+        expect(newScrollDistance).toStrictEqual(initialScrollDistance);
+      });
+    });
+
+    it.describe("Escape", () => {
+      it("Hides the `option`s when `Escape` is pressed", async ({ page }) => {
+        /* ---------- Setup ---------- */
+        const initialValue = testOptions[0];
+        await renderComponent(page, initialValue);
+        await expectComboboxToBeClosed(page);
+        await expectOptionToBeSelected(page, { label: initialValue });
+
+        // Display Options
+        await page.keyboard.press("Tab");
+        await page.keyboard.press(" ");
+        await expectOptionsToBeVisible(page);
+        await expectOptionToBeActive(page, { label: initialValue });
+        await expectOptionToBeActive(page, { label: testOptions.at(-1) as string }, false);
+
+        /* ---------- Assertions ---------- */
+        const nextOptionValue = testOptions[1];
+
+        // Activate new `option`
+        await page.keyboard.press("ArrowDown");
+        await expectOptionToBeActive(page, { label: nextOptionValue });
+        await expectOptionToBeActive(page, { label: initialValue }, false);
+
+        // Close `combobox`. INITIAL value should still be `selected`.
+        await page.keyboard.press("Escape");
+        await expectComboboxToBeClosed(page);
+        await expectOptionToBeSelected(page, { label: initialValue });
+        await expectOptionToBeSelected(page, { label: nextOptionValue }, false);
+      });
     });
   });
 });
