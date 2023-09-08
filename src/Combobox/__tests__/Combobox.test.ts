@@ -151,7 +151,7 @@ it.describe("Combobox Web Component", () => {
       renderComponent(page);
       const combobox = page.getByRole("combobox");
 
-      // 1st `option` is `active` by default
+      // Initial `option` is `active` by default
       await combobox.click();
       await expectOptionsToBeVisible(page);
       await expectOptionToBeActive(page, { label: testOptions[0] });
@@ -555,6 +555,72 @@ it.describe("Combobox Web Component", () => {
         await expectComboboxToBeClosed(page);
         await expectOptionToBeSelected(page, { label: initialValue });
         await expectOptionToBeSelected(page, { label: nextOptionValue }, false);
+      });
+    });
+
+    it.describe("SpaceBar (' ')", () => {
+      it("Shows the `option`s when `SpaceBar` (' ') is pressed (selected `option` is `active`)", async ({ page }) => {
+        // Setup
+        const initialValue = testOptions[0];
+        await renderComponent(page);
+        await expectComboboxToBeClosed(page);
+        await expectOptionToBeSelected(page, { label: initialValue });
+
+        // Assertions
+        await page.keyboard.press("Tab");
+        await page.keyboard.press(" ");
+        await expectOptionsToBeVisible(page);
+        await expectOptionToBeActive(page, { label: initialValue });
+      });
+
+      it("Selects the `active` `option` and hides the `option`s when `SpaceBar` (' ') is pressed", async ({ page }) => {
+        /* ---------- Setup ---------- */
+        const initialValue = testOptions[0];
+        await renderComponent(page);
+        await expectComboboxToBeClosed(page);
+        await expectOptionToBeSelected(page, { label: initialValue });
+
+        // Display Options
+        await page.keyboard.press("Tab");
+        await page.keyboard.press(" ");
+        await expectOptionsToBeVisible(page);
+        await expectOptionToBeActive(page, { label: initialValue });
+
+        /* ---------- Assertions ---------- */
+        // Activate new `option`
+        const newValue = testOptions[1];
+        await page.keyboard.press("ArrowDown");
+        await expectOptionToBeActive(page, { label: newValue });
+        await expectOptionToBeActive(page, { label: initialValue }, false);
+
+        // Select new `option`
+        await page.keyboard.press(" ");
+        await expectComboboxToBeClosed(page);
+        await expectOptionToBeSelected(page, { label: newValue });
+        await expectOptionToBeSelected(page, { label: initialValue }, false);
+      });
+
+      it("Prevents unwanted page scrolling when `SpaceBar` (' ') is pressed", async ({ page }) => {
+        /* ---------- Setup ---------- */
+        await renderComponent(page);
+        await expectComboboxToBeClosed(page);
+        const initialScrollDistance = await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }) as const);
+
+        /* ---------- Assertions ---------- */
+        // Focus `combobox`
+        await page.keyboard.press("Tab");
+        await expect(page.getByRole("combobox")).toBeFocused();
+
+        // No scrolling should occur when `SpaceBar` (' ') is pressed
+        await page.keyboard.press(" ");
+        await new Promise((resolve) => setTimeout(resolve, 250)); // Wait for **possible** scrolling to finish
+
+        // For sanity's sake, press `SpaceBar` (' ') again while the `combobox` is already expanded
+        await page.keyboard.press(" ");
+        await new Promise((resolve) => setTimeout(resolve, 250)); // Wait for **possible** scrolling to finish
+
+        const newScrollDistance = await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }) as const);
+        expect(newScrollDistance).toStrictEqual(initialScrollDistance);
       });
     });
   });

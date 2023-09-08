@@ -82,7 +82,7 @@ class ComboboxSingle extends HTMLElement implements Pick<ElementInternals, Expos
 
     /* -------------------- Unselect previous option -------------------- */
     const listbox = this.nextElementSibling as HTMLUListElement;
-    listbox.querySelector(`[${attrs["aria-selected"]}="${true}"]`)?.removeAttribute(attrs["aria-selected"]);
+    listbox.querySelector(`[${attrs["aria-selected"]}="${true}"]`)?.setAttribute(attrs["aria-selected"], String(false));
 
     /* -------------------- Operate on new option -------------------- */
     const selectedOption = document.getElementById(`${listbox.id}-option-${v}`);
