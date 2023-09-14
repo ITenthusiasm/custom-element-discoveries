@@ -191,7 +191,7 @@ it.describe("Combobox Web Component", () => {
     });
 
     it.describe("ArrowDown", () => {
-      it("Shows the `option`s when `ArrowDown` is pressed (selected `option` is `active`)", async ({ page }) => {
+      it("Shows the `option`s (selected `option` is `active`)", async ({ page }) => {
         // Setup
         const initialValue = testOptions[0];
         await renderComponent(page);
@@ -205,7 +205,7 @@ it.describe("Combobox Web Component", () => {
         await expectOptionToBeActive(page, { label: initialValue });
       });
 
-      it("Marks the next `option` as `active` when `ArrowDown` is pressed", async ({ page }) => {
+      it("Marks the next `option` as `active`", async ({ page }) => {
         /* ---------- Setup ---------- */
         const initialValue = testOptions[0];
         await renderComponent(page);
@@ -228,7 +228,7 @@ it.describe("Combobox Web Component", () => {
         await expectOptionToBeActive(page, { label: initialValue }, false);
       });
 
-      it("DOES NOT update the `active` `option` when `ArrowDown` is pressed on the last `option`", async ({ page }) => {
+      it("DOES NOT update the `active` `option` if the last `option` is `active`", async ({ page }) => {
         /* ---------- Setup ---------- */
         const initialValue = testOptions[0];
         await renderComponent(page);
@@ -251,7 +251,7 @@ it.describe("Combobox Web Component", () => {
         await expectOptionToBeActive(page, { label: testOptions.at(-1) as string });
       });
 
-      it("Shows the `option`s when `Alt`+`ArrowDown` is pressed (selected `option` is `active`)", async ({ page }) => {
+      it("Shows the `option`s when pressed with the `Alt` key (selected `option` is `active`)", async ({ page }) => {
         // Setup
         const initialValue = testOptions[0];
         await renderComponent(page);
@@ -265,7 +265,7 @@ it.describe("Combobox Web Component", () => {
         await expectOptionToBeActive(page, { label: initialValue });
       });
 
-      it("DOES NOT update the `active` `option` when `Alt`+`ArrowDown` is pressed", async ({ page }) => {
+      it("DOES NOT update the `active` `option` when pressed with the `Alt` key", async ({ page }) => {
         /* ---------- Setup ---------- */
         const initialValue = testOptions[0];
         await renderComponent(page);
@@ -283,7 +283,7 @@ it.describe("Combobox Web Component", () => {
         await expectOptionToBeActive(page, { label: initialValue });
       });
 
-      it("Prevents unwanted page scrolling when `ArrowDown` or `Alt`+`ArrowDown` is pressed", async ({ page }) => {
+      it("Prevents unwanted page scrolling when pressed with OR without the `Alt` key", async ({ page }) => {
         /* ---------- Setup ---------- */
         await renderComponent(page);
         await expectComboboxToBeClosed(page);
@@ -307,7 +307,7 @@ it.describe("Combobox Web Component", () => {
     });
 
     it.describe("End", () => {
-      it("Shows the `option`s AND marks the last `option` as `active` when `End` is pressed", async ({ page }) => {
+      it("Shows the `option`s AND marks the last `option` as `active`", async ({ page }) => {
         /* ---------- Setup ---------- */
         const initialValue = testOptions[0];
         const lastOption = testOptions.at(-1) as string;
@@ -333,7 +333,7 @@ it.describe("Combobox Web Component", () => {
         await expectOptionToBeActive(page, { label: lastOption });
       });
 
-      it("Prevents unwanted page scrolling when `End` is pressed", async ({ page }) => {
+      it("Prevents unwanted page scrolling", async ({ page }) => {
         /* ---------- Setup ---------- */
         await renderComponent(page);
         await expectComboboxToBeClosed(page);
@@ -358,7 +358,7 @@ it.describe("Combobox Web Component", () => {
     });
 
     it.describe("ArrowUp", () => {
-      it("Shows the `option`s when `ArrowUp` is pressed (selected `option` is `active`)", async ({ page }) => {
+      it("Shows the `option`s (selected `option` is `active`)", async ({ page }) => {
         // Setup
         const initialValue = testOptions.at(-1) as string;
         await renderComponent(page, initialValue);
@@ -372,7 +372,7 @@ it.describe("Combobox Web Component", () => {
         await expectOptionToBeActive(page, { label: initialValue });
       });
 
-      it("Marks the previous `option` as `active` when `ArrowUp` is pressed", async ({ page }) => {
+      it("Marks the previous `option` as `active`", async ({ page }) => {
         /* ---------- Setup ---------- */
         const initialValue = testOptions.at(-1) as string;
         await renderComponent(page, initialValue);
@@ -396,7 +396,7 @@ it.describe("Combobox Web Component", () => {
         await expectOptionToBeActive(page, { label: initialValue }, false);
       });
 
-      it("DOES NOT update the `active` `option` when `ArrowUp` is pressed on the first `option`", async ({ page }) => {
+      it("DOES NOT update the `active` `option` if the first `option` is `active`", async ({ page }) => {
         /* ---------- Setup ---------- */
         const initialValue = testOptions.at(-1) as string;
         await renderComponent(page, initialValue);
@@ -419,7 +419,7 @@ it.describe("Combobox Web Component", () => {
         await expectOptionToBeActive(page, { label: testOptions[0] });
       });
 
-      it("Hides the `option`s when `Alt`+`ArrowUp` is pressed", async ({ page }) => {
+      it("Hides the `option`s when pressed with the `Alt` key", async ({ page }) => {
         /* ---------- Setup ---------- */
         const initialValue = testOptions.at(-1) as string;
         await renderComponent(page, initialValue);
@@ -448,7 +448,7 @@ it.describe("Combobox Web Component", () => {
         await expectOptionToBeSelected(page, { label: previousOptionValue }, false);
       });
 
-      it("Prevents unwanted page scrolling when `ArrowUp` or `Alt`+`ArrowUp` is pressed", async ({ page }) => {
+      it("Prevents unwanted page scrolling when pressed with OR without the `Alt` key", async ({ page }) => {
         /* ---------- Setup ---------- */
         await renderComponent(page);
         await expectComboboxToBeClosed(page);
@@ -475,7 +475,7 @@ it.describe("Combobox Web Component", () => {
     });
 
     it.describe("Home", () => {
-      it("Shows the `option`s AND marks the first `option` as `active` when `Home` is pressed", async ({ page }) => {
+      it("Shows the `option`s AND marks the first `option` as `active`", async ({ page }) => {
         /* ---------- Setup ---------- */
         const initialValue = testOptions.at(-1) as string;
         const firstOption = testOptions[0];
@@ -501,7 +501,7 @@ it.describe("Combobox Web Component", () => {
         await expectOptionToBeActive(page, { label: firstOption });
       });
 
-      it("Prevents unwanted page scrolling when `Home` is pressed", async ({ page }) => {
+      it("Prevents unwanted page scrolling", async ({ page }) => {
         /* ---------- Setup ---------- */
         await renderComponent(page);
         await expectComboboxToBeClosed(page);
@@ -529,7 +529,7 @@ it.describe("Combobox Web Component", () => {
     });
 
     it.describe("Escape", () => {
-      it("Hides the `option`s when `Escape` is pressed", async ({ page }) => {
+      it("Hides the `option`s", async ({ page }) => {
         /* ---------- Setup ---------- */
         const initialValue = testOptions[0];
         await renderComponent(page, initialValue);
@@ -560,7 +560,7 @@ it.describe("Combobox Web Component", () => {
     });
 
     it.describe("SpaceBar (' ')", () => {
-      it("Shows the `option`s when `SpaceBar` (' ') is pressed (selected `option` is `active`)", async ({ page }) => {
+      it("Shows the `option`s (selected `option` is `active`)", async ({ page }) => {
         // Setup
         const initialValue = testOptions[0];
         await renderComponent(page);
@@ -574,7 +574,7 @@ it.describe("Combobox Web Component", () => {
         await expectOptionToBeActive(page, { label: initialValue });
       });
 
-      it("Selects the `active` `option` and hides the `option`s when `SpaceBar` (' ') is pressed", async ({ page }) => {
+      it("Selects the `active` `option` and hides the `option`s", async ({ page }) => {
         /* ---------- Setup ---------- */
         const initialValue = testOptions[0];
         await renderComponent(page);
@@ -601,7 +601,7 @@ it.describe("Combobox Web Component", () => {
         await expectOptionToBeSelected(page, { label: initialValue }, false);
       });
 
-      it("Prevents unwanted page scrolling when `SpaceBar` (' ') is pressed", async ({ page }) => {
+      it("Prevents unwanted page scrolling", async ({ page }) => {
         /* ---------- Setup ---------- */
         await renderComponent(page);
         await expectComboboxToBeClosed(page);
@@ -625,13 +625,6 @@ it.describe("Combobox Web Component", () => {
       });
     });
 
-    /*
-     * TODO: For the sake of space, maybe we should consider removing the "when <KEY> is pressed" phrases from
-     * our tests. This also reduces redundancy. For the keys with modifiers (e.g., `Alt+ArrowDown`), we can either
-     * 1) Separate the `Alt+<KEY>` tests into separate `describe` blocks or 2) break the convention that we just
-     * described of reducing redundancy, but **_ONLY_** when the `describe`d block requires tests for modifiers
-     * (such as the `alt` key).
-     */
     it.describe("Tab", () => {
       it("Performs the default action (i.e., it moves focus to the next element)", async ({ page }) => {
         /* ---------- Setup ---------- */
