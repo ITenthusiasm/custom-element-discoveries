@@ -1,5 +1,6 @@
 import { test as it, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
+import type ComboboxContainer from "../ComboboxContainer";
 
 /** The attributes _commonly_ used for **testing** the `Combobox` Web Component. (Declared to help avoid typos.) */
 const attrs = Object.freeze({
@@ -621,6 +622,95 @@ it.describe("Combobox Web Component", () => {
 
         const newScrollDistance = await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }) as const);
         expect(newScrollDistance).toStrictEqual(initialScrollDistance);
+      });
+    });
+
+    /*
+     * TODO: For the sake of space, maybe we should consider removing the "when <KEY> is pressed" phrases from
+     * our tests. This also reduces redundancy. For the keys with modifiers (e.g., `Alt+ArrowDown`), we can either
+     * 1) Separate the `Alt+<KEY>` tests into separate `describe` blocks or 2) break the convention that we just
+     * described of reducing redundancy, but **_ONLY_** when the `describe`d block requires tests for modifiers
+     * (such as the `alt` key).
+     */
+    it.describe("Tab", () => {
+      it("Performs the default action (i.e., it moves focus to the next element)", async ({ page }) => {
+        /* ---------- Setup ---------- */
+        await renderComponent(page);
+        await expectComboboxToBeClosed(page);
+
+        // Surround `combobox` with focusable elements
+        await page.evaluate(() => {
+          const component = document.querySelector("combobox-container") as ComboboxContainer;
+          component.insertAdjacentElement("beforebegin", document.createElement("button"));
+          component.insertAdjacentElement("afterend", document.createElement("button"));
+        });
+
+        // Focus `combobox`
+        const combobox = page.getByRole("combobox");
+        for (let i = 0; i < 2; i++) await page.keyboard.press("Tab");
+        await expect(combobox).toBeFocused();
+
+        /* ---------- Assertions ---------- */
+        // Forward Tabbing Works
+        await page.keyboard.press("Tab");
+        await expect(combobox).not.toBeFocused();
+        await expect(page.locator("combobox-container + *")).toBeFocused();
+
+        // Backwards Tabbing Works
+        await page.keyboard.press("Shift+Tab");
+        await expect(combobox).toBeFocused();
+
+        await page.keyboard.press("Shift+Tab");
+        await expect(combobox).not.toBeFocused();
+        await expect(page.locator(":has(+ combobox-container)")).toBeFocused();
+      });
+
+      it("Selects the `active` `option`, hides the `option`s, and performs the default action", async ({ page }) => {
+        /* ---------- Setup ---------- */
+        const initialValue = testOptions[0];
+        await renderComponent(page);
+        await expectComboboxToBeClosed(page);
+        await expectOptionToBeSelected(page, { label: initialValue });
+
+        // Surround `combobox` with focusable elements
+        await page.evaluate(() => {
+          const component = document.querySelector("combobox-container") as ComboboxContainer;
+          component.insertAdjacentElement("beforebegin", document.createElement("button"));
+          component.insertAdjacentElement("afterend", document.createElement("button"));
+        });
+
+        // Focus `combobox`
+        const combobox = page.getByRole("combobox");
+        for (let i = 0; i < 2; i++) await page.keyboard.press("Tab");
+        await expect(combobox).toBeFocused();
+
+        /* ---------- Assertions ---------- */
+        // Forward Tabbing Works
+        const newValue = testOptions[1];
+        for (let i = 0; i < 2; i++) await page.keyboard.press("ArrowDown");
+
+        await page.keyboard.press("Tab");
+        await expect(combobox).not.toBeFocused();
+        await expect(page.locator("combobox-container + *")).toBeFocused();
+
+        expectComboboxToBeClosed(page);
+        await expectOptionToBeSelected(page, { label: newValue });
+        await expectOptionToBeSelected(page, { label: initialValue }, false);
+
+        // Backwards Tabbing Works
+        const secondNewValue = testOptions[2];
+        await page.keyboard.press("Shift+Tab");
+        await expect(combobox).toBeFocused();
+        for (let i = 0; i < 2; i++) await page.keyboard.press("ArrowDown");
+
+        await page.keyboard.press("Shift+Tab");
+        await expect(combobox).not.toBeFocused();
+        await expect(page.locator(":has(+ combobox-container)")).toBeFocused();
+
+        expectComboboxToBeClosed(page);
+        await expectOptionToBeSelected(page, { label: secondNewValue });
+        await expectOptionToBeSelected(page, { label: newValue }, false);
+        await expectOptionToBeSelected(page, { label: initialValue }, false);
       });
     });
   });

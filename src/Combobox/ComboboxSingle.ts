@@ -189,15 +189,15 @@ function handleComboboxKeydown(event: KeyboardEvent): void {
     return;
   }
 
-  if (event.key === "Tab") {
-    if (combobox.getAttribute(attrs["aria-expanded"]) === String(true)) return activeOption?.click();
-    return;
-  }
-
   if (event.key === " ") {
     event.preventDefault(); // Don't scroll
     if (combobox.getAttribute(attrs["aria-expanded"]) === String(true)) return activeOption?.click();
     return combobox.setAttribute(attrs["aria-expanded"], String(true));
+  }
+
+  if (event.key === "Tab") {
+    if (combobox.getAttribute(attrs["aria-expanded"]) === String(true)) return activeOption?.click();
+    return;
   }
 
   if (event.key === "Enter") {
@@ -265,3 +265,5 @@ function handleActiveDescendantChange(mutation: MutationRecord): void {
 }
 
 export default ComboboxSingle;
+
+/* Future Reference Note: For searchable comboboxes, a `contenteditable` div is probably the way to go. See MDN. */
