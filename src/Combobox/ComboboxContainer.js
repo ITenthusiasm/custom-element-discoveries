@@ -1,5 +1,3 @@
-import type ComboboxSingle from "./ComboboxSingle";
-
 /** The attributes _commonly_ used by the `Combobox` component. (These are declared to help avoid typos.) */
 export const attrs = Object.freeze({
   "aria-activedescendant": "aria-activedescendant",
@@ -12,17 +10,25 @@ export const attrs = Object.freeze({
 class ComboboxContainer extends HTMLElement {
   // Internals
   #mounted = false;
-  /** The ID used as a base for the IDs of all important elements belonging to the `ComboboxContainer` */
-  #baseId?: string; // TODO: Do we want to use this? Also improve JSDoc. Or we can create a custom `root-id` attribute.
+
+  // TODO: Do we want to use this? Also improve JSDoc. Or we can create a custom `root-id` attribute.
+  /**
+   * @type {string | undefined}
+   * The ID used as a base for the IDs of all important elements belonging to the `ComboboxContainer`
+   */
+  #baseId;
 
   // Important Elements
-  #combobox: ComboboxSingle;
-  #listbox: HTMLUListElement;
+  /** @type {import("./ComboboxSingle").default} */
+  #combobox;
+
+  /** @type {HTMLUListElement} */
+  #listbox;
 
   constructor() {
     super();
 
-    this.#combobox = document.createElement("combobox-single") as ComboboxSingle;
+    this.#combobox = /** @type {import("./ComboboxSingle").default} */ (document.createElement("combobox-single"));
     this.#listbox = document.createElement("ul");
   }
 
@@ -66,7 +72,7 @@ class ComboboxContainer extends HTMLElement {
          * https://developer.mozilla.org/en-US/docs/Web/API/HTMLOptionElement
          */
         // TODO: If we use a custom element, can we just do node.value?
-        const optionValue = node.getAttribute(attrs.value) ?? (node.textContent as string);
+        const optionValue = node.getAttribute(attrs.value) ?? /** @type {string} */ (node.textContent);
         node.setAttribute("id", `${this.#listbox.id}-option-${optionValue}`);
         node.setAttribute("role", "option");
         node.setAttribute("aria-selected", String(false));
@@ -98,29 +104,41 @@ class ComboboxContainer extends HTMLElement {
 }
 
 /* -------------------- Listbox Handlers -------------------- */
-function handleDelegatedOptionHover(event: MouseEvent): void {
-  const listbox = event.currentTarget as HTMLUListElement;
-  const option = event.target as HTMLElement;
+/**
+ * @param {MouseEvent} event
+ * @returns {void}
+ */
+function handleDelegatedOptionHover(event) {
+  const listbox = /** @type {HTMLUListElement} */ (event.currentTarget);
+  const option = /** @type {HTMLElement} */ (event.target);
   if (option === listbox) return; // We hovered the `listbox`, not an `option`
 
-  const combobox = listbox.previousElementSibling as ComboboxSingle;
+  const combobox = /** @type {import("./ComboboxSingle").default} */ (listbox.previousElementSibling);
   setAttributeFor(combobox, attrs["aria-activedescendant"], option.id);
 }
 
-function handleDelegatedOptionClick(event: MouseEvent): void {
-  const listbox = event.currentTarget as HTMLUListElement;
-  const option = event.target as HTMLElement;
+/**
+ * @param {MouseEvent} event
+ * @returns {void}
+ */
+function handleDelegatedOptionClick(event) {
+  const listbox = /** @type {HTMLUListElement} */ (event.currentTarget);
+  const option = /** @type {HTMLElement} */ (event.target);
   if (option === listbox) return; // We clicked the `listbox`, not an `option`
   if (option.hasAttribute("aria-disabled")) return;
 
-  const combobox = listbox.previousElementSibling as ComboboxSingle;
-  combobox.value = option.getAttribute(attrs.value) ?? (option.textContent as string);
+  const combobox = /** @type {import("./ComboboxSingle").default} */ (listbox.previousElementSibling);
+  combobox.value = option.getAttribute(attrs.value) ?? /** @type {string} */ (option.textContent);
   combobox.setAttribute(attrs["aria-expanded"], String(false));
 }
 
 /* -------------------- Container Handlers -------------------- */
-function handleDelegatedMousedown(event: MouseEvent): void {
-  if ((event.target as HTMLElement).matches("[role='option']")) return event.preventDefault();
+/**
+ * @param {MouseEvent} event
+ * @returns {void}
+ */
+function handleDelegatedMousedown(event) {
+  if (/** @type {HTMLElement} */ (event.target).matches("[role='option']")) return event.preventDefault();
 }
 
 /*
@@ -134,8 +152,13 @@ function handleDelegatedMousedown(event: MouseEvent): void {
 /**
  * Sets the `attribute` of an `element` to the specified `value` _if_ the element's attribute
  * did not already have that value. Used to avoid redundantly triggering `MutationObserver`s.
+ *
+ * @param {HTMLElement} element
+ * @param {string} attribute
+ * @param {string} value
+ * @returns {void}
  */
-export function setAttributeFor(element: HTMLElement, attribute: string, value: string): void {
+export function setAttributeFor(element, attribute, value) {
   if (element.getAttribute(attribute) === value) return;
   element.setAttribute(attribute, value);
 }

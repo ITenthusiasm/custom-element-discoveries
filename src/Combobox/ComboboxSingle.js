@@ -1,18 +1,28 @@
 import { attrs, setAttributeFor } from "./ComboboxContainer";
 
-type ExposedInternals = keyof Pick<ElementInternals, "labels" | "form" | "validity" | "validationMessage">;
-class ComboboxSingle extends HTMLElement implements Pick<ElementInternals, ExposedInternals> {
+/** @typedef {keyof Pick<ElementInternals, "labels" | "form" | "validity" | "validationMessage">} ExposedInternals */
+
+/** @implements {Pick<ElementInternals, ExposedInternals>} */
+class ComboboxSingle extends HTMLElement {
   static formAssociated = true;
 
   // Internals
   #mounted = false;
-  #internals: ElementInternals;
-  #searchString = "";
-  #searchTimeout: number | undefined;
 
-  // Mutation Observer Callbacks
-  readonly #expansionObserver: MutationObserver;
-  readonly #activeOptionObserver: MutationObserver;
+  /** @type {ElementInternals} */
+  #internals;
+
+  #searchString = "";
+
+  /** @type {number | undefined} */
+  #searchTimeout;
+
+  // Internals --> Mutation Observer Callbacks
+  /** @readonly @type {MutationObserver} */
+  #expansionObserver;
+
+  /** @readonly @type {MutationObserver} */
+  #activeOptionObserver;
 
   // Local State
   /** The Custom Element's internal value. **DO NOT** use directly. Use the getter and setter instead. */
@@ -71,17 +81,20 @@ class ComboboxSingle extends HTMLElement implements Pick<ElementInternals, Expos
     this.removeEventListener("keydown", handleComboboxKeydown);
   }
 
-  /** Retrieves the Custom Element's internal value (`this.#value`). */
-  get value(): string {
+  /** Retrieves the Custom Element's internal value (`this.#value`). @returns {string} */
+  get value() {
     return this.#value;
   }
 
-  /** Updates the Custom Element's internal value (`this.#value`) along with any relevant element attributes. */
-  set value(v: string) {
+  /**
+   * Updates the Custom Element's internal value (`this.#value`) along with any relevant element attributes.
+   * @param {string} v
+   */
+  set value(v) {
     if (v === this.#value && v !== "") return; // Don't run setter logic redundantly
 
     /* -------------------- Unselect previous option -------------------- */
-    const listbox = this.nextElementSibling as HTMLUListElement;
+    const listbox = /** @type {HTMLUListElement} */ (this.nextElementSibling);
     listbox.querySelector(`[${attrs["aria-selected"]}="${true}"]`)?.setAttribute(attrs["aria-selected"], String(false));
 
     /* -------------------- Operate on new option -------------------- */
@@ -105,43 +118,59 @@ class ComboboxSingle extends HTMLElement implements Pick<ElementInternals, Expos
   }
 
   // Note: This getter SHOULD NOT be used within the class
-  get labels(): ElementInternals["labels"] {
+  /** @returns {ElementInternals["labels"]} */
+  get labels() {
     return this.#internals.labels;
   }
 
   // Note: This getter SHOULD NOT be used within the class
-  get form(): ElementInternals["form"] {
+  /** @returns {ElementInternals["form"]} */
+  get form() {
     return this.#internals.form;
   }
 
   // Note: This getter SHOULD NOT be used within the class
-  get validity(): ElementInternals["validity"] {
+  /** @returns {ElementInternals["validity"]} */
+  get validity() {
     return this.#internals.validity;
   }
 
   // Note: This getter SHOULD NOT be used within the class
-  get validationMessage(): ElementInternals["validationMessage"] {
+  /** @returns {ElementInternals["validationMessage"]} */
+  get validationMessage() {
     return this.#internals.validationMessage;
   }
 }
 
 /* -------------------- Combobox Handlers -------------------- */
-function handleComboboxClick(event: MouseEvent): void {
-  const combobox = event.target as ComboboxSingle;
+/**
+ * @param {MouseEvent} event
+ * @returns {void}
+ */
+function handleComboboxClick(event) {
+  const combobox = /** @type {ComboboxSingle} */ (event.target);
   const expanded = combobox.getAttribute("aria-expanded") === String(true);
   combobox.setAttribute(attrs["aria-expanded"], String(!expanded));
 }
 
-function handleComboboxBlur(event: FocusEvent): void {
-  const combobox = event.target as ComboboxSingle;
+/**
+ * @param {FocusEvent} event
+ * @returns {void}
+ */
+function handleComboboxBlur(event) {
+  const combobox = /** @type {ComboboxSingle} */ (event.target);
   setAttributeFor(combobox, attrs["aria-expanded"], String(false));
 }
 
 // TODO: How to handle the `CustomSelect` component being disabled?
-function handleComboboxKeydown(event: KeyboardEvent): void {
-  const combobox = event.target as ComboboxSingle;
-  const listbox = combobox.nextElementSibling as HTMLUListElement;
-  const activeOption = listbox.querySelector<HTMLElement>("[data-active='true']");
+/**
+ * @param {KeyboardEvent} event
+ * @returns {void}
+ */
+function handleComboboxKeydown(event) {
+  const combobox = /** @type {ComboboxSingle} */ (event.target);
+  const listbox = /** @type {HTMLUListElement} */ (combobox.nextElementSibling);
+  const activeOption = /** @type {HTMLElement | null} */ (listbox.querySelector("[data-active='true']"));
 
   if (event.altKey && event.key === "ArrowDown") {
     event.preventDefault(); // Don't scroll
@@ -162,7 +191,7 @@ function handleComboboxKeydown(event: KeyboardEvent): void {
   if (event.key === "End") {
     event.preventDefault(); // Don't scroll
     setAttributeFor(combobox, attrs["aria-expanded"], String(true));
-    setAttributeFor(combobox, attrs["aria-activedescendant"], listbox.lastElementChild?.id as string);
+    setAttributeFor(combobox, attrs["aria-activedescendant"], /** @type {string} */ (listbox.lastElementChild?.id));
     return;
   }
 
@@ -185,7 +214,7 @@ function handleComboboxKeydown(event: KeyboardEvent): void {
   if (event.key === "Home") {
     event.preventDefault(); // Don't scroll
     setAttributeFor(combobox, attrs["aria-expanded"], String(true));
-    setAttributeFor(combobox, attrs["aria-activedescendant"], listbox.firstElementChild?.id as string);
+    setAttributeFor(combobox, attrs["aria-activedescendant"], /** @type {string} */ (listbox.firstElementChild?.id));
     return;
   }
 
@@ -222,8 +251,11 @@ function handleComboboxKeydown(event: KeyboardEvent): void {
 /**
  * Returns a `form`'s default submit button if it exists.
  * @see https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#implicit-submission
+ *
+ * @param {HTMLFormElement} form
+ * @returns {HTMLButtonElement | HTMLInputElement | null}
  */
-function getDefaultSubmitter(form: HTMLFormElement): HTMLButtonElement | HTMLInputElement | null {
+function getDefaultSubmitter(form) {
   // Find a `submitter` if it exists
   for (let i = 0; i < form.elements.length; i++) {
     const control = form.elements[i];
@@ -236,13 +268,23 @@ function getDefaultSubmitter(form: HTMLFormElement): HTMLButtonElement | HTMLInp
 }
 
 /* -------------------- Combobox Mutation Observer Details -------------------- */
-function watchExpansion(mutations: MutationRecord[]): void {
+/**
+ * @param {MutationRecord[]} mutations
+ * @returns {void}
+ */
+function watchExpansion(mutations) {
   mutations.forEach(handleExpansionChange);
 }
 
-function handleExpansionChange(mutation: MutationRecord): void {
-  const combobox = mutation.target as ComboboxSingle;
-  const listbox = combobox.nextElementSibling as HTMLUListElement; // TODO: Should we expose a `listbox` getter?
+/**
+ * @param {MutationRecord} mutation
+ * @returns {void}
+ */
+function handleExpansionChange(mutation) {
+  const combobox = /** @type {ComboboxSingle} */ (mutation.target);
+
+  // TODO: Should we expose a `listbox` getter?
+  const listbox = /** @type {HTMLUListElement} */ (combobox.nextElementSibling);
   const expanded = combobox.getAttribute(attrs["aria-expanded"]) === String(true);
 
   // Open Combobox
@@ -250,7 +292,8 @@ function handleExpansionChange(mutation: MutationRecord): void {
     listbox.removeAttribute("hidden");
     if (combobox.getAttribute(attrs["aria-activedescendant"]) !== "") return;
 
-    const activeOption = listbox.querySelector("[aria-selected='true']") ?? (listbox.firstElementChild as HTMLElement);
+    const activeOption =
+      listbox.querySelector("[aria-selected='true']") ?? /** @type {HTMLElement} */ (listbox.firstElementChild);
     combobox.setAttribute(attrs["aria-activedescendant"], activeOption.id);
   }
   // Close Combobox
@@ -260,14 +303,22 @@ function handleExpansionChange(mutation: MutationRecord): void {
   }
 }
 
-function watchActiveDescendant(mutations: MutationRecord[]): void {
+/**
+ * @param {MutationRecord[]} mutations
+ * @returns {void}
+ */
+function watchActiveDescendant(mutations) {
   mutations.forEach(handleActiveDescendantChange);
 }
 
 // TODO: We need to add `listbox` scrolling logic for when the `activedescendant` changes
 // TODO: Would adjusting scroll during `aria-activedescendant` updates be easier if we used `box-sizing: content-box`?
-function handleActiveDescendantChange(mutation: MutationRecord): void {
-  const combobox = mutation.target as ComboboxSingle;
+/**
+ * @param {MutationRecord} mutation
+ * @returns {void}
+ */
+function handleActiveDescendantChange(mutation) {
+  const combobox = /** @type {ComboboxSingle} */ (mutation.target);
 
   // Deactivate Previous Option
   const lastOptionId = mutation.oldValue;
@@ -275,7 +326,7 @@ function handleActiveDescendantChange(mutation: MutationRecord): void {
   lastOption?.removeAttribute("data-active");
 
   // Activate New Option
-  const activeOptionId = combobox.getAttribute(attrs["aria-activedescendant"]) as string;
+  const activeOptionId = /** @type {string} */ (combobox.getAttribute(attrs["aria-activedescendant"]));
   const activeOption = document.getElementById(activeOptionId);
   activeOption?.setAttribute("data-active", String(true));
 }
