@@ -205,18 +205,34 @@ function handleComboboxKeydown(event: KeyboardEvent): void {
     if (combobox.getAttribute(attrs["aria-expanded"]) === String(true)) return activeOption?.click();
 
     // Submit the Form (if the element is collapsed)
-    const { form } = combobox;
-    if (!form) return;
+    // See: https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#implicit-submission
+    if (!combobox.form) return; // TODO: Uncomment this line
 
-    const submitterSelector = ":is(input, button)[type='submit'], button:not([type='button'], [type='reset'])";
-    const submitter = Array.from(form.elements).find((e) => e.matches(`:is(${submitterSelector}):not(:disabled)`));
-    return submitter ? (submitter as HTMLElement).click() : undefined;
+    const submitter = getDefaultSubmitter(combobox.form);
+    if (submitter) return submitter.disabled ? undefined : submitter.click();
+    return combobox.form.requestSubmit();
   }
 
   // Option Searching Logic (should only operate on printable characters)
   if (event.key.length === 1 && !event.altKey && !event.ctrlKey && !event.metaKey) {
     // TODO: Implement logic. (Should we use the `class` for this, or the element's `data-*` attributes?)
   }
+}
+
+/**
+ * Returns a `form`'s default submit button if it exists.
+ * @see https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#implicit-submission
+ */
+function getDefaultSubmitter(form: HTMLFormElement): HTMLButtonElement | HTMLInputElement | null {
+  // Find a `submitter` if it exists
+  for (let i = 0; i < form.elements.length; i++) {
+    const control = form.elements[i];
+    if (control instanceof HTMLButtonElement && control.type === "submit") return control;
+    if (control instanceof HTMLInputElement && control.type === "submit") return control;
+  }
+
+  // We found nothing
+  return null;
 }
 
 /* -------------------- Combobox Mutation Observer Details -------------------- */

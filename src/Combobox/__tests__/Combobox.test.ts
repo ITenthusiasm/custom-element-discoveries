@@ -1,6 +1,7 @@
 import { test as it, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import type ComboboxContainer from "../ComboboxContainer";
+import type ComboboxSingle from "../ComboboxSingle";
 
 /** The attributes _commonly_ used for **testing** the `Combobox` Web Component. (Declared to help avoid typos.) */
 const attrs = Object.freeze({
@@ -704,6 +705,347 @@ it.describe("Combobox Web Component", () => {
         await expectOptionToBeSelected(page, { label: secondNewValue });
         await expectOptionToBeSelected(page, { label: newValue }, false);
         await expectOptionToBeSelected(page, { label: initialValue }, false);
+      });
+    });
+
+    it.describe("Enter", () => {
+      /** The `id` of the `form` element used in each test. Used for associating fields with the `form`. */
+      const formId = "test-form";
+
+      /** The `data` attribute on the test `form` element that tracks the number of times the form was submitted. */
+      const submissionCountAttr = "data-submission-count";
+
+      /**
+       * Associates the `combobox` on a page with the form element on the same page for testing. The association can be
+       * `implicit` (moving the `combobox` _inside_ the form element and removing the `form` attribute) or
+       * `explicit` (moving the `combobox` _outside_ the form element and giving it a valid `form` attribute).
+       *
+       * If no form element exists on the page when this function is called, then one will be created.
+       */
+      function associateComboboxWithForm(page: Page, association: "implicit" | "explicit"): Promise<void> {
+        return page.evaluate(
+          ([assoc, attr, id]) => {
+            // Find/Create Elements
+            const component = document.querySelector("combobox-container") as ComboboxContainer;
+            const combobox = component.querySelector("[role='combobox']") as ComboboxSingle;
+            if (assoc === "explicit") combobox.setAttribute("form", id);
+            else combobox.removeAttribute("form");
+
+            const form = document.querySelector("form") ?? document.createElement("form");
+            form.id = id;
+            form.setAttribute("aria-label", "Test Form");
+            if (!form.hasAttribute(attr)) form.setAttribute(attr, String(0));
+
+            // Arrange Elements
+            if (!document.body.contains(form)) document.body.insertAdjacentElement("afterbegin", form);
+            form.insertAdjacentElement(assoc === "explicit" ? "beforebegin" : "afterbegin", component);
+          },
+          [association, submissionCountAttr, formId] as const,
+        );
+      }
+
+      /**
+       * Registers the provided `onsubmit` event `handler` with the form element on the page.
+       *
+       * Note: If you only want to track how many times a form was submitted, use the {@link defaultSubmissionHandler}.
+       */
+      function registerSubmissionHandler(page: Page, handler: (event: SubmitEvent) => void): Promise<void> {
+        return page.evaluate(
+          ([handleSubmitString, helperFunctionName]) => {
+            const form = document.querySelector("form");
+            if (!form) {
+              const sentence1 = "Could not find a `form` element with which to register the `onsubmit` handler.";
+              throw new Error(`${sentence1} Call \`${helperFunctionName}\` first.`);
+            }
+
+            eval(`var handleSubmit = ${handleSubmitString}`);
+            // @ts-expect-error -- This variable was defined with `eval`
+            form.addEventListener("submit", handleSubmit);
+          },
+          [handler.toString(), associateComboboxWithForm.name] as const,
+        );
+      }
+
+      /**
+       * The default submission handler to use with {@link registerSubmissionHandler} in tests. Tracks the
+       * number of times that the form element on the page was submitted.
+       */
+      function defaultSubmissionHandler(event: SubmitEvent) {
+        event.preventDefault();
+        const form = event.currentTarget as HTMLFormElement;
+
+        const count = Number(form.getAttribute("data-submission-count" satisfies typeof submissionCountAttr));
+        form.setAttribute("data-submission-count" satisfies typeof submissionCountAttr, String(count + 1));
+      }
+
+      it("Submits the owning form if the `combobox` is collapsed", async ({ page }) => {
+        /* ---------- Setup ---------- */
+        const initialValue = getRandomOption(testOptions.slice(1));
+        await renderComponent(page, initialValue);
+        await expectComboboxToBeClosed(page);
+        await expectOptionToBeSelected(page, { label: initialValue });
+
+        /* ---------- Assertions ---------- */
+        // Attempt submission when `combobox` is a CHILD of the form
+        await associateComboboxWithForm(page, "implicit");
+        await registerSubmissionHandler(page, defaultSubmissionHandler);
+
+        const combobox = page.getByRole("combobox");
+        await combobox.focus();
+        await page.keyboard.press("Enter");
+        await expect(page.getByRole("form")).toHaveAttribute(submissionCountAttr, String(1));
+
+        // Attempt submission when `combobox` is ASSOCIATED with the form via the `form` ATTRIBUTE
+        await associateComboboxWithForm(page, "explicit");
+
+        await combobox.focus();
+        await page.keyboard.press("Enter");
+        await expect(page.getByRole("form")).toHaveAttribute(submissionCountAttr, String(2));
+
+        // Verify that the `combobox` value is included in the form's data
+        const formDataValue = await page.evaluate(() => {
+          const name = "combobox-name";
+          const combobox = document.querySelector("combobox-container [role='combobox']") as ComboboxSingle;
+          combobox.setAttribute("name", name);
+
+          return new FormData(combobox.form as HTMLFormElement).get(name);
+        });
+
+        expect(formDataValue).toBe(initialValue);
+      });
+
+      it("DOES NOT attempt form submission if the `combobox` does not belong to a form", async ({ page }) => {
+        /* ---------- Setup ---------- */
+        const initialValue = getRandomOption(testOptions.slice(1));
+        await renderComponent(page, initialValue);
+        await expectComboboxToBeClosed(page);
+        await expectOptionToBeSelected(page, { label: initialValue });
+
+        /* ---------- Assertions ---------- */
+        let error: Error | undefined;
+        page.once("pageerror", (e) => (error = e));
+
+        // Nothing should break when `Enter` is pressed without an owning form element
+        expect(await page.evaluate(() => document.querySelector("form"))).toBe(null);
+        await page.getByRole("combobox").focus();
+        await page.keyboard.press("Enter");
+        expect(error).toBe(undefined);
+      });
+
+      it("Selects the `active` `option` and hides the `option`s without submitting the form", async ({ page }) => {
+        /* ---------- Setup ---------- */
+        const initialValue = testOptions[0];
+        await renderComponent(page, initialValue);
+        await expectComboboxToBeClosed(page);
+        await expectOptionToBeSelected(page, { label: initialValue });
+
+        await associateComboboxWithForm(page, "implicit");
+        await registerSubmissionHandler(page, defaultSubmissionHandler);
+
+        /* ---------- Assertions ---------- */
+        const lastValue = testOptions.at(-1) as string;
+
+        // Activate last `option`
+        await page.keyboard.press("Tab");
+        await page.keyboard.press("End");
+        await expectOptionsToBeVisible(page);
+        await expectOptionToBeActive(page, { label: lastValue });
+
+        // Select `option`
+        await page.keyboard.press("Enter");
+        await expectComboboxToBeClosed(page);
+        await expectOptionToBeSelected(page, { label: lastValue });
+        await expectOptionToBeSelected(page, { label: initialValue }, false);
+
+        // Form was NOT submitted
+        await expect(page.getByRole("form")).toHaveAttribute(submissionCountAttr, String(0));
+      });
+
+      // See: https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#implicit-submission
+      it.describe("Support for Implicit Form Submission with Default Buttons", () => {
+        it("Acknowledges `input`s of type `submit`", async ({ page }) => {
+          /* ---------- Setup ---------- */
+          // Mount Component
+          const initialValue = testOptions[0];
+          await renderComponent(page);
+          await expectComboboxToBeClosed(page);
+          await expectOptionToBeSelected(page, { label: initialValue });
+
+          // Setup Form + Submission Handler
+          await associateComboboxWithForm(page, "implicit");
+          await registerSubmissionHandler(page, defaultSubmissionHandler);
+          await registerSubmissionHandler(page, submitHandlerAssertInput);
+
+          function submitHandlerAssertInput(event: SubmitEvent): void {
+            event.preventDefault();
+            if (event.submitter instanceof HTMLInputElement && event.submitter.type === "submit") return;
+            throw new Error("Expected `submitter` to be an `input` of type `submit`");
+          }
+
+          /* ---------- Assertions ---------- */
+          // Create and Attach `input` Submitter
+          await page.evaluate(() => {
+            const input = document.createElement("input");
+            input.setAttribute("type", "submit");
+            input.setAttribute("value", "Submit Form");
+
+            document.querySelector("form")?.appendChild(input);
+          });
+
+          // Submit Form
+          let error: Error | undefined;
+          page.once("pageerror", (e) => (error = e));
+
+          await page.getByRole("combobox").focus();
+          await page.keyboard.press("Enter");
+          await expect(page.getByRole("form")).toHaveAttribute(submissionCountAttr, String(1));
+          expect(error).toBe(undefined);
+        });
+
+        // See: https://developer.mozilla.org/en-US/docs/Web/API/HTMLButtonElement#htmlbuttonelement.type
+        it("Acknowledges `button`s that are explicitly AND implicitly of type `submit`", async ({ page }) => {
+          /* ---------- Setup ---------- */
+          // Mount Component
+          const initialValue = testOptions[0];
+          await renderComponent(page);
+          await expectComboboxToBeClosed(page);
+          await expectOptionToBeSelected(page, { label: initialValue });
+
+          // Setup Form + Submission Handler
+          await associateComboboxWithForm(page, "implicit");
+          await registerSubmissionHandler(page, defaultSubmissionHandler);
+          await registerSubmissionHandler(page, submitHandlerAssertButton);
+
+          function submitHandlerAssertButton(event: SubmitEvent): void {
+            event.preventDefault();
+            if (event.submitter instanceof HTMLButtonElement && event.submitter.type === "submit") return;
+            throw new Error("Expected `submitter` to be a `button` of type `submit`");
+          }
+
+          /* ---------- Assertions ---------- */
+          // Create and Attach EXPLICIT `button` Submitter
+          await page.evaluate((id) => {
+            const button = document.createElement("button");
+            button.setAttribute("type", "submit");
+            button.setAttribute("form", id);
+            button.textContent = "Submit Form";
+
+            document.querySelector("form")?.insertAdjacentElement("afterend", button);
+          }, formId);
+
+          // Submit Form with EXPLICIT `button` Submitter
+          let error: Error | undefined;
+          page.once("pageerror", (e) => (error = e));
+
+          await page.getByRole("combobox").focus();
+          await page.keyboard.press("Enter");
+          await expect(page.getByRole("form")).toHaveAttribute(submissionCountAttr, String(1));
+          expect(error).toBe(undefined);
+
+          // Submit Form with IMPLICIT `button` Submitter (INVALID `type` attribute)
+          await page.evaluate(() => document.querySelector("button")?.setAttribute("type", "INVALID"));
+          await page.keyboard.press("Enter");
+          await expect(page.getByRole("form")).toHaveAttribute(submissionCountAttr, String(2));
+          expect(error).toBe(undefined);
+
+          // Submit Form with IMPLICIT `button` Submitter (OMITTED `type` attribute)
+          await page.evaluate(() => document.querySelector("button")?.removeAttribute("type"));
+          await page.keyboard.press("Enter");
+          await expect(page.getByRole("form")).toHaveAttribute(submissionCountAttr, String(3));
+          expect(error).toBe(undefined);
+        });
+
+        it("Submits forms lacking a `submitter`", async ({ page }) => {
+          /* ---------- Setup ---------- */
+          // Mount Component
+          const initialValue = testOptions[0];
+          await renderComponent(page);
+          await expectComboboxToBeClosed(page);
+          await expectOptionToBeSelected(page, { label: initialValue });
+
+          // Setup Form + Submission Handler
+          await associateComboboxWithForm(page, "explicit");
+          await registerSubmissionHandler(page, defaultSubmissionHandler);
+          await registerSubmissionHandler(page, submitHandlerAssertNoSubmitter);
+
+          function submitHandlerAssertNoSubmitter(event: SubmitEvent): void {
+            event.preventDefault();
+            if (event.submitter) throw new Error("Expected `form` NOT to have a `submitter`");
+          }
+
+          /* ---------- Assertions ---------- */
+          let error: Error | undefined;
+          page.once("pageerror", (e) => (error = e));
+
+          await page.getByRole("combobox").focus();
+          await page.keyboard.press("Enter");
+          await expect(page.getByRole("form")).toHaveAttribute(submissionCountAttr, String(1));
+          expect(error).toBe(undefined);
+        });
+
+        it("Respects `disabled` submit buttons", async ({ page }) => {
+          /* -------------------- Setup -------------------- */
+          // Mount Component
+          const initialValue = testOptions[0];
+          await renderComponent(page);
+          await expectComboboxToBeClosed(page);
+          await expectOptionToBeSelected(page, { label: initialValue });
+
+          // Setup Form + Submission Handler
+          await associateComboboxWithForm(page, "explicit");
+          await registerSubmissionHandler(page, defaultSubmissionHandler);
+
+          // Create an _enabled_ `submitter`
+          await page.evaluate((id) => {
+            const submitter = document.createElement("button");
+            submitter.textContent = "Enabled Submitter";
+            submitter.setAttribute("form", id);
+
+            document.querySelector("form")?.appendChild(submitter);
+          }, formId);
+
+          /* -------------------- Assertions -------------------- */
+          const combobox = page.getByRole("combobox");
+
+          /* ---------- Disabled `button` Submitter ---------- */
+          await page.evaluate((id) => {
+            const disabledSubmitterButton = document.createElement("button");
+            disabledSubmitterButton.setAttribute("disabled", "");
+            disabledSubmitterButton.setAttribute("form", id);
+
+            document.body.insertAdjacentElement("afterbegin", disabledSubmitterButton);
+          }, formId);
+
+          // Implicit Submission fails when disabled
+          await combobox.focus();
+          await page.keyboard.press("Enter");
+          await expect(page.getByRole("form")).toHaveAttribute(submissionCountAttr, String(0));
+
+          // Implicit Submission works when enabled
+          await page.evaluate(() => document.querySelector(":disabled")?.remove());
+          await page.keyboard.press("Enter");
+          await expect(page.getByRole("form")).toHaveAttribute(submissionCountAttr, String(1));
+
+          /* ---------- Disabled `input` Submitter ---------- */
+          await page.evaluate((id) => {
+            const disabledSubmitterInput = document.createElement("input");
+            disabledSubmitterInput.setAttribute("type", "submit");
+            disabledSubmitterInput.setAttribute("disabled", "");
+            disabledSubmitterInput.setAttribute("form", id);
+
+            document.body.insertAdjacentElement("afterbegin", disabledSubmitterInput);
+          }, formId);
+
+          // Implicit Submission fails when disabled
+          await combobox.focus();
+          await page.keyboard.press("Enter");
+          await expect(page.getByRole("form")).toHaveAttribute(submissionCountAttr, String(1));
+
+          // Implicit Submission works when enabled
+          await page.evaluate(() => document.querySelector(":disabled")?.remove());
+          await page.keyboard.press("Enter");
+          await expect(page.getByRole("form")).toHaveAttribute(submissionCountAttr, String(2));
+        });
       });
     });
   });
