@@ -117,25 +117,22 @@ class ComboboxSingle extends HTMLElement {
     this.childNodes[0].textContent = selectedOption.getAttribute(attrs["aria-label"]) ?? selectedOption.textContent;
   }
 
-  // Note: This getter SHOULD NOT be used within the class
+  /* -------------------- Exposed Internals (These getters SHOULD NOT be used within the class) -------------------- */
   /** @returns {ElementInternals["labels"]} */
   get labels() {
     return this.#internals.labels;
   }
 
-  // Note: This getter SHOULD NOT be used within the class
   /** @returns {ElementInternals["form"]} */
   get form() {
     return this.#internals.form;
   }
 
-  // Note: This getter SHOULD NOT be used within the class
   /** @returns {ElementInternals["validity"]} */
   get validity() {
     return this.#internals.validity;
   }
 
-  // Note: This getter SHOULD NOT be used within the class
   /** @returns {ElementInternals["validationMessage"]} */
   get validationMessage() {
     return this.#internals.validationMessage;
