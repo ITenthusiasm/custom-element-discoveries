@@ -1,5 +1,5 @@
 combobox-container {
-  --blocks: 10; /* Number of option blocks to display before needing to scroll */
+  --blocks: 5; /* Number of option blocks to display before needing to scroll */
 
   position: relative;
   display: inline-block;
@@ -8,7 +8,7 @@ combobox-container {
   height: auto;
 
   @media only screen and (min-width: 600px) {
-    --blocks: 5;
+    --blocks: 10;
   }
 
   > [role="combobox"] {
