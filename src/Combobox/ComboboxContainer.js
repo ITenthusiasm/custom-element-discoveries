@@ -90,8 +90,8 @@ class ComboboxContainer extends HTMLElement {
     }
 
     /* -------------------- Setup Event Listeners -------------------- */
-    this.#listbox.addEventListener("mouseover", handleDelegatedOptionHover);
-    this.#listbox.addEventListener("click", handleDelegatedOptionClick);
+    this.#listbox.addEventListener("mouseover", handleDelegatedOptionHover, { passive: true });
+    this.#listbox.addEventListener("click", handleDelegatedOptionClick, { passive: true });
     this.addEventListener("mousedown", handleDelegatedMousedown);
   }
 

@@ -66,8 +66,8 @@ class ComboboxSingle extends HTMLElement {
     });
 
     // Setup Event Listeners
-    this.addEventListener("click", handleComboboxClick);
-    this.addEventListener("blur", handleComboboxBlur);
+    this.addEventListener("click", handleComboboxClick, { passive: true });
+    this.addEventListener("blur", handleComboboxBlur, { passive: true });
     this.addEventListener("keydown", this.#handleTypeahead, { passive: true });
     this.addEventListener("keydown", handleComboboxKeydown);
   }
@@ -101,6 +101,7 @@ class ComboboxSingle extends HTMLElement {
       /* -------------------- Determine Next Active `option` -------------------- */
       /** @type {Element | undefined} */
       let nextActiveOption;
+      // TODO: What about `array.findIndex`?
       const start = Array.prototype.indexOf.call(listbox.children, activeOption) + 1;
 
       for (let i = start; i < listbox.children.length + start; i++) {
