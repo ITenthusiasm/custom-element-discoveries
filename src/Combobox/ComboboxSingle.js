@@ -68,6 +68,7 @@ class ComboboxSingle extends HTMLElement {
     // Setup Event Listeners
     this.addEventListener("click", handleComboboxClick);
     this.addEventListener("blur", handleComboboxBlur);
+    this.addEventListener("keydown", this.#handleTypeahead, { passive: true });
     this.addEventListener("keydown", handleComboboxKeydown);
   }
 
@@ -78,8 +79,47 @@ class ComboboxSingle extends HTMLElement {
 
     this.removeEventListener("click", handleComboboxClick);
     this.removeEventListener("blur", handleComboboxBlur);
+    this.removeEventListener("keydown", this.#handleTypeahead);
     this.removeEventListener("keydown", handleComboboxKeydown);
   }
+
+  /**
+   * Handles the `option` searching logic of the `combobox`
+   * @param {KeyboardEvent} event
+   * @returns {void}
+   */
+  #handleTypeahead = (event) => {
+    const combobox = /** @type {ComboboxSingle} */ (event.target);
+    const listbox = /** @type {HTMLUListElement} */ (combobox.nextElementSibling);
+    const activeOption = /** @type {HTMLElement | null} */ (listbox.querySelector("[data-active='true']"));
+
+    // TODO: Should we allow matching multi-word `option`s by removing empty spaces during a search comparison?
+    if (event.key.length === 1 && event.key !== " " && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      setAttributeFor(combobox, attrs["aria-expanded"], String(true));
+      this.#searchString += event.key;
+
+      /* -------------------- Determine Next Active `option` -------------------- */
+      /** @type {Element | undefined} */
+      let nextActiveOption;
+      const start = Array.prototype.indexOf.call(listbox.children, activeOption) + 1;
+
+      for (let i = start; i < listbox.children.length + start; i++) {
+        const index = i % listbox.children.length;
+
+        if (listbox.children[index].textContent?.toLowerCase().startsWith(this.#searchString.toLowerCase())) {
+          nextActiveOption = listbox.children[index];
+          break;
+        }
+      }
+
+      /* -------------------- Update `search` and Active `option` -------------------- */
+      clearTimeout(this.#searchTimeout);
+      if (!nextActiveOption) return void (this.#searchString = "");
+
+      setAttributeFor(combobox, attrs["aria-activedescendant"], nextActiveOption.id);
+      this.#searchTimeout = setTimeout(() => (this.#searchString = ""), 500);
+    }
+  };
 
   /** Retrieves the Custom Element's internal value (`this.#value`). @returns {string} */
   get value() {
@@ -139,7 +179,7 @@ class ComboboxSingle extends HTMLElement {
   }
 }
 
-/* -------------------- Combobox Handlers -------------------- */
+/* ------------------------------ Combobox Handlers ------------------------------ */
 /**
  * @param {MouseEvent} event
  * @returns {void}
@@ -264,7 +304,7 @@ function getDefaultSubmitter(form) {
   return null;
 }
 
-/* -------------------- Combobox Mutation Observer Details -------------------- */
+/* ------------------------------ Combobox Mutation Observer Details ------------------------------ */
 /**
  * @param {MutationRecord[]} mutations
  * @returns {void}

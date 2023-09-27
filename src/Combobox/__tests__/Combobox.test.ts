@@ -23,11 +23,28 @@ it.describe("Combobox Web Component", () => {
   }
 
   const url = "http://localhost:5173";
-  const testOptions = ["First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eigth", "Ninth", "Tenth"];
+  const testOptions = Object.freeze([
+    "First",
+    "Second",
+    "Third",
+    "Fourth",
+    "Fifth",
+    "Sixth",
+    "Seventh",
+    "Eigth",
+    "Ninth",
+    "Tenth",
+  ] as const);
 
   /* -------------------- Helper Functions -------------------- */
-  async function renderComponent(page: Page, initialValue?: string): Promise<void> {
+  type RenderComponentOptions = { options: ReadonlyArray<string>; initialValue?: string };
+  async function renderComponent(page: Page, options: RenderComponentOptions): Promise<void>;
+  async function renderComponent(page: Page, initialValue?: string): Promise<void>;
+  async function renderComponent(page: Page, config?: string | RenderComponentOptions): Promise<void> {
     await page.goto(url);
+    const initialValue = typeof config === "object" ? config.initialValue : config;
+    const opts = typeof config === "object" ? config.options : testOptions;
+
     return page.evaluate(
       ([options, initialValue]) => {
         const app = document.getElementById("app") as HTMLDivElement;
@@ -41,11 +58,11 @@ it.describe("Combobox Web Component", () => {
         </div>
       `;
       },
-      [testOptions, initialValue] as const,
+      [opts, initialValue] as const,
     );
   }
 
-  function getRandomOption<T extends string[]>(options: T = testOptions as T): T[number] {
+  function getRandomOption<T extends ReadonlyArray<string>>(options: T = testOptions as unknown as T): T[number] {
     const optionIndex = Math.floor(Math.random() * options.length);
     return options[optionIndex];
   }
@@ -1047,6 +1064,143 @@ it.describe("Combobox Web Component", () => {
             await page.keyboard.press("Enter");
             await expect(page.getByRole("form")).toHaveAttribute(submissionCountAttr, String(2));
           });
+        });
+      });
+
+      // NOTE: In these tests, a "matching" `option` is an `option` that STARTS with the search string/character
+      it.describe("Typeahead Functionality (via Printable Characters)", () => {
+        /** The amount of time, in `milliseconds`, after which the `combobox` search string is reset. (See Source) */
+        const timeout = 500;
+
+        /** The fraction by which the {@link timeout} should be increased (or decreased) to avoid test flakiness. */
+        const fraction = 0.25;
+
+        it("Shows the `option`s AND marks the NEXT matching `option` as `active`", async ({ page }) => {
+          /* ---------- Setup ---------- */
+          // Search Character
+          const searchChar = "S";
+          expect(testOptions.filter((o) => o.startsWith(searchChar)).length).toBeGreaterThan(1);
+
+          // Initial Value
+          const initialValue = testOptions[0];
+          await renderComponent(page, initialValue);
+          await expectComboboxToBeClosed(page);
+          await expectOptionToBeSelected(page, { label: initialValue });
+
+          /* ---------- Assertions ---------- */
+          // Try searching while the `combobox` is collapsed
+          const nextValue = testOptions.find((o) => o.startsWith(searchChar)) as string;
+
+          await page.keyboard.press("Tab");
+          await page.keyboard.press(searchChar, { delay: timeout * (1 + fraction) });
+          await expectOptionsToBeVisible(page);
+          await expectOptionToBeActive(page, { label: nextValue });
+          await expectOptionToBeActive(page, { label: initialValue }, false);
+
+          // Try searching while the `combobox` is already expanded
+          const latterValue = testOptions.find((o) => o.startsWith(searchChar) && o !== nextValue) as string;
+
+          await page.keyboard.press(searchChar);
+          await expectOptionToBeActive(page, { label: latterValue });
+          await expectOptionToBeActive(page, { label: nextValue }, false);
+          await expectOptionToBeActive(page, { label: initialValue }, false);
+        });
+
+        it("Matches `option`s case-insensitively", async ({ page }) => {
+          /* ---------- Setup ---------- */
+          const options = ["lowercase", "UPPERCASE"] as const;
+          await renderComponent(page, { options });
+
+          /* ---------- Assertions ---------- */
+          // Use "Uppercase Search" for "Lowercase Option"
+          const uppercaseSearch = "L";
+          expect(options[0]).not.toBe(uppercaseSearch);
+
+          await page.keyboard.press("Tab");
+          await page.keyboard.press(uppercaseSearch, { delay: timeout * (1 + fraction) });
+          await expectOptionToBeActive(page, { label: options[0] });
+
+          // Use "Lowercase Search" for "Uppercase Option"
+          const lowercaseSearch = "u";
+          expect(options[1]).not.toBe(lowercaseSearch);
+
+          await page.keyboard.press(lowercaseSearch);
+          await expectOptionToBeActive(page, { label: options[1] });
+          await expectOptionToBeActive(page, { label: options[0] }, false);
+        });
+
+        it("Matches substrings and entire words", async ({ page }) => {
+          /* ---------- Setup ---------- */
+          const second = testOptions[1];
+          expect(testOptions.filter((o) => o.slice(0, 2) === second.slice(0, 2)).length).toBeGreaterThan(1);
+          await renderComponent(page);
+
+          /* ---------- Assertions ---------- */
+          // First, `Second` matches
+          await page.keyboard.press("Tab");
+          await page.keyboard.press(second[0]);
+          await expectOptionToBeActive(page, { label: testOptions[1] });
+
+          // Then `Seventh` matches
+          await page.keyboard.press(second[1]);
+          await expectOptionToBeActive(page, { label: testOptions[6] });
+          await expectOptionToBeActive(page, { label: testOptions[1] }, false);
+
+          // As we complete the word `Second`, only `Second` matches from now on
+          for (let i = 2; i < second.length; i++) {
+            await page.keyboard.press(second[i]);
+            await expectOptionToBeActive(page, { label: testOptions[1] });
+            await expectOptionToBeActive(page, { label: testOptions[6] }, false);
+          }
+        });
+
+        it(`Resets the search string when ${timeout}ms of inactivity have passed`, async ({ page }) => {
+          /* ---------- Setup ---------- */
+          const seventh = testOptions[6];
+          await renderComponent(page);
+
+          /* ---------- Assertions ---------- */
+          // `Second` is found first
+          await page.keyboard.press("Tab");
+          await page.keyboard.press(seventh[0], { delay: timeout * (1 - fraction) });
+          await expectOptionToBeActive(page, { label: testOptions[1] });
+
+          // Then `Seventh`
+          for (let i = 1; i < 3; i++) {
+            await page.keyboard.press(seventh[i], { delay: timeout * (1 - fraction) });
+            await expectOptionToBeActive(page, { label: testOptions[6] });
+            await expectOptionToBeActive(page, { label: testOptions[1] }, false);
+          }
+
+          // `Seventh` is still found because we've been typing fast enough
+          await page.keyboard.press(seventh[3], { delay: timeout * (1 + fraction) });
+          await expectOptionToBeActive(page, { label: testOptions[6] });
+
+          // After an extended delay, the `n` in `Seventh` actually matches `Ninth` because the search string was reset
+          await page.keyboard.press(seventh[4]);
+          await expectOptionToBeActive(page, { label: testOptions[8] });
+          await expectOptionToBeActive(page, { label: testOptions[6] }, false);
+        });
+
+        it("Resets the search string when no match is found", async ({ page }) => {
+          /* ---------- Setup ---------- */
+          const firstLetter = testOptions[0][0];
+          await renderComponent(page);
+
+          /* ---------- Assertions ---------- */
+          // `First` is found initially
+          await page.keyboard.press("Tab");
+          await page.keyboard.press(firstLetter);
+          await expectOptionToBeActive(page, { label: testOptions[0] });
+
+          // Nothing is found for `ff`, so the `active` `option` DOES NOT change
+          await page.keyboard.press(firstLetter);
+          await expectOptionToBeActive(page, { label: testOptions[0] });
+
+          // Because the search string was reset, it becomes `t` instead of `fft`, resulting in a match
+          await page.keyboard.press("t");
+          await expectOptionToBeActive(page, { label: testOptions[2] });
+          await expectOptionToBeActive(page, { label: testOptions[0] }, false);
         });
       });
     });
