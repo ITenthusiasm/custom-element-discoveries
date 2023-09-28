@@ -1211,6 +1211,7 @@ it.describe("Combobox Web Component", () => {
       it.describe("disabled (Property)", () => {
         it("Exposes the underlying `disabled` attribute", async ({ page }) => {
           /* ---------- Setup ---------- */
+          await page.goto(url);
           await page.evaluate((options) => {
             const app = document.getElementById("app") as HTMLDivElement;
 
@@ -1248,6 +1249,7 @@ it.describe("Combobox Web Component", () => {
           /* ---------- Setup ---------- */
           const initialName = "initial-combobox";
 
+          await page.goto(url);
           await page.evaluate(
             ([options, initialName]) => {
               const app = document.getElementById("app") as HTMLDivElement;
@@ -1283,6 +1285,7 @@ it.describe("Combobox Web Component", () => {
 
         it("Complies with Form Standards by yielding an empty string in lieu of an attribute", async ({ page }) => {
           /* ---------- Setup ---------- */
+          await page.goto(url);
           await page.evaluate((options) => {
             const app = document.getElementById("app") as HTMLDivElement;
 
