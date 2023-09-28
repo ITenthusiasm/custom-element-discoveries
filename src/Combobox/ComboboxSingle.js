@@ -273,16 +273,11 @@ function handleComboboxKeydown(event) {
 
     // Submit the Form (if the element is collapsed)
     // See: https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#implicit-submission
-    if (!combobox.form) return; // TODO: Uncomment this line
+    if (!combobox.form) return;
 
     const submitter = getDefaultSubmitter(combobox.form);
     if (submitter) return submitter.disabled ? undefined : submitter.click();
     return combobox.form.requestSubmit();
-  }
-
-  // Option Searching Logic (should only operate on printable characters)
-  if (event.key.length === 1 && !event.altKey && !event.ctrlKey && !event.metaKey) {
-    // TODO: Implement logic. (Should we use the `class` for this, or the element's `data-*` attributes?)
   }
 }
 
