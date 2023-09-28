@@ -19,7 +19,7 @@ class ComboboxContainer extends HTMLElement {
   #baseId;
 
   // Important Elements
-  /** @type {import("./ComboboxSingle").default} */
+  /** @type {import("./ComboboxField").default} */
   #combobox;
 
   /** @type {HTMLUListElement} */
@@ -28,7 +28,7 @@ class ComboboxContainer extends HTMLElement {
   constructor() {
     super();
 
-    this.#combobox = /** @type {import("./ComboboxSingle").default} */ (document.createElement("combobox-single"));
+    this.#combobox = /** @type {import("./ComboboxField").default} */ (document.createElement("combobox-field"));
     this.#listbox = document.createElement("ul");
   }
 
@@ -113,7 +113,7 @@ function handleDelegatedOptionHover(event) {
   const option = /** @type {HTMLElement} */ (event.target);
   if (option === listbox) return; // We hovered the `listbox`, not an `option`
 
-  const combobox = /** @type {import("./ComboboxSingle").default} */ (listbox.previousElementSibling);
+  const combobox = /** @type {import("./ComboboxField").default} */ (listbox.previousElementSibling);
   setAttributeFor(combobox, attrs["aria-activedescendant"], option.id);
 }
 
@@ -127,7 +127,7 @@ function handleDelegatedOptionClick(event) {
   if (option === listbox) return; // We clicked the `listbox`, not an `option`
   if (option.hasAttribute("aria-disabled")) return;
 
-  const combobox = /** @type {import("./ComboboxSingle").default} */ (listbox.previousElementSibling);
+  const combobox = /** @type {import("./ComboboxField").default} */ (listbox.previousElementSibling);
   combobox.value = option.getAttribute(attrs.value) ?? /** @type {string} */ (option.textContent);
   combobox.setAttribute(attrs["aria-expanded"], String(false));
 }

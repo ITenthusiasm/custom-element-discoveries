@@ -3,7 +3,7 @@ import { attrs, setAttributeFor } from "./ComboboxContainer";
 /** @typedef {keyof Pick<ElementInternals, "labels" | "form" | "validity" | "validationMessage">} ExposedInternals */
 
 /** @implements {Pick<ElementInternals, ExposedInternals>} */
-class ComboboxSingle extends HTMLElement {
+class ComboboxField extends HTMLElement {
   static formAssociated = true;
 
   // Internals
@@ -89,7 +89,7 @@ class ComboboxSingle extends HTMLElement {
    * @returns {void}
    */
   #handleTypeahead = (event) => {
-    const combobox = /** @type {ComboboxSingle} */ (event.target);
+    const combobox = /** @type {ComboboxField} */ (event.target);
     const listbox = /** @type {HTMLUListElement} */ (combobox.nextElementSibling);
     const activeOption = /** @type {HTMLElement | null} */ (listbox.querySelector("[data-active='true']"));
 
@@ -203,7 +203,7 @@ class ComboboxSingle extends HTMLElement {
  * @returns {void}
  */
 function handleComboboxClick(event) {
-  const combobox = /** @type {ComboboxSingle} */ (event.target);
+  const combobox = /** @type {ComboboxField} */ (event.target);
   const expanded = combobox.getAttribute("aria-expanded") === String(true);
   combobox.setAttribute(attrs["aria-expanded"], String(!expanded));
 }
@@ -213,7 +213,7 @@ function handleComboboxClick(event) {
  * @returns {void}
  */
 function handleComboboxBlur(event) {
-  const combobox = /** @type {ComboboxSingle} */ (event.target);
+  const combobox = /** @type {ComboboxField} */ (event.target);
   setAttributeFor(combobox, attrs["aria-expanded"], String(false));
 }
 
@@ -222,7 +222,7 @@ function handleComboboxBlur(event) {
  * @returns {void}
  */
 function handleComboboxKeydown(event) {
-  const combobox = /** @type {ComboboxSingle} */ (event.target);
+  const combobox = /** @type {ComboboxField} */ (event.target);
   const listbox = /** @type {HTMLUListElement} */ (combobox.nextElementSibling);
   const activeOption = /** @type {HTMLElement | null} */ (listbox.querySelector("[data-active='true']"));
 
@@ -330,7 +330,7 @@ function watchExpansion(mutations) {
  * @returns {void}
  */
 function handleExpansionChange(mutation) {
-  const combobox = /** @type {ComboboxSingle} */ (mutation.target);
+  const combobox = /** @type {ComboboxField} */ (mutation.target);
 
   // TODO: Should we expose a `listbox` getter?
   const listbox = /** @type {HTMLUListElement} */ (combobox.nextElementSibling);
@@ -367,7 +367,7 @@ function watchActiveDescendant(mutations) {
  * @returns {void}
  */
 function handleActiveDescendantChange(mutation) {
-  const combobox = /** @type {ComboboxSingle} */ (mutation.target);
+  const combobox = /** @type {ComboboxField} */ (mutation.target);
 
   // Deactivate Previous Option
   const lastOptionId = mutation.oldValue;
@@ -380,6 +380,6 @@ function handleActiveDescendantChange(mutation) {
   activeOption?.setAttribute("data-active", String(true));
 }
 
-export default ComboboxSingle;
+export default ComboboxField;
 
 /* Future Reference Note: For searchable comboboxes, a `contenteditable` div is probably the way to go. See MDN. */

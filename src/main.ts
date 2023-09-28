@@ -1,5 +1,5 @@
 // Primary Imports
-import ComboboxSingle from "./Combobox/ComboboxSingle";
+import ComboboxField from "./Combobox/ComboboxField";
 import ComboboxContainer from "./Combobox/ComboboxContainer";
 import CustomSelect from "./deprecated/CustomSelect/CustomSelect";
 
@@ -10,7 +10,7 @@ import "./app.css";
 
 /* -------------------- "App Logic" -------------------- */
 customElements.define("custom-select", CustomSelect);
-customElements.define("combobox-single", ComboboxSingle);
+customElements.define("combobox-field", ComboboxField);
 customElements.define("combobox-container", ComboboxContainer);
 
 /* -------------------- Handlers for Debugging -------------------- */

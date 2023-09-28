@@ -1,7 +1,7 @@
 import { test as it, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import type ComboboxContainer from "../ComboboxContainer";
-import type ComboboxSingle from "../ComboboxSingle";
+import type ComboboxField from "../ComboboxField";
 
 /** The attributes _commonly_ used for **testing** the `Combobox` Web Component. (Declared to help avoid typos.) */
 const attrs = Object.freeze({
@@ -745,7 +745,7 @@ it.describe("Combobox Web Component", () => {
             ([assoc, attr, id]) => {
               // Find/Create Elements
               const component = document.querySelector("combobox-container") as ComboboxContainer;
-              const combobox = component.querySelector("[role='combobox']") as ComboboxSingle;
+              const combobox = component.querySelector("[role='combobox']") as ComboboxField;
               if (assoc === "explicit") combobox.setAttribute("form", id);
               else combobox.removeAttribute("form");
 
@@ -823,7 +823,7 @@ it.describe("Combobox Web Component", () => {
           // Verify that the `combobox` value is included in the form's data
           const formDataValue = await page.evaluate(() => {
             const name = "combobox-name";
-            const combobox = document.querySelector("combobox-container [role='combobox']") as ComboboxSingle;
+            const combobox = document.querySelector("combobox-container [role='combobox']") as ComboboxField;
             combobox.setAttribute("name", name);
 
             return new FormData(combobox.form as HTMLFormElement).get(name);
@@ -1227,17 +1227,17 @@ it.describe("Combobox Web Component", () => {
           await expect(combobox).toHaveJSProperty("disabled", true);
 
           // `attribute` responds to `property` updates
-          await page.evaluate(() => ((document.querySelector("[role='combobox']") as ComboboxSingle).disabled = false));
+          await page.evaluate(() => ((document.querySelector("[role='combobox']") as ComboboxField).disabled = false));
           expect(await page.evaluate(() => document.querySelector("[role='combobox']")?.hasAttribute("disabled"))).toBe(
             false,
           );
 
-          await page.evaluate(() => ((document.querySelector("[role='combobox']") as ComboboxSingle).disabled = true));
+          await page.evaluate(() => ((document.querySelector("[role='combobox']") as ComboboxField).disabled = true));
           await expect(combobox).toHaveAttribute("disabled", "");
 
           // `property` also responds to `attribute` updates
           await page.evaluate(() =>
-            (document.querySelector("[role='combobox']") as ComboboxSingle).removeAttribute("disabled"),
+            (document.querySelector("[role='combobox']") as ComboboxField).removeAttribute("disabled"),
           );
           await expect(combobox).toHaveJSProperty("disabled", false);
         });
@@ -1269,14 +1269,14 @@ it.describe("Combobox Web Component", () => {
           // `attribute` responds to `property` updates
           const newPropertyName = "property-combobox";
           await page.evaluate(
-            () => ((document.querySelector("[role='combobox']") as ComboboxSingle).name = newPropertyName),
+            () => ((document.querySelector("[role='combobox']") as ComboboxField).name = newPropertyName),
           );
           await expect(combobox).toHaveAttribute("name", newPropertyName);
 
           // `property` responds to `attribute` updates
           const newAttributeName = "attribute-combobox";
           await page.evaluate(
-            () => document.querySelector<ComboboxSingle>("[role='combobox']")?.setAttribute("name", newAttributeName),
+            () => document.querySelector<ComboboxField>("[role='combobox']")?.setAttribute("name", newAttributeName),
           );
           await expect(combobox).toHaveJSProperty("name", newAttributeName);
         });
@@ -1300,7 +1300,7 @@ it.describe("Combobox Web Component", () => {
 
           // `property` still defaults to empty string when the `name` attribute is _cleared_
           await page.evaluate(() => {
-            const combobox = document.querySelector("[role='combobox']") as ComboboxSingle;
+            const combobox = document.querySelector("[role='combobox']") as ComboboxField;
             combobox.setAttribute("name", "some-valid-name");
             combobox.removeAttribute("name");
           });
