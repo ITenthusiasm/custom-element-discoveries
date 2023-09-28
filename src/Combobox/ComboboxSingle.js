@@ -122,23 +122,21 @@ class ComboboxSingle extends HTMLElement {
     }
   };
 
+  /* ------------------------------ Exposed Form Properties ------------------------------ */
   /** Retrieves the Custom Element's internal value (`this.#value`). @returns {string} */
   get value() {
     return this.#value;
   }
 
-  /**
-   * Updates the Custom Element's internal value (`this.#value`) along with any relevant element attributes.
-   * @param {string} v
-   */
+  /** Updates the Custom Element's internal value (`this.#value`) along with any relevant element attributes. */
   set value(v) {
     if (v === this.#value && v !== "") return; // Don't run setter logic redundantly
 
-    /* -------------------- Unselect previous option -------------------- */
+    /* ---------- Unselect previous option ---------- */
     const listbox = /** @type {HTMLUListElement} */ (this.nextElementSibling);
     listbox.querySelector(`[${attrs["aria-selected"]}="${true}"]`)?.setAttribute(attrs["aria-selected"], String(false));
 
-    /* -------------------- Operate on new option -------------------- */
+    /* ---------- Operate on new option ---------- */
     const selectedOption = document.getElementById(`${listbox.id}-option-${v}`);
 
     // An invalid option was supplied
@@ -156,6 +154,25 @@ class ComboboxSingle extends HTMLElement {
     selectedOption.setAttribute(attrs["aria-selected"], String(true));
     // TODO: What if we made a custom `ComboboxOption` element that had a `label` attribute like regular options?
     this.childNodes[0].textContent = selectedOption.getAttribute(attrs["aria-label"]) ?? selectedOption.textContent;
+  }
+
+  /** Sets or retrieves the name of the object. @returns {HTMLInputElement["name"]} */
+  get name() {
+    return this.getAttribute("name") ?? "";
+  }
+
+  set name(value) {
+    this.setAttribute("name", value);
+  }
+
+  /** @returns {HTMLInputElement["disabled"]} */
+  get disabled() {
+    return this.hasAttribute("disabled");
+  }
+
+  set disabled(value) {
+    if (value) this.setAttribute("disabled", "");
+    else this.removeAttribute("disabled");
   }
 
   /* -------------------- Exposed Internals (These getters SHOULD NOT be used within the class) -------------------- */
@@ -200,7 +217,6 @@ function handleComboboxBlur(event) {
   setAttributeFor(combobox, attrs["aria-expanded"], String(false));
 }
 
-// TODO: How to handle the `CustomSelect` component being disabled?
 /**
  * @param {KeyboardEvent} event
  * @returns {void}
