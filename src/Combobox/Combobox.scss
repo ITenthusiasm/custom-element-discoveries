@@ -24,12 +24,11 @@ combobox-container {
       outline: 1px solid blue;
     }
 
-    + ul[role="listbox"] {
+    + [role="listbox"] {
       --listbox-border: 2px;
       --option-height: 38px;
       --option-padding: 8px;
 
-      list-style: none;
       position: absolute;
       z-index: 2;
 
@@ -45,6 +44,7 @@ combobox-container {
       background-color: white;
 
       > [role="option"] {
+        display: block;
         box-sizing: border-box;
         height: var(--option-height);
         padding: var(--option-padding);

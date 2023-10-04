@@ -1,4 +1,4 @@
-import { attrs, setAttributeFor } from "./ComboboxContainer";
+import { attrs, setAttributeFor } from "./ComboboxContainer.js";
 
 /** @typedef {keyof Pick<ElementInternals, "labels" | "form" | "validity" | "validationMessage">} ExposedInternals */
 
@@ -8,8 +8,9 @@ class ComboboxField extends HTMLElement {
 
   // Internals
   #mounted = false;
+  #modified = false;
 
-  /** @type {ElementInternals} */
+  /** @readonly @type {ElementInternals} */
   #internals;
 
   #searchString = "";
@@ -53,8 +54,8 @@ class ComboboxField extends HTMLElement {
 
     // Require a Corresponding `listbox`
     const expectedListbox = this.nextElementSibling;
-    if (!(expectedListbox instanceof HTMLUListElement) || expectedListbox.getAttribute("role") !== "listbox") {
-      throw new Error(`The ${this.constructor.name} must be placed before a valid \`ul[role="listbox"]\` element.`);
+    if (!(expectedListbox instanceof HTMLElement) || expectedListbox.getAttribute("role") !== "listbox") {
+      throw new Error(`The ${this.constructor.name} must be placed before a valid \`[role="listbox"]\` element.`);
     }
 
     // Setup Mutation Observers
@@ -130,30 +131,25 @@ class ComboboxField extends HTMLElement {
 
   /** Updates the Custom Element's internal value (`this.#value`) along with any relevant element attributes. */
   set value(v) {
-    if (v === this.#value && v !== "") return; // Don't run setter logic redundantly
+    if (v === this.#value && v !== "") return;
+    this.#modified = true;
 
-    /* ---------- Unselect previous option ---------- */
-    const listbox = /** @type {HTMLUListElement} */ (this.nextElementSibling);
-    listbox.querySelector(`[${attrs["aria-selected"]}="${true}"]`)?.setAttribute(attrs["aria-selected"], String(false));
+    const options = this.listbox.children;
+    const newOption = /** @type {typeof previousOption} */ (Array.prototype.find.call(options, (o) => o.value === v));
+    const previousOption = /** @type {typeof options[number] | undefined} */ (
+      Array.prototype.find.call(options, (o) => o.selected && o !== newOption)
+    );
 
-    /* ---------- Operate on new option ---------- */
-    const selectedOption = document.getElementById(`${listbox.id}-option-${v}`);
+    /* ---------- Update Values ---------- */
+    if (!newOption) return; // Ignore invalid values
 
-    // An invalid option was supplied
-    if (!selectedOption) {
-      this.#value = "";
-      this.#internals.setFormValue(this.#value);
-      // TODO: Should we set internal `validity` to `badInput`?
-      this.childNodes[0].textContent = "";
-      return;
-    }
-
-    // A valid option was supplied
     this.#value = v;
     this.#internals.setFormValue(this.#value);
-    selectedOption.setAttribute(attrs["aria-selected"], String(true));
-    // TODO: What if we made a custom `ComboboxOption` element that had a `label` attribute like regular options?
-    this.childNodes[0].textContent = selectedOption.getAttribute(attrs["aria-label"]) ?? selectedOption.textContent;
+    this.childNodes[0].textContent = newOption.label;
+
+    // Update `option`s AFTER updating `value`
+    newOption.selected = true;
+    if (previousOption) previousOption.selected = false;
   }
 
   /** Sets or retrieves the name of the object. @returns {HTMLInputElement["name"]} */
@@ -173,6 +169,19 @@ class ComboboxField extends HTMLElement {
   set disabled(value) {
     if (value) this.setAttribute("disabled", "");
     else this.removeAttribute("disabled");
+  }
+
+  /** Indicates that the `combobox`'s value was modified (even if it isn't dirty). @returns {boolean} */
+  get modified() {
+    return this.#modified;
+  }
+
+  /**
+   * The `listbox` that this `combobox` controls.
+   * @returns {HTMLElement & { children: HTMLCollectionOf<import("./ComboboxOption.js").default>}}
+   */
+  get listbox() {
+    return /** @type {typeof this.listbox} */ (this.nextElementSibling);
   }
 
   /* -------------------- Exposed Internals (These getters SHOULD NOT be used within the class) -------------------- */
@@ -217,6 +226,7 @@ function handleComboboxBlur(event) {
   setAttributeFor(combobox, attrs["aria-expanded"], String(false));
 }
 
+// TODO: What about `disabled` _options_?
 /**
  * @param {KeyboardEvent} event
  * @returns {void}

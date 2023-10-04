@@ -1,10 +1,9 @@
+import ComboboxOption from "./ComboboxOption.js";
+
 /** The attributes _commonly_ used by the `Combobox` component. (These are declared to help avoid typos.) */
 export const attrs = Object.freeze({
   "aria-activedescendant": "aria-activedescendant",
   "aria-expanded": "aria-expanded",
-  "aria-selected": "aria-selected",
-  "aria-label": "aria-label",
-  value: "value",
 });
 
 class ComboboxContainer extends HTMLElement {
@@ -19,17 +18,16 @@ class ComboboxContainer extends HTMLElement {
   #baseId;
 
   // Important Elements
-  /** @type {import("./ComboboxField").default} */
+  /** @readonly @type {import("./ComboboxField.js").default} */
   #combobox;
 
-  /** @type {HTMLUListElement} */
+  /** @readonly @type {HTMLElement} */
   #listbox;
 
   constructor() {
     super();
-
-    this.#combobox = /** @type {import("./ComboboxField").default} */ (document.createElement("combobox-field"));
-    this.#listbox = document.createElement("ul");
+    this.#combobox = /** @type {import("./ComboboxField.js").default} */ (document.createElement("combobox-field"));
+    this.#listbox = document.createElement("div");
   }
 
   // "On Mount" for Custom Elements
@@ -38,7 +36,7 @@ class ComboboxContainer extends HTMLElement {
 
     if (!this.#mounted) {
       /* -------------------- Setup Elements -------------------- */
-      // Note: If we generated unique IDs, we wouldn't need this check. We can address this later.
+      // TODO: If we generated unique IDs, we wouldn't need this check. We can address this later.
       if (!this.id) throw new TypeError("An `id` attribute is required for accessibility purposes.");
 
       // Root Element
@@ -56,36 +54,28 @@ class ComboboxContainer extends HTMLElement {
 
       /* -------------------- Render Elements -------------------- */
       // Setup Children (Aggressively)
+      /** @type {ComboboxOption | undefined} */
+      let initialOption;
+
       while (this.childNodes.length > 0) {
         const node = this.childNodes[0];
+        customElements.upgrade(node);
 
-        // Only Allow Valid Elements | TODO: Require "valid `ComboboxOption` elements"
-        if (!(node instanceof HTMLElement)) {
+        if (!(node instanceof ComboboxOption)) {
           node.remove();
           continue;
         }
 
         this.#listbox.appendChild(node);
-
-        /*
-         * TODO: We should take "Option Requirements" from
-         * https://developer.mozilla.org/en-US/docs/Web/API/HTMLOptionElement
-         */
-        // TODO: If we use a custom element, can we just do node.value?
-        const optionValue = node.getAttribute(attrs.value) ?? /** @type {string} */ (node.textContent);
-        node.setAttribute("id", `${this.#listbox.id}-option-${optionValue}`);
-        node.setAttribute("role", "option");
-        node.setAttribute("aria-selected", String(false));
+        node.setAttribute("id", `${this.#listbox.id}-option-${node.value}`);
+        if (node.defaultSelected || !initialOption) initialOption = node;
       }
 
       // Setup Primary Elements
       this.appendChild(this.#listbox);
       this.#listbox.insertAdjacentElement("beforebegin", this.#combobox);
+      if (initialOption) this.#combobox.value = initialOption.value;
 
-      // Initialize Data
-      // TODO: Need a cleaner way to get default value. (Explicit, then first child VALUE (not text), then "".)
-      this.#combobox.value = (this.getAttribute("value") || this.#listbox.firstElementChild.textContent) ?? "";
-      this.removeAttribute("value");
       this.#mounted = true;
     }
 
@@ -109,11 +99,11 @@ class ComboboxContainer extends HTMLElement {
  * @returns {void}
  */
 function handleDelegatedOptionHover(event) {
-  const listbox = /** @type {HTMLUListElement} */ (event.currentTarget);
-  const option = /** @type {HTMLElement} */ (event.target);
+  const listbox = /** @type {HTMLElement} */ (event.currentTarget);
+  const option = /** @type {ComboboxOption} */ (event.target);
   if (option === listbox) return; // We hovered the `listbox`, not an `option`
 
-  const combobox = /** @type {import("./ComboboxField").default} */ (listbox.previousElementSibling);
+  const combobox = /** @type {import("./ComboboxField.js").default} */ (listbox.previousElementSibling);
   setAttributeFor(combobox, attrs["aria-activedescendant"], option.id);
 }
 
@@ -122,14 +112,14 @@ function handleDelegatedOptionHover(event) {
  * @returns {void}
  */
 function handleDelegatedOptionClick(event) {
-  const listbox = /** @type {HTMLUListElement} */ (event.currentTarget);
-  const option = /** @type {HTMLElement} */ (event.target);
+  const listbox = /** @type {HTMLElement} */ (event.currentTarget);
+  const option = /** @type {ComboboxOption} */ (event.target);
   if (option === listbox) return; // We clicked the `listbox`, not an `option`
-  if (option.hasAttribute("aria-disabled")) return;
+  if (option.disabled) return;
 
-  const combobox = /** @type {import("./ComboboxField").default} */ (listbox.previousElementSibling);
-  combobox.value = option.getAttribute(attrs.value) ?? /** @type {string} */ (option.textContent);
+  const combobox = /** @type {import("./ComboboxField.js").default} */ (listbox.previousElementSibling);
   combobox.setAttribute(attrs["aria-expanded"], String(false));
+  combobox.value = option.value;
 }
 
 /* -------------------- Container Handlers -------------------- */
@@ -138,15 +128,8 @@ function handleDelegatedOptionClick(event) {
  * @returns {void}
  */
 function handleDelegatedMousedown(event) {
-  if (/** @type {HTMLElement} */ (event.target).matches("[role='option']")) return event.preventDefault();
+  if (event.target instanceof ComboboxOption) return event.preventDefault();
 }
-
-/*
- * TODO: Maybe add a `MutationObserver` that clicks (selects) an option whenever `aria-selected` becomes true?
- * If we do this, we'd have to avoid causing an infinite loop though.
- *
- * EDIT: Frankly, this is probably too much work.
- */
 
 /* -------------------- Local Helpers -------------------- */
 /**

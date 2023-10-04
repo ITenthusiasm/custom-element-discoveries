@@ -1,7 +1,7 @@
 import { test as it, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
-import type ComboboxContainer from "../ComboboxContainer";
-import type ComboboxField from "../ComboboxField";
+import type ComboboxContainer from "../ComboboxContainer.js";
+import type ComboboxField from "../ComboboxField.js";
 
 /** The attributes _commonly_ used for **testing** the `Combobox` Web Component. (Declared to help avoid typos.) */
 const attrs = Object.freeze({
@@ -10,7 +10,6 @@ const attrs = Object.freeze({
   "aria-selected": "aria-selected",
   "aria-label": "aria-label",
   "data-active": "data-active",
-  value: "value",
 });
 
 it.describe("Combobox Web Component", () => {
@@ -46,12 +45,12 @@ it.describe("Combobox Web Component", () => {
     const opts = typeof config === "object" ? config.options : testOptions;
 
     return page.evaluate(
-      ([options, initialValue]) => {
+      ([options, value]) => {
         const app = document.getElementById("app") as HTMLDivElement;
 
         app.innerHTML = `
-        <combobox-container id="component" name="my-name"${initialValue ? ` value="${initialValue}"` : ""}>
-          ${options.map((o) => `<li>${o}</li>`).join("")}
+        <combobox-container id="component" name="my-name">
+          ${options.map((o) => `<combobox-option${value === o ? " selected" : ""}>${o}</combobox-option>`).join("")}
         </combobox-container>
         <div style="font-size: 3rem; font-weight: bold; text-align: right; background-color: red; height: 500vh;">
           Container for testing scroll prevention
@@ -1217,7 +1216,7 @@ it.describe("Combobox Web Component", () => {
 
             app.innerHTML = `
               <combobox-container id="component" disabled>
-                ${options.map((o) => `<li>${o}</li>`).join("")}
+                ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
               </combobox-container>
             `;
           }, testOptions);
@@ -1256,7 +1255,7 @@ it.describe("Combobox Web Component", () => {
 
               app.innerHTML = `
                 <combobox-container id="component" name="${initialName}">
-                  ${options.map((o) => `<li>${o}</li>`).join("")}
+                  ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
                 </combobox-container>
               `;
             },
@@ -1291,7 +1290,7 @@ it.describe("Combobox Web Component", () => {
 
             app.innerHTML = `
               <combobox-container id="component">
-                ${options.map((o) => `<li>${o}</li>`).join("")}
+                ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
               </combobox-container>
             `;
           }, testOptions);
