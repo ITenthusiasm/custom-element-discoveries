@@ -10,13 +10,6 @@ class ComboboxContainer extends HTMLElement {
   // Internals
   #mounted = false;
 
-  // TODO: Do we want to use this? Also improve JSDoc. Or we can create a custom `root-id` attribute.
-  /**
-   * @type {string | undefined}
-   * The ID used as a base for the IDs of all important elements belonging to the `ComboboxContainer`
-   */
-  #baseId;
-
   // Important Elements
   /** @readonly @type {import("./ComboboxField.js").default} */
   #combobox;
@@ -36,10 +29,8 @@ class ComboboxContainer extends HTMLElement {
 
     if (!this.#mounted) {
       /* -------------------- Setup Elements -------------------- */
-      // TODO: If we generated unique IDs, we wouldn't need this check. We can address this later.
-      if (!this.id) throw new TypeError("An `id` attribute is required for accessibility purposes.");
-
       // Root Element
+      this.id = this.id || Math.random().toString(36).slice(2);
       this.setAttribute("role", "none");
 
       // Combobox
