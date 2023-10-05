@@ -3,7 +3,9 @@
 class ComboboxOption extends HTMLElement {
   #mounted = false;
   #selected = false;
-  static observedAttributes = /** @readonly @type {const} */ (["selected"]);
+  static get observedAttributes() {
+    return /** @type {const} */ (["selected"]);
+  }
 
   /**
    * Responds to updates to the `selected` attribute

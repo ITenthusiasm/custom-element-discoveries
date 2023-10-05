@@ -4,7 +4,10 @@ import { attrs, setAttributeFor } from "./ComboboxContainer.js";
 
 /** @implements {Pick<ElementInternals, ExposedInternals>} */
 class ComboboxField extends HTMLElement {
-  static formAssociated = true;
+  /** @returns {true} */
+  static get formAssociated() {
+    return true;
+  }
 
   // Internals
   #mounted = false;
