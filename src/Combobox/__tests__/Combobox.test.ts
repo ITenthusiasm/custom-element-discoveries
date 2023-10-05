@@ -1215,7 +1215,7 @@ it.describe("Combobox Web Component", () => {
             const app = document.getElementById("app") as HTMLDivElement;
 
             app.innerHTML = `
-              <combobox-container id="component" disabled>
+              <combobox-container disabled>
                 ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
               </combobox-container>
             `;
@@ -1228,9 +1228,7 @@ it.describe("Combobox Web Component", () => {
 
           // `attribute` responds to `property` updates
           await page.evaluate(() => ((document.querySelector("[role='combobox']") as ComboboxField).disabled = false));
-          expect(await page.evaluate(() => document.querySelector("[role='combobox']")?.hasAttribute("disabled"))).toBe(
-            false,
-          );
+          await expect(combobox).not.toHaveAttribute("disabled", /.*/);
 
           await page.evaluate(() => ((document.querySelector("[role='combobox']") as ComboboxField).disabled = true));
           await expect(combobox).toHaveAttribute("disabled", "");
@@ -1254,7 +1252,7 @@ it.describe("Combobox Web Component", () => {
               const app = document.getElementById("app") as HTMLDivElement;
 
               app.innerHTML = `
-                <combobox-container id="component" name="${initialName}">
+                <combobox-container name="${initialName}">
                   ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
                 </combobox-container>
               `;
@@ -1270,14 +1268,16 @@ it.describe("Combobox Web Component", () => {
           // `attribute` responds to `property` updates
           const newPropertyName = "property-combobox";
           await page.evaluate(
-            () => ((document.querySelector("[role='combobox']") as ComboboxField).name = newPropertyName),
+            (name) => ((document.querySelector("[role='combobox']") as ComboboxField).name = name),
+            newPropertyName,
           );
           await expect(combobox).toHaveAttribute("name", newPropertyName);
 
           // `property` responds to `attribute` updates
           const newAttributeName = "attribute-combobox";
           await page.evaluate(
-            () => document.querySelector<ComboboxField>("[role='combobox']")?.setAttribute("name", newAttributeName),
+            (attrValue) => document.querySelector<ComboboxField>("[role='combobox']")?.setAttribute("name", attrValue),
+            newAttributeName,
           );
           await expect(combobox).toHaveJSProperty("name", newAttributeName);
         });
@@ -1289,7 +1289,7 @@ it.describe("Combobox Web Component", () => {
             const app = document.getElementById("app") as HTMLDivElement;
 
             app.innerHTML = `
-              <combobox-container id="component">
+              <combobox-container>
                 ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
               </combobox-container>
             `;

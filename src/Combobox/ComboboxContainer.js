@@ -34,9 +34,21 @@ class ComboboxContainer extends HTMLElement {
       this.setAttribute("role", "none");
 
       // Combobox
-      // TODO: We need to figure out how to properly transfer the valid `name` to the `combobox`
       this.#combobox.setAttribute("id", `${this.id}-combobox`);
       this.#combobox.setAttribute("aria-controls", `${this.id}-listbox`);
+
+      // Transfer relevant attributes from `container` to `combobox`
+      let i = 0;
+      while (this.attributes.length > 2) {
+        const attr = this.attributes[i];
+        if (attr.name === "id" || attr.name === "role") {
+          i += 1;
+          continue;
+        }
+
+        this.removeAttributeNode(attr);
+        this.#combobox.setAttributeNode(attr);
+      }
 
       // Listbox
       this.#listbox.setAttribute("id", `${this.id}-listbox`);
