@@ -52,6 +52,7 @@ class ComboboxField extends HTMLElement {
       this.setAttribute(attrs["aria-activedescendant"], "");
       this.insertAdjacentText("afterbegin", "");
 
+      this.#validateRequiredConstraint();
       this.#mounted = true;
     }
 
@@ -153,6 +154,7 @@ class ComboboxField extends HTMLElement {
     // Update `option`s AFTER updating `value`
     newOption.selected = true;
     if (previousOption) previousOption.selected = false;
+    this.#validateRequiredConstraint();
   }
 
   /** Sets or retrieves the name of the object. @returns {HTMLInputElement["name"]} */
@@ -172,6 +174,27 @@ class ComboboxField extends HTMLElement {
   set disabled(value) {
     if (value) this.setAttribute("disabled", "");
     else this.removeAttribute("disabled");
+  }
+
+  /** @returns {HTMLInputElement["required"]} */
+  get required() {
+    return this.hasAttribute("required");
+  }
+
+  set required(value) {
+    if (value) this.setAttribute("required", "");
+    else this.removeAttribute("required");
+
+    this.#validateRequiredConstraint();
+  }
+
+  /** @returns {void} */
+  #validateRequiredConstraint() {
+    if (this.required && this.#value === "") {
+      return this.#internals.setValidity({ valueMissing: true }, "Please fill out this field.");
+    }
+
+    this.#internals.setValidity({});
   }
 
   /** Indicates that the `combobox`'s value was modified (even if it isn't dirty). @returns {boolean} */
