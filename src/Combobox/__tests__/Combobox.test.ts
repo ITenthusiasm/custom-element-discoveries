@@ -1203,6 +1203,47 @@ it.describe("Combobox Web Component", () => {
         });
       });
     });
+
+    it.describe("Listbox Scrolling Functionality", () => {
+      it("Scrolls the `active` `option` into view if needed", async ({ page }) => {
+        /* ---------- Setup ---------- */
+        await renderComponent(page, testOptions[0]);
+
+        /* ---------- Assertion ---------- */
+        /**
+         * The additional number of times to press `ArrowUp`/`ArrowDown` so that the remant of the previous
+         * option is no longer visible. (This is needed because of the `safetyOffset` in `ComboboxField`).
+         */
+        const offset = 1;
+        const displayCount = 4;
+        const container = page.locator("combobox-container");
+        await container.evaluate((e, blocks) => e.style.setProperty("--blocks", blocks), String(displayCount));
+
+        // Initially, Lower Option Is NOT in View
+        await page.keyboard.press("Tab+ArrowDown");
+        await expect(page.getByRole("option").nth(displayCount + offset)).not.toBeInViewport();
+
+        // Scroll Lower Option into View
+        for (let i = 0; i < displayCount + offset; i++) await page.keyboard.press("ArrowDown");
+        await expect(page.getByRole("option").nth(displayCount + offset)).toBeInViewport();
+        await expect(page.getByRole("option").first()).not.toBeInViewport();
+
+        // Scroll Upper Option into View
+        for (let i = 0; i < displayCount + offset; i++) await page.keyboard.press("ArrowUp");
+        await expect(page.getByRole("option").first()).toBeInViewport();
+        await expect(page.getByRole("option").nth(displayCount + offset)).not.toBeInViewport();
+
+        // Scroll LAST Option into View
+        await page.keyboard.press("End");
+        await expect(page.getByRole("option").last()).toBeInViewport();
+        await expect(page.getByRole("option").first()).not.toBeInViewport();
+
+        // Scroll FIRST Option into View
+        await page.keyboard.press("Home");
+        await expect(page.getByRole("option").first()).toBeInViewport();
+        await expect(page.getByRole("option").last()).not.toBeInViewport();
+      });
+    });
   });
 
   it.describe("API", () => {

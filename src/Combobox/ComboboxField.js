@@ -415,8 +415,6 @@ function watchActiveDescendant(mutations) {
   mutations.forEach(handleActiveDescendantChange);
 }
 
-// TODO: We need to add `listbox` scrolling logic for when the `activedescendant` changes
-// TODO: Would adjusting scroll during `aria-activedescendant` updates be easier if we used `box-sizing: content-box`?
 /**
  * @param {MutationRecord} mutation
  * @returns {void}
@@ -433,6 +431,32 @@ function handleActiveDescendantChange(mutation) {
   const activeOptionId = /** @type {string} */ (combobox.getAttribute(attrs["aria-activedescendant"]));
   const activeOption = document.getElementById(activeOptionId);
   activeOption?.setAttribute("data-active", String(true));
+
+  // If Needed, Scroll to New Active Option
+  if (!activeOption) return;
+  const { listbox } = combobox;
+  const bounds = listbox.getBoundingClientRect();
+  const { top, bottom, height } = activeOption.getBoundingClientRect();
+
+  /**
+   * The offset used to prevent unwanted, rapid scrolling caused by hovering an element at the infinitesimal limit where
+   * the very edge of the `listbox` border intersects the very edge of the `element` outside the scroll container.
+   */
+  const safetyOffset = 0.5;
+
+  // Align preceding `option` with top of listbox
+  if (top < bounds.top) {
+    if (activeOption === listbox.firstElementChild) listbox.scrollTop = 0;
+    else listbox.scrollTop = activeOption.offsetTop + safetyOffset;
+  }
+  // Align succeeding `option` with bottom of listbox
+  else if (bottom > bounds.bottom) {
+    if (activeOption === listbox.lastElementChild) listbox.scrollTop = listbox.scrollHeight;
+    else {
+      const borderWidth = parseFloat(getComputedStyle(listbox).getPropertyValue("--listbox-border"));
+      listbox.scrollTop = activeOption.offsetTop - (bounds.height - borderWidth * 2) + height - safetyOffset;
+    }
+  }
 }
 
 export default ComboboxField;
