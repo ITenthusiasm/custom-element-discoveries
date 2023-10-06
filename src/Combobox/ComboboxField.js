@@ -1,6 +1,10 @@
 import { attrs, setAttributeFor } from "./ComboboxContainer.js";
 
-/** @typedef {keyof Pick<ElementInternals, "labels" | "form" | "validity" | "validationMessage">} ExposedInternals */
+/** @typedef {keyof Pick<
+      ElementInternals,
+      "labels" | "form" | "validity" | "validationMessage" | "willValidate" | "checkValidity" | "reportValidity"
+    >} ExposedInternals
+  */
 
 /** @implements {Pick<ElementInternals, ExposedInternals>} */
 class ComboboxField extends HTMLElement {
@@ -229,6 +233,21 @@ class ComboboxField extends HTMLElement {
   /** @returns {ElementInternals["validationMessage"]} */
   get validationMessage() {
     return this.#internals.validationMessage;
+  }
+
+  /** @returns {ElementInternals["willValidate"]} */
+  get willValidate() {
+    return this.#internals.willValidate;
+  }
+
+  /** @type {ElementInternals["checkValidity"]} */
+  checkValidity() {
+    return this.#internals.checkValidity();
+  }
+
+  /** @type {ElementInternals["reportValidity"]} */
+  reportValidity() {
+    return this.#internals.reportValidity();
   }
 }
 
