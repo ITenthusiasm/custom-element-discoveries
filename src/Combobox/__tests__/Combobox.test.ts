@@ -1206,214 +1206,206 @@ it.describe("Combobox Web Component", () => {
   });
 
   it.describe("API", () => {
-    it.describe("Exposed Properties and Attributes", () => {
-      it.describe("disabled (Property)", () => {
-        it("Exposes the underlying `disabled` attribute", async ({ page }) => {
-          /* ---------- Setup ---------- */
-          await page.goto(url);
-          await page.evaluate((options) => {
-            const app = document.getElementById("app") as HTMLDivElement;
+    it.describe("Combobox Field (Web Component Part)", () => {
+      it.describe("Exposed Properties and Attributes", () => {
+        it.describe("disabled (Property)", () => {
+          it("Exposes the underlying `disabled` attribute", async ({ page }) => {
+            /* ---------- Setup ---------- */
+            await page.goto(url);
+            await page.evaluate((options) => {
+              const app = document.getElementById("app") as HTMLDivElement;
 
-            app.innerHTML = `
+              app.innerHTML = `
               <combobox-container disabled>
                 ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
               </combobox-container>
             `;
-          }, testOptions);
+            }, testOptions);
 
-          /* ---------- Assertions ---------- */
-          // `property` matches initial `attribute`
-          const combobox = page.getByRole("combobox");
-          await expect(combobox).toHaveJSProperty("disabled", true);
+            /* ---------- Assertions ---------- */
+            // `property` matches initial `attribute`
+            const combobox = page.getByRole("combobox");
+            await expect(combobox).toHaveJSProperty("disabled", true);
 
-          // `attribute` responds to `property` updates
-          await page.evaluate(() => ((document.querySelector("[role='combobox']") as ComboboxField).disabled = false));
-          await expect(combobox).not.toHaveAttribute("disabled", /.*/);
+            // `attribute` responds to `property` updates
+            await combobox.evaluate((node: ComboboxField) => (node.disabled = false));
+            await expect(combobox).not.toHaveAttribute("disabled", /.*/);
 
-          await page.evaluate(() => ((document.querySelector("[role='combobox']") as ComboboxField).disabled = true));
-          await expect(combobox).toHaveAttribute("disabled", "");
+            await combobox.evaluate((node: ComboboxField) => (node.disabled = true));
+            await expect(combobox).toHaveAttribute("disabled", "");
 
-          // `property` also responds to `attribute` updates
-          await page.evaluate(() =>
-            (document.querySelector("[role='combobox']") as ComboboxField).removeAttribute("disabled"),
-          );
-          await expect(combobox).toHaveJSProperty("disabled", false);
+            // `property` also responds to `attribute` updates
+            await combobox.evaluate((node: ComboboxField) => node.removeAttribute("disabled"));
+            await expect(combobox).toHaveJSProperty("disabled", false);
+          });
         });
-      });
 
-      it.describe("required (Property)", () => {
-        it("Exposes the underlying `required` attribute", async ({ page }) => {
-          /* ---------- Setup ---------- */
-          await page.goto(url);
-          await page.evaluate((options) => {
-            const app = document.getElementById("app") as HTMLDivElement;
+        it.describe("required (Property)", () => {
+          it("Exposes the underlying `required` attribute", async ({ page }) => {
+            /* ---------- Setup ---------- */
+            await page.goto(url);
+            await page.evaluate((options) => {
+              const app = document.getElementById("app") as HTMLDivElement;
 
-            app.innerHTML = `
+              app.innerHTML = `
               <combobox-container required>
                 ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
               </combobox-container>
             `;
-          }, testOptions);
+            }, testOptions);
 
-          /* ---------- Assertions ---------- */
-          // `property` matches initial `attribute`
-          const combobox = page.getByRole("combobox");
-          await expect(combobox).toHaveJSProperty("required", true);
+            /* ---------- Assertions ---------- */
+            // `property` matches initial `attribute`
+            const combobox = page.getByRole("combobox");
+            await expect(combobox).toHaveJSProperty("required", true);
 
-          // `attribute` responds to `property` updates
-          await combobox.evaluate((node: ComboboxField) => (node.required = false));
-          await expect(combobox).not.toHaveAttribute("required", /.*/);
+            // `attribute` responds to `property` updates
+            await combobox.evaluate((node: ComboboxField) => (node.required = false));
+            await expect(combobox).not.toHaveAttribute("required", /.*/);
 
-          await combobox.evaluate((node: ComboboxField) => (node.required = true));
-          await expect(combobox).toHaveAttribute("required", "");
+            await combobox.evaluate((node: ComboboxField) => (node.required = true));
+            await expect(combobox).toHaveAttribute("required", "");
 
-          // `property` also responds to `attribute` updates
-          await combobox.evaluate((node) => node.removeAttribute("required"));
-          await expect(combobox).toHaveJSProperty("required", false);
-        });
+            // `property` also responds to `attribute` updates
+            await combobox.evaluate((node) => node.removeAttribute("required"));
+            await expect(combobox).toHaveJSProperty("required", false);
+          });
 
-        it("Marks the `combobox` as `invalid` when the `required` constraint is broken", async ({ page }) => {
-          /* ---------- Setup ---------- */
-          const error = "Please fill out this field.";
-          await page.goto(url);
-          await page.evaluate((options) => {
-            const app = document.getElementById("app") as HTMLDivElement;
+          it("Marks the `combobox` as `invalid` when the `required` constraint is broken", async ({ page }) => {
+            /* ---------- Setup ---------- */
+            const error = "Please fill out this field.";
+            await page.goto(url);
+            await page.evaluate((options) => {
+              const app = document.getElementById("app") as HTMLDivElement;
 
-            app.innerHTML = `
+              app.innerHTML = `
               <combobox-container>
                 <combobox-option value="">Select an Option</combobox-option>
                 ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
               </combobox-container>
             `;
-          }, testOptions);
+            }, testOptions);
 
-          /* ---------- Assertions (Dynamic Interactions) ---------- */
-          // `combobox` starts off valid without constraints
-          const combobox = page.getByRole("combobox");
-          expect(await combobox.evaluate((node: ComboboxField) => node.validity.valid)).toBe(true);
-          expect(await combobox.evaluate((node: ComboboxField) => node.validity.valueMissing)).toBe(false);
+            /* ---------- Assertions (Dynamic Interactions) ---------- */
+            // `combobox` starts off valid without constraints
+            const combobox = page.getByRole("combobox");
+            expect(await combobox.evaluate((node: ComboboxField) => node.validity.valid)).toBe(true);
+            expect(await combobox.evaluate((node: ComboboxField) => node.validity.valueMissing)).toBe(false);
 
-          // `combobox` becomes invalid when `required` is applied because of _empty_ value
-          await combobox.evaluate((node: ComboboxField) => (node.required = true));
-          await expectOptionToBeSelected(page, { label: "Select an Option", value: "" });
-          expect(await combobox.evaluate((node: ComboboxField) => node.validity.valid)).toBe(false);
-          expect(await combobox.evaluate((node: ComboboxField) => node.validity.valueMissing)).toBe(true);
-          expect(await combobox.evaluate((node: ComboboxField) => node.validationMessage)).toBe(error);
+            // `combobox` becomes invalid when `required` is applied because of _empty_ value
+            await combobox.evaluate((node: ComboboxField) => (node.required = true));
+            await expectOptionToBeSelected(page, { label: "Select an Option", value: "" });
+            expect(await combobox.evaluate((node: ComboboxField) => node.validity.valid)).toBe(false);
+            expect(await combobox.evaluate((node: ComboboxField) => node.validity.valueMissing)).toBe(true);
+            expect(await combobox.evaluate((node: ComboboxField) => node.validationMessage)).toBe(error);
 
-          // `combobox` becomes valid when a _non-empty_ value is selected
-          await page.keyboard.press("Tab+End+Enter");
-          await expectOptionToBeSelected(page, { label: testOptions.at(-1) as string });
-          expect(await combobox.evaluate((node: ComboboxField) => node.validity.valid)).toBe(true);
-          expect(await combobox.evaluate((node: ComboboxField) => node.validity.valueMissing)).toBe(false);
+            // `combobox` becomes valid when a _non-empty_ value is selected
+            await page.keyboard.press("Tab+End+Enter");
+            await expectOptionToBeSelected(page, { label: testOptions.at(-1) as string });
+            expect(await combobox.evaluate((node: ComboboxField) => node.validity.valid)).toBe(true);
+            expect(await combobox.evaluate((node: ComboboxField) => node.validity.valueMissing)).toBe(false);
 
-          // `combobox` becomes invalid again when an _empty_ value is selected
-          await page.keyboard.press("Home+Enter");
-          await expectOptionToBeSelected(page, { label: "Select an Option", value: "" });
-          expect(await combobox.evaluate((node: ComboboxField) => node.validity.valid)).toBe(false);
-          expect(await combobox.evaluate((node: ComboboxField) => node.validity.valueMissing)).toBe(true);
-          expect(await combobox.evaluate((node: ComboboxField) => node.validationMessage)).toBe(error);
+            // `combobox` becomes invalid again when an _empty_ value is selected
+            await page.keyboard.press("Home+Enter");
+            await expectOptionToBeSelected(page, { label: "Select an Option", value: "" });
+            expect(await combobox.evaluate((node: ComboboxField) => node.validity.valid)).toBe(false);
+            expect(await combobox.evaluate((node: ComboboxField) => node.validity.valueMissing)).toBe(true);
+            expect(await combobox.evaluate((node: ComboboxField) => node.validationMessage)).toBe(error);
 
-          /* ---------- Assertions (`onMount` Only) ---------- */
-          // With _empty_ Initial Value
-          await page.evaluate((options) => {
-            const app = document.getElementById("app") as HTMLDivElement;
+            /* ---------- Assertions (`onMount` Only) ---------- */
+            // With _empty_ Initial Value
+            await page.evaluate((options) => {
+              const app = document.getElementById("app") as HTMLDivElement;
 
-            app.innerHTML = `
+              app.innerHTML = `
               <combobox-container required>
                 <combobox-option value="">Select an Option</combobox-option>
                 ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
               </combobox-container>
             `;
-          }, testOptions);
+            }, testOptions);
 
-          expect(await combobox.evaluate((node: ComboboxField) => node.validity.valid)).toBe(false);
-          expect(await combobox.evaluate((node: ComboboxField) => node.validity.valueMissing)).toBe(true);
-          expect(await combobox.evaluate((node: ComboboxField) => node.validationMessage)).toBe(error);
+            expect(await combobox.evaluate((node: ComboboxField) => node.validity.valid)).toBe(false);
+            expect(await combobox.evaluate((node: ComboboxField) => node.validity.valueMissing)).toBe(true);
+            expect(await combobox.evaluate((node: ComboboxField) => node.validationMessage)).toBe(error);
 
-          // With _non-empty_ Initial Value
-          await page.evaluate((options) => {
-            const app = document.getElementById("app") as HTMLDivElement;
+            // With _non-empty_ Initial Value
+            await page.evaluate((options) => {
+              const app = document.getElementById("app") as HTMLDivElement;
 
-            app.innerHTML = `
+              app.innerHTML = `
               <combobox-container required>
                 <combobox-option value="">Select an Option</combobox-option>
                 ${options.map((o, i) => `<combobox-option${!i ? " selected" : ""}>${o}</combobox-option>`).join("")}
               </combobox-container>
             `;
-          }, testOptions);
+            }, testOptions);
 
-          expect(await combobox.evaluate((node: ComboboxField) => node.validity.valid)).toBe(true);
-          expect(await combobox.evaluate((node: ComboboxField) => node.validity.valueMissing)).toBe(false);
+            expect(await combobox.evaluate((node: ComboboxField) => node.validity.valid)).toBe(true);
+            expect(await combobox.evaluate((node: ComboboxField) => node.validity.valueMissing)).toBe(false);
+          });
         });
-      });
 
-      it.describe("name (Property)", () => {
-        it("Exposes the underlying `name` attribute", async ({ page }) => {
-          /* ---------- Setup ---------- */
-          const initialName = "initial-combobox";
+        it.describe("name (Property)", () => {
+          it("Exposes the underlying `name` attribute", async ({ page }) => {
+            /* ---------- Setup ---------- */
+            const initialName = "initial-combobox";
+            await page.goto(url);
+            await page.evaluate(
+              ([options, initialName]) => {
+                const app = document.getElementById("app") as HTMLDivElement;
 
-          await page.goto(url);
-          await page.evaluate(
-            ([options, initialName]) => {
-              const app = document.getElementById("app") as HTMLDivElement;
-
-              app.innerHTML = `
+                app.innerHTML = `
                 <combobox-container name="${initialName}">
                   ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
                 </combobox-container>
               `;
-            },
-            [testOptions, initialName] as const,
-          );
+              },
+              [testOptions, initialName] as const,
+            );
 
-          /* ---------- Assertions ---------- */
-          // `property` matches initial `attribute`
-          const combobox = page.getByRole("combobox");
-          await expect(combobox).toHaveJSProperty("name", initialName);
+            /* ---------- Assertions ---------- */
+            // `property` matches initial `attribute`
+            const combobox = page.getByRole("combobox");
+            await expect(combobox).toHaveJSProperty("name", initialName);
 
-          // `attribute` responds to `property` updates
-          const newPropertyName = "property-combobox";
-          await page.evaluate(
-            (name) => ((document.querySelector("[role='combobox']") as ComboboxField).name = name),
-            newPropertyName,
-          );
-          await expect(combobox).toHaveAttribute("name", newPropertyName);
+            // `attribute` responds to `property` updates
+            const newPropertyName = "property-combobox";
+            await combobox.evaluate((node: ComboboxField, name) => (node.name = name), newPropertyName);
+            await expect(combobox).toHaveAttribute("name", newPropertyName);
 
-          // `property` responds to `attribute` updates
-          const newAttributeName = "attribute-combobox";
-          await page.evaluate(
-            (attrValue) => document.querySelector<ComboboxField>("[role='combobox']")?.setAttribute("name", attrValue),
-            newAttributeName,
-          );
-          await expect(combobox).toHaveJSProperty("name", newAttributeName);
-        });
+            // `property` responds to `attribute` updates
+            const newAttributeName = "attribute-combobox";
+            await combobox.evaluate((node: ComboboxField, name) => node.setAttribute("name", name), newAttributeName);
+            await expect(combobox).toHaveJSProperty("name", newAttributeName);
+          });
 
-        it("Complies with Form Standards by yielding an empty string in lieu of an attribute", async ({ page }) => {
-          /* ---------- Setup ---------- */
-          await page.goto(url);
-          await page.evaluate((options) => {
-            const app = document.getElementById("app") as HTMLDivElement;
+          it("Complies with Form Standards by yielding an empty string in lieu of an attribute", async ({ page }) => {
+            /* ---------- Setup ---------- */
+            await page.goto(url);
+            await page.evaluate((options) => {
+              const app = document.getElementById("app") as HTMLDivElement;
 
-            app.innerHTML = `
+              app.innerHTML = `
               <combobox-container>
                 ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
               </combobox-container>
             `;
-          }, testOptions);
+            }, testOptions);
 
-          /* ---------- Assertions ---------- */
-          // `property` defaults to empty string
-          const combobox = page.getByRole("combobox");
-          await expect(combobox).toHaveJSProperty("name", "");
+            /* ---------- Assertions ---------- */
+            // `property` defaults to empty string
+            const combobox = page.getByRole("combobox");
+            await expect(combobox).toHaveJSProperty("name", "");
 
-          // `property` still defaults to empty string when the `name` attribute is _cleared_
-          await page.evaluate(() => {
-            const combobox = document.querySelector("[role='combobox']") as ComboboxField;
-            combobox.setAttribute("name", "some-valid-name");
-            combobox.removeAttribute("name");
+            // `property` still defaults to empty string when the `name` attribute is _cleared_
+            await combobox.evaluate((node: ComboboxField) => {
+              node.setAttribute("name", "some-valid-name");
+              node.removeAttribute("name");
+            });
+
+            await expect(combobox).toHaveJSProperty("name", "");
           });
-
-          await expect(combobox).toHaveJSProperty("name", "");
         });
       });
     });
