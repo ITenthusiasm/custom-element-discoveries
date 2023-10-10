@@ -122,7 +122,11 @@ function handleDelegatedOptionClick(event) {
 
   const combobox = /** @type {import("./ComboboxField.js").default} */ (listbox.previousElementSibling);
   combobox.setAttribute(attrs["aria-expanded"], String(false));
+
+  if (option.selected) return;
   combobox.value = option.value;
+  combobox.dispatchEvent(new Event("input", { bubbles: true, composed: true, cancelable: false }));
+  combobox.dispatchEvent(new Event("change", { bubbles: true, composed: false, cancelable: false }));
 }
 
 /* -------------------- Container Handlers -------------------- */

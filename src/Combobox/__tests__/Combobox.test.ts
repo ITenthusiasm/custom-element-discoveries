@@ -1449,6 +1449,69 @@ it.describe("Combobox Web Component", () => {
           });
         });
       });
+
+      it.describe("Dispatched Events", () => {
+        for (const event of ["input", "change"] as const) {
+          it(`Dispatches an \`${event}\` event when the user selects a new \`option\``, async ({ page }) => {
+            /* ---------- Setup ---------- */
+            const initialValue = getRandomOption(testOptions.slice(1));
+            await renderComponent(page, initialValue);
+            await expectComboboxToBeClosed(page);
+            await expectOptionToBeSelected(page, { label: initialValue });
+
+            /* ---------- Assertions ---------- */
+            // event is emitted AFTER the value is changed
+            const newValue = getRandomOption(testOptions.filter((o) => o !== initialValue));
+            const combobox = page.getByRole("combobox");
+
+            const eventEmitted = page.evaluate((e) => {
+              return new Promise<boolean>((resolve, reject) => {
+                const timeout = setTimeout(reject, 3000, `The \`${e}\` event was never emitted by a combobox-field.`);
+
+                document.addEventListener(
+                  e,
+                  (event) => {
+                    if (event.constructor !== Event) return;
+                    if (event.target?.constructor !== customElements.get("combobox-field")) return;
+                    clearTimeout(timeout);
+                    resolve(true);
+                  },
+                  { once: true },
+                );
+              });
+            }, event);
+
+            await combobox.click();
+            await page.getByRole("option", { name: newValue }).click();
+
+            await expectOptionToBeSelected(page, { label: newValue });
+            await expectOptionToBeSelected(page, { label: initialValue }, false);
+            expect(await eventEmitted).toBe(true);
+
+            // event is NOT emitted if the value does not change
+            const eventNotEmitted = page.evaluate((e) => {
+              return new Promise<boolean>((resolve, reject) => {
+                const timeout = setTimeout(resolve, 3000, true);
+
+                document.addEventListener(
+                  e,
+                  () => {
+                    clearTimeout(timeout);
+                    reject(`The \`${e}\` event should not have been emitted by the combobox-field`);
+                  },
+                  { once: true },
+                );
+              });
+            }, event);
+
+            await combobox.click();
+            await page.getByRole("option", { name: newValue }).click();
+
+            await expectOptionToBeSelected(page, { label: newValue });
+            expect(await eventNotEmitted).toBe(true);
+          });
+        }
+      });
     });
   });
 });
