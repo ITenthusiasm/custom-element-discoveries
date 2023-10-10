@@ -271,7 +271,6 @@ function handleComboboxBlur(event) {
   setAttributeFor(combobox, attrs["aria-expanded"], String(false));
 }
 
-// TODO: What about `disabled` _options_?
 /**
  * @param {KeyboardEvent} event
  * @returns {void}
