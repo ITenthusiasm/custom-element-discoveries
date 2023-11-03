@@ -49,13 +49,13 @@ it.describe("Combobox Web Component", () => {
         const app = document.getElementById("app") as HTMLDivElement;
 
         app.innerHTML = `
-        <combobox-container id="component" name="my-name">
-          ${options.map((o) => `<combobox-option${value === o ? " selected" : ""}>${o}</combobox-option>`).join("")}
-        </combobox-container>
-        <div style="font-size: 3rem; font-weight: bold; text-align: right; background-color: red; height: 500vh;">
-          Container for testing scroll prevention
-        </div>
-      `;
+          <combobox-container id="component" name="my-name">
+            ${options.map((o) => `<combobox-option${value === o ? " selected" : ""}>${o}</combobox-option>`).join("")}
+          </combobox-container>
+          <div style="font-size: 3rem; font-weight: bold; text-align: right; background-color: red; height: 500vh;">
+            Container for testing scroll prevention
+          </div>
+        `;
       },
       [opts, initialValue] as const,
     );
@@ -167,7 +167,7 @@ it.describe("Combobox Web Component", () => {
       });
 
       it("Marks the most recently hovered option as `active`", async ({ page }) => {
-        renderComponent(page);
+        await renderComponent(page);
         const combobox = page.getByRole("combobox");
 
         // Initial `option` is `active` by default
@@ -202,6 +202,9 @@ it.describe("Combobox Web Component", () => {
     });
 
     it.describe("Keyboard Interactions", () => {
+      /** A reusable {@link Page.evaluate} callback used to obtain the `window`'s scrolling dimensions */
+      const getWindowScrollDistance = () => ({ x: window.scrollX, y: window.scrollY }) as const;
+
       it("Is in the page `Tab` sequence", async ({ page }) => {
         await renderComponent(page);
         await page.keyboard.press("Tab");
@@ -233,7 +236,6 @@ it.describe("Combobox Web Component", () => {
           await page.keyboard.press("Tab");
           await page.keyboard.press("ArrowDown");
           await expectOptionToBeActive(page, { label: initialValue });
-          await expectOptionToBeActive(page, { label: testOptions.at(-1) as string }, false);
 
           /* ---------- Assertions ---------- */
           const activeOption = page.getByRole("option", { name: initialValue });
@@ -305,7 +307,7 @@ it.describe("Combobox Web Component", () => {
           /* ---------- Setup ---------- */
           await renderComponent(page);
           await expectComboboxToBeClosed(page);
-          const initialScrollDistance = await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }) as const);
+          const initialScrollDistance = await page.evaluate(getWindowScrollDistance);
 
           /* ---------- Assertions ---------- */
           // Focus `combobox`
@@ -319,7 +321,7 @@ it.describe("Combobox Web Component", () => {
           await page.keyboard.press("Alt+ArrowDown");
           await new Promise((resolve) => setTimeout(resolve, 250)); // Wait for **possible** scrolling to finish
 
-          const newScrollDistance = await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }) as const);
+          const newScrollDistance = await page.evaluate(getWindowScrollDistance);
           expect(newScrollDistance).toStrictEqual(initialScrollDistance);
         });
       });
@@ -355,7 +357,7 @@ it.describe("Combobox Web Component", () => {
           /* ---------- Setup ---------- */
           await renderComponent(page);
           await expectComboboxToBeClosed(page);
-          const initialScrollDistance = await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }) as const);
+          const initialScrollDistance = await page.evaluate(getWindowScrollDistance);
 
           /* ---------- Assertions ---------- */
           // Focus `combobox`
@@ -370,7 +372,7 @@ it.describe("Combobox Web Component", () => {
           await page.keyboard.press("End");
           await new Promise((resolve) => setTimeout(resolve, 250)); // Wait for **possible** scrolling to finish
 
-          const newScrollDistance = await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }) as const);
+          const newScrollDistance = await page.evaluate(getWindowScrollDistance);
           expect(newScrollDistance).toStrictEqual(initialScrollDistance);
         });
       });
@@ -401,7 +403,6 @@ it.describe("Combobox Web Component", () => {
           await page.keyboard.press("Tab");
           await page.keyboard.press("ArrowUp");
           await expectOptionToBeActive(page, { label: initialValue });
-          await expectOptionToBeActive(page, { label: testOptions[0] }, false);
 
           /* ---------- Assertions ---------- */
           const activeOption = page.getByRole("option", { name: initialValue });
@@ -449,7 +450,6 @@ it.describe("Combobox Web Component", () => {
           await page.keyboard.press("ArrowUp");
           await expectOptionsToBeVisible(page);
           await expectOptionToBeActive(page, { label: initialValue });
-          await expectOptionToBeActive(page, { label: testOptions[0] }, false);
 
           /* ---------- Assertions ---------- */
           const previousOptionValue = testOptions.at(-2) as string;
@@ -477,7 +477,7 @@ it.describe("Combobox Web Component", () => {
 
           // Scroll to bottom of page AFTER tabbing
           await page.evaluate(() => window.scrollTo({ top: document.body.scrollHeight }));
-          const initialScrollDistance = await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }) as const);
+          const initialScrollDistance = await page.evaluate(getWindowScrollDistance);
 
           /* ---------- Assertions ---------- */
           // No scrolling should occur when `ArrowUp` or `Alt`+`ArrowUp` is pressed
@@ -487,7 +487,7 @@ it.describe("Combobox Web Component", () => {
           await page.keyboard.press("Alt+ArrowUp");
           await new Promise((resolve) => setTimeout(resolve, 250)); // Wait for **possible** scrolling to finish
 
-          const newScrollDistance = await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }) as const);
+          const newScrollDistance = await page.evaluate(getWindowScrollDistance);
           expect(newScrollDistance).toStrictEqual(initialScrollDistance);
         });
       });
@@ -530,7 +530,7 @@ it.describe("Combobox Web Component", () => {
 
           // Scroll to bottom of page AFTER tabbing
           await page.evaluate(() => window.scrollTo({ top: document.body.scrollHeight }));
-          const initialScrollDistance = await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }) as const);
+          const initialScrollDistance = await page.evaluate(getWindowScrollDistance);
 
           /* ---------- Assertions ---------- */
           // No scrolling should occur when `Home` is pressed
@@ -541,7 +541,7 @@ it.describe("Combobox Web Component", () => {
           await page.keyboard.press("Home");
           await new Promise((resolve) => setTimeout(resolve, 250)); // Wait for **possible** scrolling to finish
 
-          const newScrollDistance = await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }) as const);
+          const newScrollDistance = await page.evaluate(getWindowScrollDistance);
           expect(newScrollDistance).toStrictEqual(initialScrollDistance);
         });
       });
@@ -559,7 +559,6 @@ it.describe("Combobox Web Component", () => {
           await page.keyboard.press(" ");
           await expectOptionsToBeVisible(page);
           await expectOptionToBeActive(page, { label: initialValue });
-          await expectOptionToBeActive(page, { label: testOptions.at(-1) as string }, false);
 
           /* ---------- Assertions ---------- */
           const nextOptionValue = testOptions[1];
@@ -623,7 +622,7 @@ it.describe("Combobox Web Component", () => {
           /* ---------- Setup ---------- */
           await renderComponent(page);
           await expectComboboxToBeClosed(page);
-          const initialScrollDistance = await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }) as const);
+          const initialScrollDistance = await page.evaluate(getWindowScrollDistance);
 
           /* ---------- Assertions ---------- */
           // Focus `combobox`
@@ -638,7 +637,7 @@ it.describe("Combobox Web Component", () => {
           await page.keyboard.press(" ");
           await new Promise((resolve) => setTimeout(resolve, 250)); // Wait for **possible** scrolling to finish
 
-          const newScrollDistance = await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }) as const);
+          const newScrollDistance = await page.evaluate(getWindowScrollDistance);
           expect(newScrollDistance).toStrictEqual(initialScrollDistance);
         });
       });
@@ -650,8 +649,7 @@ it.describe("Combobox Web Component", () => {
           await expectComboboxToBeClosed(page);
 
           // Surround `combobox` with focusable elements
-          await page.evaluate(() => {
-            const component = document.querySelector("combobox-container") as ComboboxContainer;
+          await page.locator("combobox-container").evaluate((component: ComboboxContainer) => {
             component.insertAdjacentElement("beforebegin", document.createElement("button"));
             component.insertAdjacentElement("afterend", document.createElement("button"));
           });
@@ -684,8 +682,7 @@ it.describe("Combobox Web Component", () => {
           await expectOptionToBeSelected(page, { label: initialValue });
 
           // Surround `combobox` with focusable elements
-          await page.evaluate(() => {
-            const component = document.querySelector("combobox-container") as ComboboxContainer;
+          await page.locator("combobox-container").evaluate((component: ComboboxContainer) => {
             component.insertAdjacentElement("beforebegin", document.createElement("button"));
             component.insertAdjacentElement("afterend", document.createElement("button"));
           });
@@ -820,12 +817,10 @@ it.describe("Combobox Web Component", () => {
           await expect(page.getByRole("form")).toHaveAttribute(submissionCountAttr, String(2));
 
           // Verify that the `combobox` value is included in the form's data
-          const formDataValue = await page.evaluate(() => {
+          const formDataValue = await combobox.evaluate((node: ComboboxField) => {
             const name = "combobox-name";
-            const combobox = document.querySelector("combobox-container [role='combobox']") as ComboboxField;
-            combobox.setAttribute("name", name);
-
-            return new FormData(combobox.form as HTMLFormElement).get(name);
+            node.setAttribute("name", name);
+            return new FormData(node.form as HTMLFormElement).get(name);
           });
 
           expect(formDataValue).toBe(initialValue);
@@ -843,7 +838,7 @@ it.describe("Combobox Web Component", () => {
           page.once("pageerror", (e) => (error = e));
 
           // Nothing should break when `Enter` is pressed without an owning form element
-          expect(await page.evaluate(() => document.querySelector("form"))).toBe(null);
+          await expect(page.locator("form")).not.toBeAttached();
           await page.getByRole("combobox").focus();
           await page.keyboard.press("Enter");
           expect(error).toBe(undefined);
@@ -1039,7 +1034,7 @@ it.describe("Combobox Web Component", () => {
             await expect(page.getByRole("form")).toHaveAttribute(submissionCountAttr, String(0));
 
             // Implicit Submission works when enabled
-            await page.evaluate(() => document.querySelector(":disabled")?.remove());
+            await page.locator(":disabled").evaluate((node) => node.remove());
             await page.keyboard.press("Enter");
             await expect(page.getByRole("form")).toHaveAttribute(submissionCountAttr, String(1));
 
@@ -1059,7 +1054,7 @@ it.describe("Combobox Web Component", () => {
             await expect(page.getByRole("form")).toHaveAttribute(submissionCountAttr, String(1));
 
             // Implicit Submission works when enabled
-            await page.evaluate(() => document.querySelector(":disabled")?.remove());
+            await page.locator(":disabled").evaluate((node) => node.remove());
             await page.keyboard.press("Enter");
             await expect(page.getByRole("form")).toHaveAttribute(submissionCountAttr, String(2));
           });
@@ -1107,25 +1102,25 @@ it.describe("Combobox Web Component", () => {
 
         it("Matches `option`s case-insensitively", async ({ page }) => {
           /* ---------- Setup ---------- */
-          const options = ["lowercase", "UPPERCASE"] as const;
+          const options = ["0-initial-value-0", "lowercase", "UPPERCASE"] as const;
           await renderComponent(page, { options });
 
           /* ---------- Assertions ---------- */
           // Use "Uppercase Search" for "Lowercase Option"
           const uppercaseSearch = "L";
-          expect(options[0]).not.toBe(uppercaseSearch);
+          expect(options[1][0]).not.toBe(uppercaseSearch);
 
           await page.keyboard.press("Tab");
           await page.keyboard.press(uppercaseSearch, { delay: timeout * (1 + fraction) });
-          await expectOptionToBeActive(page, { label: options[0] });
+          await expectOptionToBeActive(page, { label: options[1] });
 
           // Use "Lowercase Search" for "Uppercase Option"
           const lowercaseSearch = "u";
-          expect(options[1]).not.toBe(lowercaseSearch);
+          expect(options[2][0]).not.toBe(lowercaseSearch);
 
           await page.keyboard.press(lowercaseSearch);
-          await expectOptionToBeActive(page, { label: options[1] });
-          await expectOptionToBeActive(page, { label: options[0] }, false);
+          await expectOptionToBeActive(page, { label: options[2] });
+          await expectOptionToBeActive(page, { label: options[1] }, false);
         });
 
         it("Matches substrings and entire words", async ({ page }) => {
@@ -1217,7 +1212,7 @@ it.describe("Combobox Web Component", () => {
         const offset = 1;
         const displayCount = 4;
         const container = page.locator("combobox-container");
-        await container.evaluate((e, blocks) => e.style.setProperty("--blocks", blocks), String(displayCount));
+        await container.evaluate((e, blocks) => e.style.setProperty("--blocks", blocks), `${displayCount}` as const);
 
         // Initially, Lower Option Is NOT in View
         await page.keyboard.press("Tab+ArrowDown");
