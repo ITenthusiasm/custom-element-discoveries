@@ -33,8 +33,14 @@ class ComboboxField extends HTMLElement {
   #activeOptionObserver;
 
   // Local State
-  /** The Custom Element's internal value. **DO NOT** use directly. Use the getter and setter instead. */
-  #value = "";
+  /**
+   * @type {string | null} The Custom Element's internal value. **DO NOT** use directly.
+   * Use the getter and setter instead.
+   *
+   * **Note**: A `null` value indicates that the `combobox` value has not yet been initialized (for instance, if
+   * the `combobox` was not rendered with any `option`s).
+   */
+  #value = null;
 
   constructor() {
     super();
@@ -134,13 +140,13 @@ class ComboboxField extends HTMLElement {
   /* ------------------------------ Exposed Form Properties ------------------------------ */
   /** Retrieves the Custom Element's internal value (`this.#value`). @returns {string} */
   get value() {
-    return this.#value;
+    return this.#value ?? "";
   }
 
   /** Updates the Custom Element's internal value (`this.#value`) along with any relevant element attributes. */
   set value(v) {
-    if (v === this.#value && v !== "") return;
-    this.#modified = true;
+    if (v === this.#value) return;
+    this.#modified = true; // TODO: Can we move this under the `newOption` check now?
 
     const options = this.listbox.children;
     const newOption = /** @type {typeof previousOption} */ (Array.prototype.find.call(options, (o) => o.value === v));
