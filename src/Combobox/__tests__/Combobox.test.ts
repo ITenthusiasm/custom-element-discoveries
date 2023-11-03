@@ -1252,10 +1252,10 @@ it.describe("Combobox Web Component", () => {
               const app = document.getElementById("app") as HTMLDivElement;
 
               app.innerHTML = `
-              <combobox-container disabled>
-                ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
-              </combobox-container>
-            `;
+                <combobox-container disabled>
+                  ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
+                </combobox-container>
+              `;
             }, testOptions);
 
             /* ---------- Assertions ---------- */
@@ -1284,10 +1284,10 @@ it.describe("Combobox Web Component", () => {
               const app = document.getElementById("app") as HTMLDivElement;
 
               app.innerHTML = `
-              <combobox-container required>
-                ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
-              </combobox-container>
-            `;
+                <combobox-container required>
+                  ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
+                </combobox-container>
+              `;
             }, testOptions);
 
             /* ---------- Assertions ---------- */
@@ -1315,11 +1315,11 @@ it.describe("Combobox Web Component", () => {
               const app = document.getElementById("app") as HTMLDivElement;
 
               app.innerHTML = `
-              <combobox-container>
-                <combobox-option value="">Select an Option</combobox-option>
-                ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
-              </combobox-container>
-            `;
+                <combobox-container>
+                  <combobox-option value="">Select an Option</combobox-option>
+                  ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
+                </combobox-container>
+              `;
             }, testOptions);
 
             /* ---------- Assertions (Dynamic Interactions) ---------- */
@@ -1354,11 +1354,11 @@ it.describe("Combobox Web Component", () => {
               const app = document.getElementById("app") as HTMLDivElement;
 
               app.innerHTML = `
-              <combobox-container required>
-                <combobox-option value="">Select an Option</combobox-option>
-                ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
-              </combobox-container>
-            `;
+                <combobox-container required>
+                  <combobox-option value="">Select an Option</combobox-option>
+                  ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
+                </combobox-container>
+              `;
             }, testOptions);
 
             expect(await combobox.evaluate((node: ComboboxField) => node.validity.valid)).toBe(false);
@@ -1370,11 +1370,11 @@ it.describe("Combobox Web Component", () => {
               const app = document.getElementById("app") as HTMLDivElement;
 
               app.innerHTML = `
-              <combobox-container required>
-                <combobox-option value="">Select an Option</combobox-option>
-                ${options.map((o, i) => `<combobox-option${!i ? " selected" : ""}>${o}</combobox-option>`).join("")}
-              </combobox-container>
-            `;
+                <combobox-container required>
+                  <combobox-option value="">Select an Option</combobox-option>
+                  ${options.map((o, i) => `<combobox-option${!i ? " selected" : ""}>${o}</combobox-option>`).join("")}
+                </combobox-container>
+              `;
             }, testOptions);
 
             expect(await combobox.evaluate((node: ComboboxField) => node.validity.valid)).toBe(true);
@@ -1392,10 +1392,10 @@ it.describe("Combobox Web Component", () => {
                 const app = document.getElementById("app") as HTMLDivElement;
 
                 app.innerHTML = `
-                <combobox-container name="${initialName}">
-                  ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
-                </combobox-container>
-              `;
+                  <combobox-container name="${initialName}">
+                    ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
+                  </combobox-container>
+                `;
               },
               [testOptions, initialName] as const,
             );
@@ -1423,10 +1423,10 @@ it.describe("Combobox Web Component", () => {
               const app = document.getElementById("app") as HTMLDivElement;
 
               app.innerHTML = `
-              <combobox-container>
-                ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
-              </combobox-container>
-            `;
+                <combobox-container>
+                  ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
+                </combobox-container>
+              `;
             }, testOptions);
 
             /* ---------- Assertions ---------- */
