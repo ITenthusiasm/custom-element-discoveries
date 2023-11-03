@@ -3,6 +3,11 @@ import type { Page } from "@playwright/test";
 import type ComboboxContainer from "../ComboboxContainer.js";
 import type ComboboxField from "../ComboboxField.js";
 
+/*
+ * NOTE: It seems that the accessibility requirements for the `Combobox` Web Component are now taken care of.
+ * Now we need to focus on testing the API (of _all_ the Combobox Parts).
+ */
+
 /** The attributes _commonly_ used for **testing** the `Combobox` Web Component. (Declared to help avoid typos.) */
 const attrs = Object.freeze({
   "aria-activedescendant": "aria-activedescendant",
@@ -730,8 +735,8 @@ it.describe("Combobox Web Component", () => {
         const submissionCountAttr = "data-submission-count";
 
         /**
-         * Associates the `combobox` on a page with the form element on the same page for testing. The association can be
-         * `implicit` (moving the `combobox` _inside_ the form element and removing the `form` attribute) or
+         * Associates the `combobox` on a page with the form element on the same page for testing. The association can
+         * be * `implicit` (moving the `combobox` _inside_ the form element and removing the `form` attribute) or
          * `explicit` (moving the `combobox` _outside_ the form element and giving it a valid `form` attribute).
          *
          * If no form element exists on the page when this function is called, then one will be created.
@@ -761,7 +766,8 @@ it.describe("Combobox Web Component", () => {
         /**
          * Registers the provided `onsubmit` event `handler` with the form element on the page.
          *
-         * Note: If you only want to track how many times a form was submitted, use the {@link defaultSubmissionHandler}.
+         * Note: If you only want to track how many times a form was submitted, use the
+         * {@link defaultSubmissionHandler}.
          */
         function registerSubmissionHandler(page: Page, handler: (event: SubmitEvent) => void): Promise<void> {
           return page.evaluate(
