@@ -119,9 +119,10 @@ it.describe("Combobox Web Component", () => {
       await expect(combobox).not.toHaveText(label);
     }
 
-    // Verify that the `option` has the correct attributes WITHOUT disrupting other tests
+    // Verify that the `option` has the correct attributes/properties WITHOUT disrupting other tests
     const option = page.getByText(optionLabel).and(page.locator("[role='option']"));
     await expect(option).toHaveAttribute(attrs["aria-selected"], String(selected));
+    await expect(option).toHaveJSProperty("selected", selected);
   }
 
   /* -------------------- Tests -------------------- */
@@ -1447,6 +1448,98 @@ it.describe("Combobox Web Component", () => {
             });
 
             await expect(combobox).toHaveJSProperty("name", "");
+          });
+        });
+
+        it.describe("value (Property)", () => {
+          it("Exposes the `value` of the `combobox`", async ({ page }) => {
+            // Setup
+            await page.goto(url);
+            await page.evaluate((options) => {
+              const app = document.getElementById("app") as HTMLDivElement;
+
+              app.innerHTML = `
+                <combobox-container>
+                  <combobox-option value="">Select a Value</combobox-option>
+                  ${options.map((o, i) => `<combobox-option value="${i}">${o}</combobox-option>`).join("")}
+                </combobox-container>
+              `;
+            }, testOptions);
+
+            // Assertions
+            const combobox = page.getByRole("combobox");
+            expectOptionToBeSelected(page, { value: "", label: "Select a Value" });
+            expect(await combobox.evaluate((n: ComboboxField) => n.value)).toBe("");
+
+            const userValue = testOptions[0];
+            await combobox.click();
+            await page.getByRole("option", { name: userValue }).click();
+            expectOptionToBeSelected(page, { value: "0", label: "First" });
+            expect(await combobox.evaluate((n: ComboboxField) => n.value)).toBe("0");
+
+            const secondUserValue = testOptions[7];
+            await combobox.click();
+            await page.getByRole("option", { name: secondUserValue }).click();
+            expectOptionToBeSelected(page, { value: "7", label: "Eigth" });
+            expect(await combobox.evaluate((n: ComboboxField) => n.value)).toBe("7");
+          });
+
+          it("Updates the `value` of the `combobx`, including its `option`s and validity state", async ({ page }) => {
+            // Setup
+            await page.goto(url);
+            await page.evaluate((options) => {
+              const app = document.getElementById("app") as HTMLDivElement;
+
+              app.innerHTML = `
+                <combobox-container required>
+                  <combobox-option value="">Select a Value</combobox-option>
+                  ${options.map((o, i) => `<combobox-option value="${i}">${o}</combobox-option>`).join("")}
+                </combobox-container>
+              `;
+            }, testOptions);
+
+            // Assertions
+            const combobox = page.getByRole("combobox");
+
+            const empty = { value: "", label: "Select a Value" };
+            expectOptionToBeSelected(page, { value: empty.value, label: empty.label });
+            expect(await combobox.evaluate((n: ComboboxField) => n.validity.valid)).toBe(false);
+
+            // Manually Make Value Valid
+            const userValue = "7";
+            await combobox.evaluate((n: ComboboxField, value) => (n.value = value), userValue);
+            expectOptionToBeSelected(page, { value: userValue, label: testOptions[userValue] });
+            expect(await combobox.evaluate((n: ComboboxField) => n.checkValidity())).toBe(true);
+
+            // Manually Make Value Invalid
+            expect(await combobox.evaluate((n: ComboboxField, value) => (n.value = value), empty.value));
+            expectOptionToBeSelected(page, { value: empty.value, label: empty.label });
+            expect(await combobox.evaluate((n: ComboboxField) => n.reportValidity())).toBe(false);
+          });
+
+          it("Rejects values that are not found in the available `option`s", async ({ page }) => {
+            /* ---------- Setup ---------- */
+            const initialValue = testOptions[0];
+            await renderComponent(page);
+            await expectOptionToBeSelected(page, { label: initialValue });
+
+            /* ---------- Assertions ---------- */
+            const combobox = page.getByRole("combobox");
+
+            // Invalid values are rejected
+            const invalidValue = Math.random().toString(36).slice(2);
+            await combobox.evaluate((n: ComboboxField, value) => (n.value = value), invalidValue);
+
+            expect(await combobox.evaluate((n: ComboboxField) => n.value)).not.toBe(invalidValue);
+            await expectOptionToBeSelected(page, { label: initialValue });
+
+            // Valid values are accepted
+            const goodValue = getRandomOption(testOptions.slice(1));
+            await combobox.evaluate((n: ComboboxField, value) => (n.value = value), goodValue);
+
+            expect(await combobox.evaluate((n: ComboboxField) => n.value)).toBe(goodValue);
+            await expectOptionToBeSelected(page, { label: initialValue }, false);
+            await expectOptionToBeSelected(page, { label: goodValue });
           });
         });
       });
