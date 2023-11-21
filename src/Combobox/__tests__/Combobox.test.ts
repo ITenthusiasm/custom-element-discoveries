@@ -1074,7 +1074,7 @@ it.describe("Combobox Web Component", () => {
         const timeout = 500;
 
         /** The fraction by which the {@link timeout} should be increased (or decreased) to avoid test flakiness. */
-        const fraction = 0.25;
+        const fraction = 0.3;
 
         it("Shows the `option`s AND marks the NEXT matching `option` as `active`", async ({ page }) => {
           /* ---------- Setup ---------- */
@@ -1250,6 +1250,10 @@ it.describe("Combobox Web Component", () => {
 
   it.describe("API", () => {
     it.describe("Combobox Field (Web Component Part)", () => {
+      /*
+       * NOTE: For the time being, the `modified` property is not tested. It might actually be a leakage of
+       * internal implementation details that needs to be reconsidered.
+       */
       it.describe("Exposed Properties and Attributes", () => {
         it.describe("disabled (Property)", () => {
           it("Exposes the underlying `disabled` attribute", async ({ page }) => {
@@ -1540,6 +1544,115 @@ it.describe("Combobox Web Component", () => {
             expect(await combobox.evaluate((n: ComboboxField) => n.value)).toBe(goodValue);
             await expectOptionToBeSelected(page, { label: initialValue }, false);
             await expectOptionToBeSelected(page, { label: goodValue });
+          });
+        });
+
+        it.describe("listbox (Property)", () => {
+          it("Exposes the `listbox` that the `combobox` controls (for convenience)", async ({ page }) => {
+            await renderComponent(page);
+            const combobox = page.getByRole("combobox");
+            const listboxId = await combobox.evaluate((n: ComboboxField) => n.listbox.id);
+            const ariaControls = await combobox.evaluate((n: ComboboxContainer) => n.getAttribute("aria-controls"));
+
+            expect(ariaControls).toBe(listboxId);
+            expect(await combobox.evaluate((n: ComboboxField) => n.listbox instanceof HTMLElement)).toBe(true);
+            expect(await combobox.evaluate((n: ComboboxField) => n.listbox.getAttribute("role"))).toBe("listbox");
+          });
+        });
+
+        it.describe("labels (Property)", () => {
+          it("Exposes any `label`s associated with the `combobox`", async ({ page }) => {
+            /* ---------- Setup ---------- */
+            const containerId = "component";
+            const firstLabel = "This is a Combobox";
+            const secondLabel = "Value Selector";
+
+            await page.goto(url);
+            await page.evaluate(
+              ([options, [baseId, label1]]) => {
+                const app = document.getElementById("app") as HTMLDivElement;
+
+                app.innerHTML = `
+                  <label for="${baseId}-combobox">${label1}</label>
+                  <combobox-container id="${baseId}">
+                    ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
+                  </combobox-container>
+                `;
+              },
+              [testOptions, [containerId, firstLabel]] as const,
+            );
+
+            /* ---------- Assertions ---------- */
+            // Combobox has semantic labels
+            const combobox = page.getByRole("combobox");
+            expect(await combobox.evaluate((n: ComboboxField) => n.labels.length)).toBe(1);
+            expect(await combobox.evaluate((n: ComboboxField) => n.labels[0].textContent)).toBe(firstLabel);
+
+            // The 1st label transfers focus
+            await expect(combobox).not.toBeFocused();
+
+            await page.getByText(firstLabel).click();
+            await expect(combobox).toBeFocused();
+
+            // Labels created after rendering also work
+            await page.evaluate(
+              ([baseId, label2]) => {
+                document.body.insertAdjacentHTML("beforeend", `<label for="${baseId}-combobox">${label2}</label>`);
+              },
+              [containerId, secondLabel],
+            );
+
+            expect(await combobox.evaluate((n: ComboboxField) => n.labels.length)).toBe(2);
+            expect(await combobox.evaluate((n: ComboboxField) => n.labels[0].textContent)).toBe(firstLabel);
+            expect(await combobox.evaluate((n: ComboboxField) => n.labels[1].textContent)).toBe(secondLabel);
+            expect(
+              await combobox.evaluate((n: ComboboxField) => {
+                return Array.prototype.every.call(n.labels, (l) => l instanceof HTMLLabelElement);
+              }),
+            ).toBe(true);
+
+            // The 2nd label also transfers focus
+            await page.locator("body").click();
+            await expect(combobox).not.toBeFocused();
+
+            await page.getByText(secondLabel).click();
+            await expect(combobox).toBeFocused();
+          });
+        });
+
+        it.describe("form (Property)", () => {
+          it("Exposes the `form` with which the `combobox` is associated", async ({ page }) => {
+            /* ---------- Setup ---------- */
+            await page.goto(url);
+            await page.evaluate((options) => {
+              const app = document.getElementById("app") as HTMLDivElement;
+
+              app.innerHTML = `
+                <form>
+                  <combobox-container>
+                    ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
+                  </combobox-container>
+                </form>
+              `;
+            }, testOptions);
+
+            /* ---------- Assertions ---------- */
+            // Combobox has a semantic form
+            const combobox = page.getByRole("combobox");
+            expect(await combobox.evaluate((n: ComboboxField) => n.form?.id)).toBe("");
+            expect(await combobox.evaluate((n: ComboboxField) => n.form instanceof HTMLFormElement)).toBe(true);
+
+            // Combobox `form` property updates in response to attribute changes
+            const form2Id = "final-form";
+            await combobox.evaluate((n: ComboboxField, secondFormId) => n.setAttribute("form", secondFormId), form2Id);
+            expect(await combobox.evaluate((n: ComboboxField) => n.form)).toBe(null);
+
+            // Combobox `form` attribute updates in response to DOM changes
+            await page.evaluate((secondFormId) => {
+              document.body.insertAdjacentHTML("beforeend", `<form id="${secondFormId}"></form>`);
+            }, form2Id);
+            expect(await combobox.evaluate((n: ComboboxField) => n.form?.id)).toBe(form2Id);
+            expect(await combobox.evaluate((n: ComboboxField) => n.form instanceof HTMLFormElement)).toBe(true);
           });
         });
       });

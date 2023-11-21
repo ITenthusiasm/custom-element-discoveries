@@ -116,7 +116,6 @@ class ComboboxField extends HTMLElement {
       /* -------------------- Determine Next Active `option` -------------------- */
       /** @type {Element | undefined} */
       let nextActiveOption;
-      // TODO: What about `array.findIndex`?
       const start = Array.prototype.indexOf.call(listbox.children, activeOption) + 1;
 
       for (let i = start; i < listbox.children.length + start; i++) {
@@ -207,6 +206,7 @@ class ComboboxField extends HTMLElement {
     this.#internals.setValidity({});
   }
 
+  // TODO: Is this a leaked implementation detail that should be refactored? (It's mainly used by `ComboboxOption`.)
   /** Indicates that the `combobox`'s value was modified (even if it isn't dirty). @returns {boolean} */
   get modified() {
     return this.#modified;
