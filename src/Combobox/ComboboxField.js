@@ -13,6 +13,10 @@ class ComboboxField extends HTMLElement {
     return true;
   }
 
+  static get observedAttributes() {
+    return /** @type {const} */ (["required"]);
+  }
+
   // Internals
   #mounted = false;
   #modified = false;
@@ -49,6 +53,15 @@ class ComboboxField extends HTMLElement {
     this.#activeOptionObserver = new MutationObserver(watchActiveDescendant);
   }
 
+  /**
+   * @param {typeof ComboboxField.observedAttributes[number]} name
+   * @param {string | null} oldValue
+   * @param {string | null} newValue
+   */
+  attributeChangedCallback(name, oldValue, newValue) {
+    if (name === "required") return this.#validateRequiredConstraint();
+  }
+
   // "On Mount" for Custom Elements
   connectedCallback() {
     if (!this.isConnected) return;
@@ -60,9 +73,8 @@ class ComboboxField extends HTMLElement {
       this.setAttribute("aria-haspopup", "listbox");
       this.setAttribute(attrs["aria-expanded"], String(false));
       this.setAttribute(attrs["aria-activedescendant"], "");
-      this.insertAdjacentText("afterbegin", "");
 
-      this.#validateRequiredConstraint();
+      this.insertAdjacentText("afterbegin", "");
       this.#mounted = true;
     }
 
@@ -193,8 +205,6 @@ class ComboboxField extends HTMLElement {
   set required(value) {
     if (value) this.setAttribute("required", "");
     else this.removeAttribute("required");
-
-    this.#validateRequiredConstraint();
   }
 
   /** @returns {void} */

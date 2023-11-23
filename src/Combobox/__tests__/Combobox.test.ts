@@ -1655,6 +1655,88 @@ it.describe("Combobox Web Component", () => {
             expect(await combobox.evaluate((n: ComboboxField) => n.form instanceof HTMLFormElement)).toBe(true);
           });
         });
+
+        it.describe("validity (Property)", () => {
+          it("Exposes the `ValidityState` of the `combobox`", async ({ page }) => {
+            /* ---------- Setup ---------- */
+            await page.goto(url);
+            await page.evaluate((options) => {
+              const app = document.getElementById("app") as HTMLDivElement;
+
+              app.innerHTML = `
+                <combobox-container>
+                  <combobox-option value="">Select an Option</combobox-option>
+                  ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
+                </combobox-container>
+              `;
+            }, testOptions);
+
+            /* ---------- Assertions ---------- */
+            // `combobox` has a real `ValidityState`
+            const combobox = page.getByRole("combobox");
+            expect(await combobox.evaluate((n: ComboboxField) => n.validity instanceof ValidityState)).toBe(true);
+
+            // By default, `combobox` is valid without constraints
+            expect(await combobox.evaluate((n: ComboboxField) => n.validity.valid)).toBe(true);
+
+            // `ValidityState` updates with constraints
+            await combobox.evaluate((n: ComboboxField) => n.setAttribute("required", ""));
+            expect(await combobox.evaluate((n: ComboboxField) => n.validity.valid)).toBe(false);
+            expect(await combobox.evaluate((n: ComboboxField) => n.validity.valueMissing)).toBe(true);
+
+            // `ValidityState` updates with user interaction
+            await combobox.click();
+            await page.getByRole("option", { name: testOptions[0] }).click();
+            expect(await combobox.evaluate((n: ComboboxField) => n.validity.valid)).toBe(true);
+            expect(await combobox.evaluate((n: ComboboxField) => n.validity.valueMissing)).toBe(false);
+          });
+        });
+
+        it.describe("validationMessage (Property)", () => {
+          it("Exposes the `combobox`'s error message", async ({ page }) => {
+            /* ---------- Setup ---------- */
+            await page.goto(url);
+            await page.evaluate((options) => {
+              const app = document.getElementById("app") as HTMLDivElement;
+
+              app.innerHTML = `
+                <combobox-container>
+                  <combobox-option value="">Select an Option</combobox-option>
+                  ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
+                </combobox-container>
+              `;
+            }, testOptions);
+
+            /* ---------- Assertions ---------- */
+            // No error message exists if no constraints are broken
+            const combobox = page.getByRole("combobox");
+            await expect(combobox).toHaveJSProperty("validationMessage", "");
+
+            // Error message exists if a constraint is broken
+            await combobox.evaluate((node: ComboboxField) => node.setAttribute("required", ""));
+            await expect(combobox).toHaveJSProperty("validationMessage", "Please fill out this field.");
+          });
+        });
+
+        it.describe("willValidate (Property)", () => {
+          // Note: See: https://developer.mozilla.org/en-US/docs/Web/API/ElementInternals/willValidate
+          it("Correctly indicates when the `combobox` will partake in constraint validation", async ({ page }) => {
+            await renderComponent(page);
+            const combobox = page.getByRole("combobox");
+
+            // With `disabled` conflict, `willValidate` is `false`
+            await combobox.evaluate((node: ComboboxField) => node.setAttribute("disabled", ""));
+            await expect(combobox).toHaveJSProperty("willValidate", false);
+
+            // Without conflicts, `willValidate` is `true`
+            await combobox.evaluate((node: ComboboxField) => node.removeAttribute("disabled"));
+            await expect(combobox).toHaveJSProperty("willValidate", true);
+
+            // With `readonly` conflict, `willValidate` is `false`
+            await combobox.evaluate((node: ComboboxField) => node.setAttribute("readonly", ""));
+            await expect(combobox).toHaveJSProperty("willValidate", false);
+          });
+        });
       });
 
       it.describe("Dispatched Events", () => {
