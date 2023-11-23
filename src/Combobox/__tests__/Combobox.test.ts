@@ -1739,6 +1739,71 @@ it.describe("Combobox Web Component", () => {
         });
       });
 
+      it.describe("Validation Methods", () => {
+        /*
+         * NOTE: Currently, according to our knowledge, there's no way to run assertions on the native
+         * error bubbles that browsers create.
+         */
+        for (const method of ["checkValidity", "reportValidity"] as const) {
+          it(`Performs field validation when \`${method}\` is called`, async ({ page }) => {
+            /* ---------- Setup ---------- */
+            await page.goto(url);
+            await page.evaluate((options) => {
+              const app = document.getElementById("app") as HTMLDivElement;
+
+              app.innerHTML = `
+                <combobox-container required>
+                  <combobox-option value="">Select an Option</combobox-option>
+                  ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
+                </combobox-container>
+              `;
+            }, testOptions);
+
+            /* ---------- Assertions ---------- */
+            // Validation on an invalid `combobox`
+            const combobox = page.getByRole("combobox");
+            const invalidEventEmitted = combobox.evaluate((node: ComboboxField) => {
+              return new Promise<boolean>((resolve, reject) => {
+                const timeout = setTimeout(reject, 3000, "The `invalid` event was never emitted by a combobox-field");
+
+                node.addEventListener(
+                  "invalid",
+                  (event) => {
+                    if (!event.isTrusted) return;
+                    clearTimeout(timeout);
+                    resolve(true);
+                  },
+                  { once: true },
+                );
+              });
+            });
+
+            expect(await combobox.evaluate((node: ComboboxField, m) => node[m](), method)).toBe(false);
+            expect(await invalidEventEmitted).toBe(true);
+
+            // Validation on a valid `combobox`
+            const invalidEventNotEmitted = combobox.evaluate((node: ComboboxField) => {
+              return new Promise<boolean>((resolve, reject) => {
+                const timeout = setTimeout(resolve, 3000, true);
+
+                node.addEventListener(
+                  "invalid",
+                  () => {
+                    clearTimeout(timeout);
+                    reject("The `invalid` event should not have been emitted by the combobox-field");
+                  },
+                  { once: true },
+                );
+              });
+            });
+
+            await combobox.evaluate((node: ComboboxField) => node.removeAttribute("required"));
+            expect(await combobox.evaluate((node: ComboboxField, m) => node[m](), method)).toBe(true);
+            expect(await invalidEventNotEmitted).toBe(true);
+          });
+        }
+      });
+
       it.describe("Dispatched Events", () => {
         for (const event of ["input", "change"] as const) {
           it(`Dispatches an \`${event}\` event when the user selects a new \`option\``, async ({ page }) => {
