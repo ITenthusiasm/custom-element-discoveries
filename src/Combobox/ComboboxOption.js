@@ -42,6 +42,8 @@ class ComboboxOption extends HTMLElement {
     return this.getAttribute("value") ?? /** @type {string} */ (this.textContent);
   }
 
+  // TODO: We need to dynamically respond to updates to the `value` attribute as well. So much for
+  // just responding to the `selected` attribute. ALSO: Do we need to do the same with `aria-selected`?
   set value(v) {
     this.setAttribute("value", v);
     this.#syncWithCombobox();
