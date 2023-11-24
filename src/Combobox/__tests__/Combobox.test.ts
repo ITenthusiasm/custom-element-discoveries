@@ -2185,6 +2185,61 @@ it.describe("Combobox Web Component", () => {
             await expectOptionToBeSelected(page, { label: lastOption });
           });
         });
+
+        it.describe("index (Property)", () => {
+          it("Indicates the position of the `option`", async ({ page }) => {
+            // Display `option`s
+            await renderComponent(page);
+            await page.getByRole("combobox").click();
+
+            // Check `option` labels
+            const options = page.getByRole("option");
+            const count = await options.count();
+            expect(count).toBeGreaterThan(1);
+
+            await Promise.all([...Array(count)].map((_, i) => expect(options.nth(i)).toHaveJSProperty("index", i)));
+          });
+        });
+
+        it.describe("form (Property)", () => {
+          it("Exposes the `form` with which the `option` is associated", async ({ page }) => {
+            /* ---------- Setup ---------- */
+            await page.goto(url);
+            await page.evaluate((options) => {
+              const app = document.getElementById("app") as HTMLDivElement;
+
+              app.innerHTML = `
+                <form>
+                  <combobox-container>
+                    ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
+                  </combobox-container>
+                </form>
+              `;
+            }, testOptions);
+
+            /* ---------- Assertions ---------- */
+            // Display options
+            const combobox = page.getByRole("combobox");
+            await combobox.click();
+
+            // `option` has a semantic form
+            const option = page.getByRole("option").first();
+            expect(await option.evaluate((n: ComboboxOption) => n.form?.id)).toBe("");
+            expect(await option.evaluate((n: ComboboxOption) => n.form instanceof HTMLFormElement)).toBe(true);
+
+            // The `option`'s `form` property updates in response to attribute changes on the owning `combobox`
+            const form2Id = "final-form";
+            await combobox.evaluate((n: ComboboxField, secondFormId) => n.setAttribute("form", secondFormId), form2Id);
+            expect(await option.evaluate((n: ComboboxOption) => n.form)).toBe(null);
+
+            // The `option`'s `form` attribute updates in response to DOM changes
+            await page.evaluate((secondFormId) => {
+              document.body.insertAdjacentHTML("beforeend", `<form id="${secondFormId}"></form>`);
+            }, form2Id);
+            expect(await option.evaluate((n: ComboboxOption) => n.form?.id)).toBe(form2Id);
+            expect(await option.evaluate((n: ComboboxOption) => n.form instanceof HTMLFormElement)).toBe(true);
+          });
+        });
       });
     });
   });
