@@ -8,7 +8,6 @@ class ComboboxOption extends HTMLElement {
   }
 
   /**
-   * Responds to updates to the `selected` attribute
    * @param {typeof ComboboxOption.observedAttributes[number]} name
    * @param {string | null} oldValue
    * @param {string | null} newValue
@@ -99,8 +98,8 @@ class ComboboxOption extends HTMLElement {
   #syncWithCombobox() {
     const combobox = this.#combobox;
 
-    if (this.#selected && combobox.value !== this.value) combobox.value = this.value;
-    else if (!this.#selected && combobox.value === this.value) {
+    if (this.selected && combobox.value !== this.value) combobox.value = this.value;
+    else if (!this.selected && combobox.value === this.value) {
       combobox.value = /** @type {this}  */ (this.#listbox.firstElementChild).value;
     }
   }
