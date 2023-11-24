@@ -1609,23 +1609,23 @@ it.describe("Combobox Web Component", () => {
         it.describe("labels (Property)", () => {
           it("Exposes any `label`s associated with the `combobox`", async ({ page }) => {
             /* ---------- Setup ---------- */
-            const containerId = "component";
+            const comboboxId = "combobox";
             const firstLabel = "This is a Combobox";
             const secondLabel = "Value Selector";
 
             await page.goto(url);
             await page.evaluate(
-              ([options, [baseId, label1]]) => {
+              ([options, [id, label1]]) => {
                 const app = document.getElementById("app") as HTMLDivElement;
 
                 app.innerHTML = `
-                  <label for="${baseId}-combobox">${label1}</label>
-                  <combobox-container id="${baseId}">
+                  <label for="${id}">${label1}</label>
+                  <combobox-container id="${id}">
                     ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
                   </combobox-container>
                 `;
               },
-              [testOptions, [containerId, firstLabel]] as const,
+              [testOptions, [comboboxId, firstLabel]] as const,
             );
 
             /* ---------- Assertions ---------- */
@@ -1642,10 +1642,8 @@ it.describe("Combobox Web Component", () => {
 
             // Labels created after rendering also work
             await page.evaluate(
-              ([baseId, label2]) => {
-                document.body.insertAdjacentHTML("beforeend", `<label for="${baseId}-combobox">${label2}</label>`);
-              },
-              [containerId, secondLabel],
+              ([id, label2]) => document.body.insertAdjacentHTML("beforeend", `<label for="${id}">${label2}</label>`),
+              [comboboxId, secondLabel] as const,
             );
 
             expect(await combobox.evaluate((n: ComboboxField) => n.labels.length)).toBe(2);

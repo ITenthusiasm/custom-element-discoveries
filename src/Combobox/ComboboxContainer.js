@@ -27,12 +27,13 @@ class ComboboxContainer extends HTMLElement {
     if (!this.#mounted) {
       /* -------------------- Setup Elements -------------------- */
       // Root Element
-      this.id = this.id || Math.random().toString(36).slice(2);
+      const comboboxId = this.id || Math.random().toString(36).slice(2);
+      this.id = `${comboboxId}-container`;
       this.setAttribute("role", "none");
 
       // Combobox
-      this.#combobox.setAttribute("id", `${this.id}-combobox`);
-      this.#combobox.setAttribute("aria-controls", `${this.id}-listbox`);
+      this.#combobox.setAttribute("id", comboboxId);
+      this.#combobox.setAttribute("aria-controls", `${comboboxId}-listbox`);
 
       // Transfer relevant attributes from `container` to `combobox`
       for (let i = 0; this.attributes.length > 2; ) {
@@ -47,7 +48,7 @@ class ComboboxContainer extends HTMLElement {
       }
 
       // Listbox
-      this.#listbox.setAttribute("id", `${this.id}-listbox`);
+      this.#listbox.setAttribute("id", `${comboboxId}-listbox`);
       this.#listbox.setAttribute("role", "listbox");
       this.#listbox.setAttribute("hidden", "");
 
@@ -66,7 +67,7 @@ class ComboboxContainer extends HTMLElement {
         }
 
         this.#listbox.appendChild(node);
-        node.setAttribute("id", `${this.#listbox.id}-option-${node.value}`);
+        node.setAttribute("id", `${comboboxId}-option-${node.value}`);
         if (node.defaultSelected || !initialOption) initialOption = node;
       }
 
