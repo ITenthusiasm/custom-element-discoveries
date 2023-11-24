@@ -8,6 +8,7 @@ import { attrs, setAttributeFor } from "./ComboboxContainer.js";
 
 /** @implements {Pick<ElementInternals, ExposedInternals>} */
 class ComboboxField extends HTMLElement {
+  /* ------------------------------ Custom Element Settings ------------------------------ */
   /** @returns {true} */
   static get formAssociated() {
     return true;
@@ -17,26 +18,16 @@ class ComboboxField extends HTMLElement {
     return /** @type {const} */ (["required"]);
   }
 
-  // Internals
+  /* ------------------------------ Internals ------------------------------ */
   #mounted = false;
   #modified = false;
-
-  /** @readonly @type {ElementInternals} */
-  #internals;
+  /** @readonly */ #internals = this.attachInternals();
 
   #searchString = "";
+  /** @type {number | undefined} */ #searchTimeout;
+  /** @readonly */ #expansionObserver = new MutationObserver(watchExpansion);
+  /** @readonly */ #activeOptionObserver = new MutationObserver(watchActiveDescendant);
 
-  /** @type {number | undefined} */
-  #searchTimeout;
-
-  // Internals --> Mutation Observer Callbacks
-  /** @readonly @type {MutationObserver} */
-  #expansionObserver;
-
-  /** @readonly @type {MutationObserver} */
-  #activeOptionObserver;
-
-  // Local State
   /**
    * @type {string | null} The Custom Element's internal value. **DO NOT** use directly.
    * Use the getter and setter instead.
@@ -46,13 +37,7 @@ class ComboboxField extends HTMLElement {
    */
   #value = null;
 
-  constructor() {
-    super();
-    this.#internals = this.attachInternals();
-    this.#expansionObserver = new MutationObserver(watchExpansion);
-    this.#activeOptionObserver = new MutationObserver(watchActiveDescendant);
-  }
-
+  /* ------------------------------ Lifecycle Callbacks ------------------------------ */
   /**
    * @param {typeof ComboboxField.observedAttributes[number]} name
    * @param {string | null} oldValue
@@ -79,8 +64,7 @@ class ComboboxField extends HTMLElement {
     }
 
     // Require a Corresponding `listbox`
-    const expectedListbox = this.nextElementSibling;
-    if (!(expectedListbox instanceof HTMLElement) || expectedListbox.getAttribute("role") !== "listbox") {
+    if (!(this.listbox instanceof HTMLElement) || this.listbox.getAttribute("role") !== "listbox") {
       throw new Error(`The ${this.constructor.name} must be placed before a valid \`[role="listbox"]\` element.`);
     }
 
@@ -111,14 +95,14 @@ class ComboboxField extends HTMLElement {
   }
 
   /**
-   * Handles the `option` searching logic of the `combobox`
+   * Handles the searching logic of the `combobox`
    * @param {KeyboardEvent} event
    * @returns {void}
    */
   #handleTypeahead = (event) => {
     const combobox = /** @type {ComboboxField} */ (event.target);
-    const listbox = /** @type {HTMLUListElement} */ (combobox.nextElementSibling);
-    const activeOption = /** @type {HTMLElement | null} */ (listbox.querySelector("[data-active='true']"));
+    const { listbox } = combobox;
+    const activeOption = listbox.querySelector("[data-active='true']");
 
     // TODO: Should we allow matching multi-word `option`s by removing empty spaces during a search comparison?
     if (event.key.length === 1 && event.key !== " " && !event.altKey && !event.ctrlKey && !event.metaKey) {
@@ -149,12 +133,11 @@ class ComboboxField extends HTMLElement {
   };
 
   /* ------------------------------ Exposed Form Properties ------------------------------ */
-  /** Retrieves the Custom Element's internal value (`this.#value`). @returns {string} */
+  /** Sets or retrieves the `value` of the `combobox` @returns {string} */
   get value() {
     return this.#value ?? "";
   }
 
-  /** Updates the Custom Element's internal value (`this.#value`) along with any relevant element attributes. */
   set value(v) {
     if (v === this.#value) return;
     this.#modified = true; // TODO: Can we move this under the `newOption` check now?
@@ -209,7 +192,7 @@ class ComboboxField extends HTMLElement {
 
   /** @returns {void} */
   #validateRequiredConstraint() {
-    if (this.required && this.#value === "") {
+    if (this.required && this.value === "") {
       return this.#internals.setValidity({ valueMissing: true }, "Please fill out this field.");
     }
 
@@ -230,7 +213,7 @@ class ComboboxField extends HTMLElement {
     return /** @type {typeof this.listbox} */ (this.nextElementSibling);
   }
 
-  /* -------------------- Exposed Internals (These getters SHOULD NOT be used within the class) -------------------- */
+  /* ------------------------------ Exposed `ElementInternals` ------------------------------ */
   /** @returns {ElementInternals["labels"]} */
   get labels() {
     return this.#internals.labels;
@@ -267,7 +250,10 @@ class ComboboxField extends HTMLElement {
   }
 }
 
-/* ------------------------------ Combobox Handlers ------------------------------ */
+/* Future Reference Note: For searchable comboboxes, a `contenteditable` div is probably the way to go. See MDN. */
+export default ComboboxField;
+
+/* ------------------------------ Combobox Event Handlers ------------------------------ */
 /**
  * @param {MouseEvent} event
  * @returns {void}
@@ -293,7 +279,7 @@ function handleComboboxBlur(event) {
  */
 function handleComboboxKeydown(event) {
   const combobox = /** @type {ComboboxField} */ (event.target);
-  const listbox = /** @type {HTMLUListElement} */ (combobox.nextElementSibling);
+  const { listbox } = combobox;
   const activeOption = /** @type {HTMLElement | null} */ (listbox.querySelector("[data-active='true']"));
 
   if (event.altKey && event.key === "ArrowDown") {
@@ -358,32 +344,19 @@ function handleComboboxKeydown(event) {
     if (combobox.getAttribute(attrs["aria-expanded"]) === String(true)) return activeOption?.click();
 
     // Submit the Form (if the element is collapsed)
+    const { form } = combobox;
+    if (!form) return;
+
     // See: https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#implicit-submission
-    if (!combobox.form) return;
+    /** @type {HTMLButtonElement | HTMLInputElement | null} */
+    const submitter = Array.prototype.find.call(form.elements, (control) => {
+      if (!(control instanceof HTMLInputElement) && !(control instanceof HTMLButtonElement)) return false;
+      return control.type === "submit";
+    });
 
-    const submitter = getDefaultSubmitter(combobox.form);
     if (submitter) return submitter.disabled ? undefined : submitter.click();
-    return combobox.form.requestSubmit();
+    return form.requestSubmit();
   }
-}
-
-/**
- * Returns a `form`'s default submit button if it exists.
- * @see https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#implicit-submission
- *
- * @param {HTMLFormElement} form
- * @returns {HTMLButtonElement | HTMLInputElement | null}
- */
-function getDefaultSubmitter(form) {
-  // Find a `submitter` if it exists
-  for (let i = 0; i < form.elements.length; i++) {
-    const control = form.elements[i];
-    if (control instanceof HTMLButtonElement && control.type === "submit") return control;
-    if (control instanceof HTMLInputElement && control.type === "submit") return control;
-  }
-
-  // We found nothing
-  return null;
 }
 
 /* ------------------------------ Combobox Mutation Observer Details ------------------------------ */
@@ -401,9 +374,7 @@ function watchExpansion(mutations) {
  */
 function handleExpansionChange(mutation) {
   const combobox = /** @type {ComboboxField} */ (mutation.target);
-
-  // TODO: Should we expose a `listbox` getter?
-  const listbox = /** @type {HTMLUListElement} */ (combobox.nextElementSibling);
+  const { listbox } = combobox;
   const expanded = combobox.getAttribute(attrs["aria-expanded"]) === String(true);
 
   // Open Combobox
@@ -468,12 +439,8 @@ function handleActiveDescendantChange(mutation) {
   else if (bottom > bounds.bottom) {
     if (activeOption === listbox.lastElementChild) listbox.scrollTop = listbox.scrollHeight;
     else {
-      const borderWidth = parseFloat(getComputedStyle(listbox).getPropertyValue("--listbox-border"));
+      const borderWidth = parseFloat(getComputedStyle(listbox).getPropertyValue("border-width"));
       listbox.scrollTop = activeOption.offsetTop - (bounds.height - borderWidth * 2) + height - safetyOffset;
     }
   }
 }
-
-export default ComboboxField;
-
-/* Future Reference Note: For searchable comboboxes, a `contenteditable` div is probably the way to go. See MDN. */
