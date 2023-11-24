@@ -2120,6 +2120,71 @@ it.describe("Combobox Web Component", () => {
             await expect(option).toHaveJSProperty("defaultSelected", false);
           });
         });
+
+        it.describe("disabled (Property)", () => {
+          it("Exposes the underlying `aria-disabled` attribute", async ({ page }) => {
+            /* ---------- Setup ---------- */
+            const option = "Choose Me!!!";
+            await page.goto(url);
+            await page.evaluate((o) => {
+              const app = document.getElementById("app") as HTMLDivElement;
+
+              app.innerHTML = `
+                <combobox-container>
+                  <combobox-option aria-disabled="true">${o}</combobox-option>
+                </combobox-container>
+              `;
+            }, option);
+
+            /* ---------- Assertions ---------- */
+            // Display `option`s
+            await page.getByRole("combobox").click();
+
+            // `property` matches initial `attribute`
+            const optionElement = page.getByRole("option", { name: option });
+            await expect(optionElement).toHaveJSProperty("disabled", true);
+
+            // `attribute` responds to `property` updates
+            await optionElement.evaluate((node: ComboboxOption) => (node.disabled = false));
+            await expect(optionElement).toHaveAttribute("aria-disabled", String(false));
+
+            await optionElement.evaluate((node: ComboboxOption) => (node.disabled = true));
+            await expect(optionElement).toHaveAttribute("aria-disabled", String(true));
+
+            // `property` also responds to `attribute` updates
+            await optionElement.evaluate((node) => node.setAttribute("aria-disabled", String(false)));
+            await expect(optionElement).toHaveJSProperty("disabled", false);
+          });
+
+          it("Prevents the `option` from being selected by the user", async ({ page }) => {
+            /* ---------- Setup ---------- */
+            const lastOption = testOptions.at(-1) as string;
+            await renderComponent(page);
+
+            /* ---------- Assertions ---------- */
+            // Display `option`s
+            const combobox = page.getByRole("combobox");
+            await combobox.click();
+
+            // Disable last `option`
+            const lastOptionElement = page.getByRole("option").last();
+            await lastOptionElement.evaluate((node: ComboboxOption) => (node.disabled = true));
+
+            // Try to choose last `option` with mouse (fails)
+            await lastOptionElement.click({ force: true }); // Force is necessary because `option` is `aria-disabled`
+            await expectOptionToBeSelected(page, { label: lastOption }, false);
+
+            // Try to choose last `option` with keyboard (fails)
+            await combobox.focus();
+            await page.keyboard.press("End");
+            await page.keyboard.press("Enter");
+            await expectOptionToBeSelected(page, { label: lastOption }, false);
+
+            // Disabled values can still be selected _programmatically_
+            await lastOptionElement.evaluate((node: ComboboxOption) => (node.selected = true));
+            await expectOptionToBeSelected(page, { label: lastOption });
+          });
+        });
       });
     });
   });
