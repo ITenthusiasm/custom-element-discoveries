@@ -1,4 +1,4 @@
-// NOTE: The functionality here is similar to the regular `<select>` + `<option>` spec, with only minor deviations.
+// NOTE: The functionality here is similar to the regular `<select>` + `<option>` spec, with some minor deviations.
 /** @implements {Omit<HTMLOptionElement, "text">} */
 class ComboboxOption extends HTMLElement {
   #mounted = false;
@@ -52,9 +52,10 @@ class ComboboxOption extends HTMLElement {
   }
 
   set selected(value) {
-    if (this.#selected === value) return;
+    const booleanValue = Boolean(value);
+    if (this.#selected === booleanValue) return;
 
-    this.#selected = Boolean(value);
+    this.#selected = booleanValue;
     this.setAttribute("aria-selected", String(this.#selected));
     this.#syncWithCombobox();
   }
@@ -100,7 +101,7 @@ class ComboboxOption extends HTMLElement {
 
     if (this.#selected && combobox.value !== this.value) combobox.value = this.value;
     else if (!this.#selected && combobox.value === this.value) {
-      combobox.value = /** @type {this}  */ (this.#listbox.children[0]).value;
+      combobox.value = /** @type {this}  */ (this.#listbox.firstElementChild).value;
     }
   }
 }
