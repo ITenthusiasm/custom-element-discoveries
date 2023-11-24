@@ -4,7 +4,7 @@ class ComboboxOption extends HTMLElement {
   #mounted = false;
   #selected = false;
   static get observedAttributes() {
-    return /** @type {const} */ (["selected"]);
+    return /** @type {const} */ (["value", "selected"]);
   }
 
   /**
@@ -15,7 +15,8 @@ class ComboboxOption extends HTMLElement {
    */
   attributeChangedCallback(name, oldValue, newValue) {
     if (!this.#mounted) return;
-    if (name === "selected" && (oldValue === null) !== (newValue === null)) return (this.selected = newValue !== null);
+    if (name === "value" && newValue !== oldValue) return this.#syncWithCombobox();
+    if (name === "selected" && (newValue === null) !== (oldValue === null)) return (this.selected = newValue !== null);
   }
 
   // "On Mount" for Custom Elements
@@ -42,11 +43,8 @@ class ComboboxOption extends HTMLElement {
     return this.getAttribute("value") ?? /** @type {string} */ (this.textContent);
   }
 
-  // TODO: We need to dynamically respond to updates to the `value` attribute as well. So much for
-  // just responding to the `selected` attribute. ALSO: Do we need to do the same with `aria-selected`?
   set value(v) {
     this.setAttribute("value", v);
-    this.#syncWithCombobox();
   }
 
   get selected() {

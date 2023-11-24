@@ -1867,6 +1867,98 @@ it.describe("Combobox Web Component", () => {
 
     it.describe("Combobox Option (Web Component Part)", () => {
       it.describe("Exposed Properties and Attributes", () => {
+        it.describe("label (Property)", () => {
+          it("Returns the text content of the `option`", async ({ page }) => {
+            /* ---------- Setup ---------- */
+            await page.goto(url);
+            await page.evaluate((options) => {
+              const app = document.getElementById("app") as HTMLDivElement;
+
+              app.innerHTML = `
+                <combobox-container>
+                  ${options.map((o, i) => `<combobox-option value="${i + 1}">${o}</combobox-option>`).join("")}
+                </combobox-container>
+              `;
+            }, testOptions);
+
+            /* ---------- Assertions ---------- */
+            // Display `option`s
+            await page.getByRole("combobox").click();
+            const options = page.getByRole("option");
+
+            const optionsCount = await options.count();
+            expect(optionsCount).toBeGreaterThan(1);
+
+            // Check `option` labels
+            await Promise.all(
+              [...Array(optionsCount)].map((_, i) => expect(options.nth(i)).toHaveJSProperty("label", testOptions[i])),
+            );
+          });
+        });
+
+        it.describe("value (Attribute)", () => {
+          it("Updates the value of the `combobox` when changed on the selected `option`", async ({ page }) => {
+            // Setup
+            const value = "1st";
+            await renderComponent(page);
+            await page.getByRole("combobox").click();
+
+            // Adding the attribute
+            const firstOption = page.getByRole("option").first();
+            await firstOption.evaluate((node, v) => node.setAttribute("value", v), value);
+            await expectOptionToBeSelected(page, { label: testOptions[0], value });
+
+            // Removing the attribute
+            await firstOption.evaluate((node) => node.removeAttribute("value"));
+            await expectOptionToBeSelected(page, { label: testOptions[0] });
+
+            // Updating an unselected `option`'s value does nothing to the `combobox` value
+            const lastOption = page.getByRole("option").last();
+            await lastOption.evaluate((node) => node.setAttribute("value", "ignored"));
+            await expectOptionToBeSelected(page, { label: testOptions.at(-1) as string, value: "ignored" }, false);
+            await expectOptionToBeSelected(page, { label: testOptions[0] });
+          });
+        });
+
+        it.describe("value (Property)", () => {
+          it("Exposes the underlying `value` attribute (defaults to `option`'s text content)", async ({ page }) => {
+            /* ---------- Setup ---------- */
+            const option = Object.freeze({ label: "My Value", value: "my-value" });
+            await page.goto(url);
+            await page.evaluate((o) => {
+              const app = document.getElementById("app") as HTMLDivElement;
+
+              app.innerHTML = `
+                <combobox-container>
+                  <combobox-option value="${o.value}">${o.label}</combobox-option>
+                </combobox-container>
+              `;
+            }, option);
+
+            /* ---------- Assertions ---------- */
+            // Display Options
+            await page.getByRole("combobox").click();
+
+            // `property` matches initial `attribute`
+            const optionElement = page.getByRole("option");
+            await expect(optionElement).toHaveJSProperty("value", option.value);
+
+            // `attribute` responds to `property` updates
+            const newValueProperty = "my-property";
+            await optionElement.evaluate((node: ComboboxOption, v) => (node.value = v), newValueProperty);
+            await expect(optionElement).toHaveAttribute("value", newValueProperty);
+
+            // `property` responds to `attribute` updates
+            const newValueAttribute = "my-attribute";
+            await optionElement.evaluate((node: ComboboxField, v) => node.setAttribute("value", v), newValueAttribute);
+            await expect(optionElement).toHaveJSProperty("value", newValueAttribute);
+
+            // `property` defaults to text content in lieu of an `attribute`
+            await optionElement.evaluate((node: ComboboxField) => node.removeAttribute("value"));
+            await expect(optionElement).toHaveJSProperty("value", option.label);
+          });
+        });
+
         it.describe("selected (Property)", () => {
           it("Indicates whether or not the `option` is currently selected", async ({ page }) => {
             // Setup
