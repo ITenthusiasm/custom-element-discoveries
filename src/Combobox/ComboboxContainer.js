@@ -11,11 +11,8 @@ class ComboboxContainer extends HTMLElement {
   #mounted = false;
 
   // Important Elements
-  /** @readonly @type {import("./ComboboxField.js").default} */
-  #combobox;
-
-  /** @readonly @type {HTMLElement} */
-  #listbox;
+  /** @readonly @type {import("./ComboboxField.js").default} */ #combobox;
+  /** @readonly @type {HTMLElement} */ #listbox;
 
   constructor() {
     super();
@@ -38,8 +35,7 @@ class ComboboxContainer extends HTMLElement {
       this.#combobox.setAttribute("aria-controls", `${this.id}-listbox`);
 
       // Transfer relevant attributes from `container` to `combobox`
-      let i = 0;
-      while (this.attributes.length > 2) {
+      for (let i = 0; this.attributes.length > 2; ) {
         const attr = this.attributes[i];
         if (attr.name === "id" || attr.name === "role") {
           i += 1;
@@ -95,6 +91,8 @@ class ComboboxContainer extends HTMLElement {
     this.removeEventListener("mousedown", handleDelegatedMousedown);
   }
 }
+
+export default ComboboxContainer;
 
 /* -------------------- Listbox Handlers -------------------- */
 /**
@@ -152,5 +150,3 @@ export function setAttributeFor(element, attribute, value) {
   if (element.getAttribute(attribute) === value) return;
   element.setAttribute(attribute, value);
 }
-
-export default ComboboxContainer;
