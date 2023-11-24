@@ -14,8 +14,8 @@ class ComboboxOption extends HTMLElement {
    * @param {string | null} newValue
    */
   attributeChangedCallback(name, oldValue, newValue) {
-    if (!this.#mounted || this.#combobox.modified) return;
-    this.selected = newValue != null;
+    if (!this.#mounted) return;
+    if (name === "selected" && (oldValue === null) !== (newValue === null)) return (this.selected = newValue !== null);
   }
 
   // "On Mount" for Custom Elements

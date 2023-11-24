@@ -20,7 +20,6 @@ class ComboboxField extends HTMLElement {
 
   /* ------------------------------ Internals ------------------------------ */
   #mounted = false;
-  #modified = false;
   /** @readonly */ #internals = this.attachInternals();
 
   #searchString = "";
@@ -140,7 +139,6 @@ class ComboboxField extends HTMLElement {
 
   set value(v) {
     if (v === this.#value) return;
-    this.#modified = true; // TODO: Can we move this under the `newOption` check now?
 
     const options = this.listbox.children;
     const newOption = /** @type {typeof previousOption} */ (Array.prototype.find.call(options, (o) => o.value === v));
@@ -197,12 +195,6 @@ class ComboboxField extends HTMLElement {
     }
 
     this.#internals.setValidity({});
-  }
-
-  // TODO: Is this a leaked implementation detail that should be refactored? (It's mainly used by `ComboboxOption`.)
-  /** Indicates that the `combobox`'s value was modified (even if it isn't dirty). @returns {boolean} */
-  get modified() {
-    return this.#modified;
   }
 
   /**
