@@ -104,6 +104,7 @@ class ComboboxField extends HTMLElement {
     const activeOption = listbox.querySelector("[data-active='true']");
 
     // TODO: Should we allow matching multi-word `option`s by removing empty spaces during a search comparison?
+    // NOTE: The native `<select>` element does not support such functionality.
     if (event.key.length === 1 && event.key !== " " && !event.altKey && !event.ctrlKey && !event.metaKey) {
       setAttributeFor(combobox, attrs["aria-expanded"], String(true));
       this.#searchString += event.key;
@@ -297,7 +298,14 @@ function handleComboboxKeydown(event) {
     return;
   }
 
-  if ((event.altKey && event.key === "ArrowUp") || event.key === "Escape") {
+  if (event.key === "Escape") {
+    if (combobox.getAttribute(attrs["aria-expanded"]) !== String(true)) return;
+
+    event.preventDefault(); // Avoid unexpected side-effects like closing `dialog`s
+    return combobox.setAttribute(attrs["aria-expanded"], String(false));
+  }
+
+  if (event.altKey && event.key === "ArrowUp") {
     event.preventDefault(); // Don't scroll
     return setAttributeFor(combobox, attrs["aria-expanded"], String(false));
   }

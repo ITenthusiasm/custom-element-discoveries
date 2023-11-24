@@ -581,6 +581,55 @@ it.describe("Combobox Web Component", () => {
           await expectOptionToBeSelected(page, { label: initialValue });
           await expectOptionToBeSelected(page, { label: nextOptionValue }, false);
         });
+
+        it("Avoids unintended side-effects (e.g., prematurely closing `dialog`s)", async ({ page }) => {
+          /* ---------- Setup ---------- */
+          await page.goto(url);
+          await page.evaluate((options) => {
+            const app = document.getElementById("app") as HTMLDivElement;
+
+            app.innerHTML = `
+              <dialog>
+                <combobox-container>
+                  ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
+                </combobox-container>
+              </dialog>
+            `;
+          }, testOptions);
+
+          /* ---------- Assertions ---------- */
+          const combobox = page.getByRole("combobox");
+          const dialog = page.locator("dialog");
+
+          // Open `dialog` and `combobox`
+          await dialog.evaluate((node: HTMLDialogElement) => node.showModal());
+          await combobox.click();
+          await expectOptionsToBeVisible(page);
+
+          // Close `combobox` without closing `dialog` (i.e., without causing any side-effects)
+          const defaultPrevented = page.evaluate(() => {
+            return new Promise<boolean>((resolve) => {
+              document.addEventListener("keydown", (event) => resolve(event.defaultPrevented), { once: true });
+            });
+          });
+
+          await page.keyboard.press("Escape");
+          await expectComboboxToBeClosed(page);
+          await expect(dialog).toHaveJSProperty("open", true);
+          expect(await defaultPrevented).toBe(true);
+
+          // Properly close `dialog` now that `combobox` is closed
+          const defaultNotPrevented = page.evaluate(() => {
+            return new Promise<boolean>((resolve) => {
+              document.addEventListener("keydown", (event) => resolve(!event.defaultPrevented), { once: true });
+            });
+          });
+
+          await page.keyboard.press("Escape");
+          await expect(dialog).toHaveJSProperty("open", false);
+          await expect(combobox).not.toBeVisible();
+          expect(await defaultNotPrevented).toBe(true);
+        });
       });
 
       it.describe("SpaceBar (' ')", () => {
