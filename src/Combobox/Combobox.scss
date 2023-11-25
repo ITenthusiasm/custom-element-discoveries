@@ -4,24 +4,34 @@ combobox-container {
   position: relative;
   display: inline-block;
   box-sizing: border-box;
-  width: auto;
-  height: auto;
+  width: inherit;
+  height: inherit;
 
   @media only screen and (min-width: 600px) {
     --blocks: 10;
   }
 
   > [role="combobox"] {
+    --border-width: 1.5px;
+
     display: block;
     box-sizing: border-box;
     width: 100%;
     height: 100%;
+    padding: 8px;
+    border: var(--border-width) solid #cecece;
+    border-radius: 4px;
+    outline: none;
 
+    cursor: pointer;
     text-align: center;
+    font-size: inherit;
+    font-family: inherit;
     color: currentcolor;
+    background-color: white;
 
     &:focus {
-      outline: 1px solid blue;
+      border-color: dodgerblue;
     }
 
     + [role="listbox"] {
@@ -37,7 +47,7 @@ combobox-container {
       max-height: calc(var(--option-height) * var(--blocks) + var(--listbox-border) * 2);
       padding: 0;
       border: var(--listbox-border) solid #cecece;
-      border-radius: 5px;
+      border-radius: 4px;
       margin: 0;
 
       overflow: auto;
