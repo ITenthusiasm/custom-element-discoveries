@@ -11,7 +11,7 @@ combobox-container {
     --blocks: 10;
   }
 
-  > [role="combobox"] {
+  & > [role="combobox"] {
     --border-width: 1.5px;
 
     display: block;
@@ -34,7 +34,7 @@ combobox-container {
       border-color: dodgerblue;
     }
 
-    + [role="listbox"] {
+    & + [role="listbox"] {
       --listbox-border: 2px;
       --option-height: 38px;
       --option-padding: 8px;
@@ -53,7 +53,7 @@ combobox-container {
       overflow: auto;
       background-color: white;
 
-      > [role="option"] {
+      & > [role="option"] {
         display: block;
         box-sizing: border-box;
         height: var(--option-height);

@@ -1,1 +1,2 @@
-- [ ] Consider converting back to CSS with CSS Nesting to avoid the need for Sass... You will have to use `&` selectors for a little while, though...
+- [ ] Do we want to add a Caret icon for the Combobox component?
+- [ ] When do we want to consider a `searchable` Combobox -- if ever? Should it be its own component? Or should the `ComboboxField` simply be configurable?

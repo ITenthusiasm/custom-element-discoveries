@@ -4,7 +4,7 @@ import ComboboxOption from "./Combobox/ComboboxOption.js";
 import ComboboxContainer from "./Combobox/ComboboxContainer.js";
 
 // Styles
-import "./Combobox/Combobox.scss";
+import "./Combobox/Combobox.css";
 import "./app.css";
 
 /* -------------------- "App Logic" -------------------- */
