@@ -1445,11 +1445,11 @@ it.describe("Combobox Web Component", () => {
             const initialName = "initial-combobox";
             await page.goto(url);
             await page.evaluate(
-              ([options, initialName]) => {
+              ([options, name]) => {
                 const app = document.getElementById("app") as HTMLDivElement;
 
                 app.innerHTML = `
-                  <combobox-container name="${initialName}">
+                  <combobox-container name="${name}">
                     ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
                   </combobox-container>
                 `;
@@ -1834,7 +1834,7 @@ it.describe("Combobox Web Component", () => {
                   "invalid",
                   () => {
                     clearTimeout(timeout);
-                    reject("The `invalid` event should not have been emitted by the combobox-field");
+                    reject(new Error("The `invalid` event should not have been emitted by the combobox-field"));
                   },
                   { once: true },
                 );
@@ -1868,9 +1868,9 @@ it.describe("Combobox Web Component", () => {
 
                 document.addEventListener(
                   e,
-                  (event) => {
-                    if (event.constructor !== Event) return;
-                    if (event.target?.constructor !== customElements.get("combobox-field")) return;
+                  (evt) => {
+                    if (evt.constructor !== Event) return;
+                    if (evt.target?.constructor !== customElements.get("combobox-field")) return;
                     clearTimeout(timeout);
                     resolve(true);
                   },
@@ -1895,7 +1895,7 @@ it.describe("Combobox Web Component", () => {
                   e,
                   () => {
                     clearTimeout(timeout);
-                    reject(`The \`${e}\` event should not have been emitted by the combobox-field`);
+                    reject(new Error(`The \`${e}\` event should not have been emitted by the combobox-field`));
                   },
                   { once: true },
                 );

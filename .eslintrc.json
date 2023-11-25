@@ -1,12 +1,7 @@
 {
   "env": { "browser": true, "node": true, "jest": true },
-  "extends": [
-    "airbnb-base",
-    "plugin:@typescript-eslint/recommended",
-    "plugin:jest/recommended",
-    "plugin:testing-library/react",
-    "prettier"
-  ],
+  // TODO: Add `eslint-plugin-playwright`
+  "extends": ["airbnb-base", "plugin:@typescript-eslint/recommended", "prettier"],
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
     "ecmaVersion": "latest",
@@ -53,10 +48,17 @@
   },
   "overrides": [
     {
-      "files": "**/__tests__/**/*.test.ts?(x)",
+      "files": "playwright.config.ts",
+      "rules": { "import/no-extraneous-dependencies": ["error", { "devDependencies": true }] }
+    },
+    {
+      "files": "**/__tests__/**/*.test.ts",
       "rules": {
+        "no-eval": "off", // Currently, we have no choice for our Playwright tests, sadly. Cypress would be different.
         "no-await-in-loop": "off",
+        "no-param-reassign": "off",
         "no-restricted-syntax": "off",
+        "no-promise-executor-return": "off",
 
         // Import
         "import/no-extraneous-dependencies": ["error", { "devDependencies": true }]

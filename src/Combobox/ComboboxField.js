@@ -38,12 +38,12 @@ class ComboboxField extends HTMLElement {
 
   /* ------------------------------ Lifecycle Callbacks ------------------------------ */
   /**
-   * @param {typeof ComboboxField.observedAttributes[number]} name
-   * @param {string | null} oldValue
-   * @param {string | null} newValue
+   * @param {typeof ComboboxField.observedAttributes[number]} _name
+   * @param {string | null} _oldValue
+   * @param {string | null} _newValue
    */
-  attributeChangedCallback(name, oldValue, newValue) {
-    if (name === "required") return this.#validateRequiredConstraint();
+  attributeChangedCallback(_name, _oldValue, _newValue) {
+    this.#validateRequiredConstraint();
   }
 
   // "On Mount" for Custom Elements
@@ -125,10 +125,13 @@ class ComboboxField extends HTMLElement {
 
       /* -------------------- Update `search` and Active `option` -------------------- */
       clearTimeout(this.#searchTimeout);
-      if (!nextActiveOption) return void (this.#searchString = "");
+      if (!nextActiveOption) {
+        this.#searchString = "";
+        return;
+      }
 
       setAttributeFor(combobox, attrs["aria-activedescendant"], nextActiveOption.id);
-      this.#searchTimeout = setTimeout(() => (this.#searchString = ""), 500);
+      this.#searchTimeout = window.setTimeout(() => (this.#searchString = ""), 500);
     }
   };
 

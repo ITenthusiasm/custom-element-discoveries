@@ -29,6 +29,7 @@ class ComboboxOption extends HTMLElement {
     }
 
     // Require a Corresponding `listbox`
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Verification needed on mount
     if (!this.#listbox && !this.closest("combobox-container")) {
       throw new Error(`A ${this.constructor.name} must be placed inside a valid \`[role="listbox"]\` element.`);
     }

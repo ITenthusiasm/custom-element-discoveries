@@ -8,17 +8,17 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "lint": "prettier --ignore-path .gitignore --check . && eslint --ignore-path .gitignore .",
+    "lint": "prettier --ignore-path .gitignore --check . && eslint --ignore-path .gitignore . && tsc --noEmit",
     "format": "prettier --ignore-path .gitignore --write ."
   },
   "devDependencies": {
     "@playwright/test": "^1.40.0",
+    "@types/node": "^18.18.13",
     "@typescript-eslint/eslint-plugin": "^6.12.0",
     "@typescript-eslint/parser": "^6.12.0",
     "eslint": "^8.54.0",
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-config-prettier": "^9.0.0",
-    "eslint-plugin-testing-library": "^6.2.0",
     "prettier": "^3.1.0",
     "typescript": "^5.3.2",
     "vite": "^5.0.2"
