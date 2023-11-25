@@ -2289,5 +2289,77 @@ it.describe("Combobox Web Component", () => {
         });
       });
     });
+
+    it.describe("Combobox Container (Web Component Part)", () => {
+      it("Transfers its (user-provided) attributes to the `combobox` during initialization", async ({ page }) => {
+        /* ---------- Setup ---------- */
+        await page.goto(url);
+        await page.evaluate(() => {
+          const app = document.getElementById("app") as HTMLDivElement;
+
+          app.innerHTML = `
+            <combobox-container id="combobox" name="my-name" required disabled>
+              <combobox-option>Choose Me!!!</combobox-option>
+            </combobox-container>
+          `;
+        });
+
+        /* ---------- Assertions ---------- */
+        const combobox = page.getByRole("combobox");
+        const container = page.locator("combobox-container");
+
+        // The `combobox` has inherited the attributes
+        await expect(combobox).toHaveAttribute("id", "combobox");
+        await expect(combobox).toHaveAttribute("name", "my-name");
+        await expect(combobox).toHaveAttribute("required", "");
+        await expect(combobox).toHaveAttribute("disabled", "");
+
+        // The container has lost (or updated) its attributes
+        await expect(container).toHaveAttribute("id", "combobox-container");
+        await expect(container).not.toHaveAttribute("name");
+        await expect(container).not.toHaveAttribute("required");
+        await expect(container).not.toHaveAttribute("disabled");
+      });
+
+      it("Rejects unsupported nodes/elements during initialization", async ({ page }) => {
+        // Setup
+        const className = "invalid";
+        await page.goto(url);
+        await page.evaluate((c) => {
+          const app = document.getElementById("app") as HTMLDivElement;
+
+          app.innerHTML = `
+            <combobox-container>
+              <div class="${c}">I am rejected</div>
+              <combobox-option>Choose Me!!!</combobox-option>
+              <span class="${c}" role="option">I am rejected even though I have a proper role</span>
+              <div class="${c}" role="listbox">I am rejected even though a \`listbox\` will be put here</div>
+            </combobox-container>
+          `;
+        }, className);
+
+        // Unrelated elements (i.e., the `div`s and `span`s) should have been removed
+        const container = page.locator("combobox-container");
+        expect(await container.locator(".invalid").count()).toBe(0);
+        expect(await container.locator("combobox-option").count()).toBe(1);
+      });
+
+      it("Has no accessible `role`", async ({ page }) => {
+        // Setup
+        await page.goto(url);
+        await page.evaluate(() => {
+          const app = document.getElementById("app") as HTMLDivElement;
+
+          app.innerHTML = `
+            <combobox-container>
+              <combobox-option>Choose Me!!!</combobox-option>
+            </combobox-container>
+          `;
+        });
+
+        // Container should not have an accessible `role`
+        await expect(page.locator("combobox-container")).toHaveAttribute("role", "none");
+      });
+    });
   });
 });
