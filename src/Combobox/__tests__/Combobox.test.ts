@@ -2362,4 +2362,38 @@ it.describe("Combobox Web Component", () => {
       });
     });
   });
+
+  it.describe("Miscellaneous Accessibility (A11y) Requirements", () => {
+    it("Sets up the appropriate a11y relationships for a `combobox`", async ({ page }) => {
+      await renderComponent(page);
+
+      // Get Elements
+      const combobox = page.getByRole("combobox");
+      const listbox = page.getByRole("listbox");
+
+      // Expand `combobox`
+      await combobox.click();
+      await expectOptionsToBeVisible(page);
+
+      // Assert that `combobox` has a meaningful ID (even if one isn't provided)
+      await expect(combobox).toHaveAttribute("id", expect.stringMatching(/\w+/));
+
+      // Assert that `combobox` has correct static ARIA attributes
+      await expect(combobox).toHaveAttribute("aria-haspopup", "listbox");
+
+      // Assert proper relationship between `combobox` and `listbox`
+      await expect(combobox).toHaveAttribute("aria-controls", await listbox.evaluate((l) => l.id));
+      await expect(listbox).toHaveAttribute("id", `${await combobox.evaluate((c) => c.id)}-listbox`);
+
+      // Assert proper relationship between `combobox`, `listbox`, and `option`s
+      for (const option of testOptions) {
+        await page.keyboard.type(option);
+        await page.waitForTimeout(550); // Wait for Typeahead Search to reset before continuing
+
+        const optionEl = listbox.getByRole("option", { name: option });
+        await expect(combobox).toHaveAttribute("aria-activedescendant", await optionEl.evaluate((o) => o.id));
+        await expect(optionEl).toHaveAttribute("id", `${await combobox.evaluate((c) => c.id)}-option-${option}`);
+      }
+    });
+  });
 });
