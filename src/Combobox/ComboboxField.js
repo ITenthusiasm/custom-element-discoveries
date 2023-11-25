@@ -1,10 +1,10 @@
 import { attrs, setAttributeFor } from "./ComboboxContainer.js";
 
-/** @typedef {keyof Pick<
-      ElementInternals,
-      "labels" | "form" | "validity" | "validationMessage" | "willValidate" | "checkValidity" | "reportValidity"
-    >} ExposedInternals
-  */
+/** 
+ * @typedef {keyof Pick<ElementInternals,
+     "labels" | "form" | "validity" | "validationMessage" | "willValidate" | "checkValidity" | "reportValidity"
+   >} ExposedInternals
+ */
 
 /** @implements {Pick<ElementInternals, ExposedInternals>} */
 class ComboboxField extends HTMLElement {
