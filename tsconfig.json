@@ -9,9 +9,6 @@
     "checkJs": true,
     "skipLibCheck": false,
 
-    /* Bundler Mode */
-    "moduleResolution": "NodeNext",
-
     "noEmit": true,
     "isolatedModules": true,
     "forceConsistentCasingInFileNames": true
