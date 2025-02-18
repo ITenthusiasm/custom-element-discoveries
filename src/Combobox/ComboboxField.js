@@ -1,5 +1,6 @@
 /** @import ComboboxOption from "./ComboboxOption.js" */
-import { attrs, setAttributeFor } from "./ComboboxContainer.js";
+import { attrs } from "./ComboboxContainer.js";
+import { setAttributeFor } from "../utils/dom.js";
 
 /** 
  * @typedef {keyof Pick<ElementInternals,

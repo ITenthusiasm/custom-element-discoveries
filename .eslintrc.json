@@ -48,6 +48,10 @@
   },
   "overrides": [
     {
+      "files": "src/utils/**.js",
+      "rules": { "import/prefer-default-export": "off" } // Usually these files are intended to have named exports only
+    },
+    {
       "files": "playwright.config.ts",
       "rules": { "import/no-extraneous-dependencies": ["error", { "devDependencies": true }] }
     },

@@ -1,5 +1,6 @@
 /** @import ComboboxField from "./ComboboxField.js" */
 import ComboboxOption from "./ComboboxOption.js";
+import { setAttributeFor } from "../utils/dom.js";
 
 /** The attributes _commonly_ used by the `Combobox` component. (These are declared to help avoid typos.) */
 export const attrs = Object.freeze({
@@ -136,19 +137,4 @@ function handleDelegatedOptionClick(event) {
  */
 function handleDelegatedMousedown(event) {
   if (event.target instanceof ComboboxOption) return event.preventDefault();
-}
-
-/* -------------------- Local Helpers -------------------- */
-/**
- * Sets the `attribute` of an `element` to the specified `value` _if_ the element's attribute
- * did not already have that value. Used to avoid redundantly triggering `MutationObserver`s.
- *
- * @param {HTMLElement} element
- * @param {string} attribute
- * @param {string} value
- * @returns {void}
- */
-export function setAttributeFor(element, attribute, value) {
-  if (element.getAttribute(attribute) === value) return;
-  element.setAttribute(attribute, value);
 }
