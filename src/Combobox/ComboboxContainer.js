@@ -1,3 +1,4 @@
+/** @import ComboboxField from "./ComboboxField.js" */
 import ComboboxOption from "./ComboboxOption.js";
 
 /** The attributes _commonly_ used by the `Combobox` component. (These are declared to help avoid typos.) */
@@ -11,12 +12,12 @@ class ComboboxContainer extends HTMLElement {
   #mounted = false;
 
   // Important Elements
-  /** @readonly @type {import("./ComboboxField.js").default} */ #combobox;
+  /** @readonly @type {ComboboxField} */ #combobox;
   /** @readonly @type {HTMLElement} */ #listbox;
 
   constructor() {
     super();
-    this.#combobox = /** @type {import("./ComboboxField.js").default} */ (document.createElement("combobox-field"));
+    this.#combobox = /** @type {ComboboxField} */ (document.createElement("combobox-field"));
     this.#listbox = document.createElement("div");
   }
 
@@ -105,7 +106,7 @@ function handleDelegatedOptionHover(event) {
   const option = /** @type {ComboboxOption} */ (event.target);
   if (option === listbox) return; // We hovered the `listbox`, not an `option`
 
-  const combobox = /** @type {import("./ComboboxField.js").default} */ (listbox.previousElementSibling);
+  const combobox = /** @type {ComboboxField} */ (listbox.previousElementSibling);
   setAttributeFor(combobox, attrs["aria-activedescendant"], option.id);
 }
 
@@ -119,7 +120,7 @@ function handleDelegatedOptionClick(event) {
   if (option === listbox) return; // We clicked the `listbox`, not an `option`
   if (option.disabled) return;
 
-  const combobox = /** @type {import("./ComboboxField.js").default} */ (listbox.previousElementSibling);
+  const combobox = /** @type {ComboboxField} */ (listbox.previousElementSibling);
   combobox.setAttribute(attrs["aria-expanded"], String(false));
 
   if (option.selected) return;

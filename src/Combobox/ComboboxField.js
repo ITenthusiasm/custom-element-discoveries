@@ -1,3 +1,4 @@
+/** @import ComboboxOption from "./ComboboxOption.js" */
 import { attrs, setAttributeFor } from "./ComboboxContainer.js";
 
 /** 
@@ -206,7 +207,7 @@ class ComboboxField extends HTMLElement {
 
   /**
    * The `listbox` that this `combobox` controls.
-   * @returns {HTMLElement & { children: HTMLCollectionOf<import("./ComboboxOption.js").default>}}
+   * @returns {HTMLElement & { children: HTMLCollectionOf<ComboboxOption> }}
    */
   get listbox() {
     return /** @type {typeof this.listbox} */ (this.nextElementSibling);

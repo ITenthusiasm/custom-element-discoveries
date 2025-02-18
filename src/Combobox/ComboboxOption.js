@@ -1,3 +1,5 @@
+/** @import ComboboxField from "./ComboboxField.js" */
+
 // NOTE: The functionality here is similar to the regular `<select>` + `<option>` spec, with some minor deviations.
 /** @implements {Omit<HTMLOptionElement, "text">} */
 class ComboboxOption extends HTMLElement {
@@ -18,6 +20,7 @@ class ComboboxOption extends HTMLElement {
     if (name === "selected" && (newValue === null) !== (oldValue === null)) return (this.selected = newValue !== null);
   }
 
+  // TODO: Do we want to use `ElementInternals` for ARIA? Would Playwright/Testing Library be able to detect that?
   // "On Mount" for Custom Elements
   connectedCallback() {
     if (!this.isConnected) return;
@@ -28,6 +31,7 @@ class ComboboxOption extends HTMLElement {
       this.#mounted = true;
     }
 
+    // TODO: Do we need the `closest` check anymore?
     // Require a Corresponding `listbox`
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Verification needed on mount
     if (!this.#listbox && !this.closest("combobox-container")) {
@@ -91,9 +95,9 @@ class ComboboxOption extends HTMLElement {
     return /** @type {HTMLElement} */ (this.closest("[role='listbox']"));
   }
 
-  /** Retrives `combobox` that this `option` belongs to @returns {import("./ComboboxField.js").default} */
+  /** Retrives `combobox` that this `option` belongs to @returns {ComboboxField} */
   get #combobox() {
-    return /** @type {import("./ComboboxField.js").default} */ (this.#listbox.previousElementSibling);
+    return /** @type {ComboboxField} */ (this.#listbox.previousElementSibling);
   }
 
   #syncWithCombobox() {
