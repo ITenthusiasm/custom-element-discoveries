@@ -1,12 +1,7 @@
 /** @import ComboboxField from "./ComboboxField.js" */
-import ComboboxOption from "./ComboboxOption.js";
 import { setAttributeFor } from "../utils/dom.js";
-
-/** The attributes _commonly_ used by the `Combobox` component. (These are declared to help avoid typos.) */
-export const attrs = Object.freeze({
-  "aria-activedescendant": "aria-activedescendant",
-  "aria-expanded": "aria-expanded",
-});
+import ComboboxOption from "./ComboboxOption.js";
+import attrs from "./attrs.js";
 
 class ComboboxContainer extends HTMLElement {
   // Internals
