@@ -58,6 +58,7 @@ class ComboboxField extends HTMLElement {
       this.setAttribute(attrs["aria-expanded"], String(false));
       this.setAttribute(attrs["aria-activedescendant"], "");
 
+      // TODO: Internally track "Label" node instead of assuming its position in the DOM throughout the code?
       this.insertAdjacentText("afterbegin", "");
       this.#mounted = true;
     }
@@ -101,7 +102,7 @@ class ComboboxField extends HTMLElement {
   #handleTypeahead = (event) => {
     const combobox = /** @type {ComboboxField} */ (event.target);
     const { listbox } = combobox;
-    const activeOption = listbox.querySelector("[data-active='true']");
+    const activeOption = listbox.querySelector(":scope [role='option'][data-active='true']");
 
     // TODO: Should we allow matching multi-word `option`s by removing empty spaces during a search comparison?
     // NOTE: The native `<select>` element does not support such functionality.
@@ -112,6 +113,7 @@ class ComboboxField extends HTMLElement {
       /* -------------------- Determine Next Active `option` -------------------- */
       /** @type {Element | undefined} */
       let nextActiveOption;
+      // TODO: Change to `ComboboxOption.index` + 1?
       const start = Array.prototype.indexOf.call(listbox.children, activeOption) + 1;
 
       for (let i = start; i < listbox.children.length + start; i++) {
@@ -125,6 +127,7 @@ class ComboboxField extends HTMLElement {
 
       /* -------------------- Update `search` and Active `option` -------------------- */
       clearTimeout(this.#searchTimeout);
+      // TODO: Maybe do invert the logic? That is, early return for positive case instead of negative case?
       if (!nextActiveOption) {
         this.#searchString = "";
         return;
