@@ -1,7 +1,7 @@
 // Primary Imports
 import ComboboxField from "./Combobox/ComboboxField.js";
 import ComboboxOption from "./Combobox/ComboboxOption.js";
-import ComboboxContainer from "./Combobox/ComboboxContainer.js";
+import SelectEnhancer from "./Combobox/SelectEnhancer.js";
 
 // Styles
 import "./Combobox/Combobox.css";
@@ -10,7 +10,7 @@ import "./app.css";
 /* -------------------- "App Logic" -------------------- */
 customElements.define("combobox-field", ComboboxField);
 customElements.define("combobox-option", ComboboxOption);
-customElements.define("combobox-container", ComboboxContainer);
+customElements.define("select-enhancer", SelectEnhancer);
 
 /* -------------------- Handlers for Debugging -------------------- */
 document.querySelector("form")?.addEventListener("submit", handleSubmit);

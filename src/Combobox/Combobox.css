@@ -1,4 +1,4 @@
-combobox-container {
+select-enhancer {
   --blocks: 5; /* Number of option blocks to display before needing to scroll */
 
   position: relative;

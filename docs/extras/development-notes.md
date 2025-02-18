@@ -2,7 +2,9 @@
 
 A collection of questions/concerns that I thought through while designing some of the Web Components in this repository.
 
-## Why Does `ComboboxContainer` Sketchily Transfer Its Attributes to `ComboboxField`?
+<!-- TODO: We might have to update this comment/note now, since we'll be starting with regular `<select>` elements from now on. -->
+
+## Why Does `SelectEnhancer` Sketchily Transfer Its Attributes to `ComboboxField`?
 
 This was a pretty peculiar design decision, but it was a design decision that -- given my constraints -- I thought made sense. To understand how I got here, it's important to first understand what my constraints were.
 
@@ -94,7 +96,7 @@ Now... Let's compare our final result with what consumers would need to do when 
 </select>
 ```
 
-See how much worse the Developer Experience is if we _don't_ create the wrapper for consumers? And the DX is not only bad; it's error prone. Everything turns out much better if we simply create an intelligent wrapper for the consumer. This is why we have the `<combobox-container>` Web Component.
+See how much worse the Developer Experience is if we _don't_ create the wrapper for consumers? And the DX is not only bad; it's error prone. Everything turns out much better if we simply create an intelligent wrapper for the consumer. This is why we have the `<select-enhancer>` Web Component.
 
 #### B&rpar; Accepting Responsibility for the Combobox Component Layout
 
@@ -128,22 +130,22 @@ Then ideally, its enhanced Web Component version would look and feel similar. Un
 </combobox-field>
 ```
 
-The next best thing is to use the `<combobox-container>` to hold everything instead (_if_ the goal is creating an experience similar to a `<select>` element):
+The next best thing is to use the `<select-enhancer>` to hold everything instead (_if_ the goal is creating an experience similar to a `<select>` element):
 
 ```html
-<combobox-container>
+<select-enhancer>
   <combobox-option>First</combobox-option>
   <!-- ... -->
   <combobox-option>Last</combobox-option>
-</combobox-container>
+</select-enhancer>
 ```
 
 #### Where Do We Put the `combobox` and the `listbox`?
 
-We don't put them anywhere. We can let the `<combobox-container>` create and position these elements itself. So instead of writing
+We don't put them anywhere. We can let the `<select-enhancer>` create and position these elements itself. So instead of writing
 
 ```html
-<combobox-container>
+<select-enhancer>
   <combobox-field></combobox-field>
 
   <!-- Or you can create an extra `<combobox-listbox>` Web Component -->
@@ -152,72 +154,72 @@ We don't put them anywhere. We can let the `<combobox-container>` create and pos
     <!-- ... -->
     <combobox-option>Last</combobox-option>
   </div>
-</combobox-container>
+</select-enhancer>
 ```
 
 consumers can simply write
 
 ```html
-<combobox-container>
+<select-enhancer>
   <combobox-option>First</combobox-option>
   <!-- ... -->
   <combobox-option>Last</combobox-option>
-</combobox-container>
+</select-enhancer>
 ```
 
 Now, I know... This may look like undesirable magic. But there are some benefits to taking this approach that are worth noting:
 
-**First: With this approach, we can prevent illegal elements from entering the `<combobox-container>`.** The `<combobox-container>` can be configured to erase anything that isn't a `<combobox-option>`. This means that illegal elements won't be accepted by the container as children, and duplicates of `<combobox-field>` won't be accepted by the container either. (Note: Alternatively, we could write extra logic to resolve duplicate `<combobox-field>`s, but this ultimately introduces more complexity to both the Combobox Component and the consumers of the Combobox Component.) Additionally, this allows the container to have full control over how its children are arranged. For example, we can _guarantee_ that the `combobox`'s `nextElementSibling` will be the `listbox` -- allowing us to simplify our JavaScript logic and our default styles.
+**First: With this approach, we can prevent illegal elements from entering the `<select-enhancer>`.** The `<select-enhancer>` can be configured to erase anything that isn't a `<combobox-option>`. This means that illegal elements won't be accepted by the container as children, and duplicates of `<combobox-field>` won't be accepted by the container either. (Note: Alternatively, we could write extra logic to resolve duplicate `<combobox-field>`s, but this ultimately introduces more complexity to both the Combobox Component and the consumers of the Combobox Component.) Additionally, this allows the container to have full control over how its children are arranged. For example, we can _guarantee_ that the `combobox`'s `nextElementSibling` will be the `listbox` -- allowing us to simplify our JavaScript logic and our default styles.
 
 **Second: We save the consumer from creating a redundant `listbox`**. Recall that ideally, the consumer shouldn't have to think about ARIA attributes. We _could_ allow consumers to write:
 
 ```html
-<combobox-container>
+<select-enhancer>
   <div role="listbox">
     <combobox-option>First</combobox-option>
     <!-- ... -->
     <combobox-option>Last</combobox-option>
   </div>
-</combobox-container>
+</select-enhancer>
 ```
 
 But remember that if we give the consumer control over the element that wraps the options, our default styles for the `listbox` aren't guaranteed to be consistent. To guarantee absolute safety, we would need to give the consumer a `combobox-listbox` element and enforce that no other kind of element is used to wrap the options:
 
 ```html
-<combobox-container>
+<select-enhancer>
   <combobox-listbox>
     <combobox-option>First</combobox-option>
     <!-- ... -->
     <combobox-option>Last</combobox-option>
   </combobox-listbox>
-</combobox-container>
+</select-enhancer>
 ```
 
-This is an acceptable solution. However, it adds more things that the consumer needs to think about, and to me it feels a bit redundant. This approach also steps further away from the look and feel of a regular `<select>` element. So having the `<combobox-container>` create the `listbox` _for_ the consumer seems more ideal.
+This is an acceptable solution. However, it adds more things that the consumer needs to think about, and to me it feels a bit redundant. This approach also steps further away from the look and feel of a regular `<select>` element. So having the `<select-enhancer>` create the `listbox` _for_ the consumer seems more ideal.
 
 **Third: We save the consumer from any complications arising from the `combobox`.** As I mentioned before, the ideal Combobox Component behaves similarly to the the native `<select>` element. This also means that ideally, any useful APIs belonging to `<select>` or `<option>` should be mimicked. For instance, the useful `HTMLSelectElement.value` property should be supported by the `ComboboxField` element, and the useful `HTMLOptionElement.selected` property should be supported by the `ComboboxOption` element. However, such support means that the `ComboboxField` and the `ComboboxOption` both influence each other's data.
 
 Because the default value of a Combobox Component should be determined during "initial render" (when the parts of the Combobox Component are initially attached to the DOM), the constraint of emulating the native `<select>` APIs requires the `ComboboxField` and the list of `ComboboxOption`s to be loaded in a carefully-considered order. Otherwise, an infinite loop or a runtime error could accidentally get introduced.
 
-There might be some ways to allow the consumer to supply the `<combobox-field>` to the `<combobox-container>` on their own without breaking anything. But the simplest solution is to hide these complications/concerns from the consumer altogether by allowing the container to determine _when_ the `<combobox-field>` is created and attached. This guarantees that the consumer won't encounter any unexpected bugs.
+There might be some ways to allow the consumer to supply the `<combobox-field>` to the `<select-enhancer>` on their own without breaking anything. But the simplest solution is to hide these complications/concerns from the consumer altogether by allowing the container to determine _when_ the `<combobox-field>` is created and attached. This guarantees that the consumer won't encounter any unexpected bugs.
 
 ### 4&rpar; Supplying the Proper Attributes to the `ComboboxField`
 
-Enabling the `<combobox-container>` to control everything is quite valuable. The fact it guarantees the proper arrangement of its children and forbids any invalid children is great! But taking this approach doesn't come without caveats. Let's consider what I've called the "ideal" markup again:
+Enabling the `<select-enhancer>` to control everything is quite valuable. The fact it guarantees the proper arrangement of its children and forbids any invalid children is great! But taking this approach doesn't come without caveats. Let's consider what I've called the "ideal" markup again:
 
 ```html
-<combobox-container>
+<select-enhancer>
   <combobox-option>First</combobox-option>
   <!-- ... -->
   <combobox-option>Last</combobox-option>
-</combobox-container>
+</select-enhancer>
 ```
 
 Remember that the `<combobox-field>` represents the element with the `combobox` role, and this element is the central part of the Combobox Component. But with this setup, how is the `<combobox-field>` supposed to receive any attributes? Sure, the consumer won't have to worry about any _accessibility_ attributes. But what about providing a CSS class to the `<combobox-field>`? [Data attributes](https://developer.mozilla.org/en-US/docs/Learn/HTML/Howto/Use_data_attributes)? An `id` that can be targeted by a `<label>` element? Currently, with our approach, the consumer has no way to accomplish this without writing JavaScript. Alternatively, we could try to find a way to let the consumer provide the `<combobox-field>` themselves, but we've already discussed some of the risks associated with that.
 
-If we want to avoid worrying the consumer with extra concerns, one solution is to have the `<combobox-container>` transfer all of its attributes to the `<combobox-field>`. This is a trade-off... And it's a trade-off that some may consider undesirable. However, it's a trade-off that I have accepted for the sake of creating a simpler experience that more closely matches the look and feel of a `<select>` element.
+If we want to avoid worrying the consumer with extra concerns, one solution is to have the `<select-enhancer>` transfer all of its attributes to the `<combobox-field>`. This is a trade-off... And it's a trade-off that some may consider undesirable. However, it's a trade-off that I have accepted for the sake of creating a simpler experience that more closely matches the look and feel of a `<select>` element.
 
-Although it may seem odd to transfer to transfer attributes from the `<combobox-container>` to the `<combobox-field>`, this practice is actually _very_ common when it comes to writing components with a JavaScript framework. Imagine if we had created a `Select` component in [`svelte`](https://svelte.dev/) (or some other framework) instead. Wherever this component would be used, we'd have something like the following:
+Although it may seem odd to transfer to transfer attributes from the `<select-enhancer>` to the `<combobox-field>`, this practice is actually _very_ common when it comes to writing components with a JavaScript framework. Imagine if we had created a `Select` component in [`svelte`](https://svelte.dev/) (or some other framework) instead. Wherever this component would be used, we'd have something like the following:
 
 ```svelte
 <Select>
@@ -229,12 +231,12 @@ Although it may seem odd to transfer to transfer attributes from the `<combobox-
 
 But what would be happening under the hood here? Any attributes passed to `Select` wouldn't actually get placed on any "custom select element", _nor_ would the attributes get placed on the wrapping `div` (or other element) used to contain, organize, and style the `combobox`/`listbox` within the component. Instead, the attributes would get passed directly to the element representing the `combobox`, because that's the only element that really makes the attributes useful. It's _highly_ unlikely that someone would need to supply attributes to the wrapping `div` or to any other element in the component. (Any necessary _styles_ could be handled with plain CSS). If this was deemed absolutely necessary, additional props could be exposed to satisfy this use case.
 
-So it is with the `<combobox-container>`. Its sole purpose is to setup the `combobox` and the `listbox` -- just like a `Select` component in a JS framework would do. It doesn't need to do much else; so it can safely transfer its attributes to the `<combobox-field>`.
+So it is with the `<select-enhancer>`. Its sole purpose is to setup the `combobox` and the `listbox` -- just like a `Select` component in a JS framework would do. It doesn't need to do much else; so it can safely transfer its attributes to the `<combobox-field>`.
 
-If it becomes apparent in the future that attributes are _needed_ on the `<combobox-container>`, then logic can be put in place to support that need.
+If it becomes apparent in the future that attributes are _needed_ on the `<select-enhancer>`, then logic can be put in place to support that need.
 
 ### Conclusion
 
 You don't have to agree with the design decision that I made, but hopefully this explanation helps you understand _why_ such an odd decision was made. Ultimately, what I learned from creating a Combobox Component is that it is _incredibly_ difficult to create a Web Component that mimics the `<select>`/`<option>` element's HTML and that emulates even just a _subset_ of the element's JavaScript API. And we haven't even discussed [complications with the Shadow DOM](https://github.com/enthusiastic-js/form-observer/blob/main/docs/form-observer/guides.md#be-mindful-of-the-shadow-boundary).
 
-As you start to support the features for the native `<select>` element, you are eventualy forced into situations where you have to consider trade-offs. For me, the trade-off was, transferring attributes from the `<combobox-container>` to the `<combobox-field>` in order to preserve the expected Developer Experience. A different approach could avoid this oddity, but it would encounter other problems in the process. In the end, what we really need is for the [`<selectlist>`](https://open-ui.org/components/selectlist/) element to be standardized as quickly as possible.
+As you start to support the features for the native `<select>` element, you are eventualy forced into situations where you have to consider trade-offs. For me, the trade-off was, transferring attributes from the `<select-enhancer>` to the `<combobox-field>` in order to preserve the expected Developer Experience. A different approach could avoid this oddity, but it would encounter other problems in the process. In the end, what we really need is for the [`<selectlist>`](https://open-ui.org/components/selectlist/) element to be standardized as quickly as possible.

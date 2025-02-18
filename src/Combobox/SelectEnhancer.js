@@ -3,7 +3,7 @@ import { setAttributeFor } from "../utils/dom.js";
 import ComboboxOption from "./ComboboxOption.js";
 import attrs from "./attrs.js";
 
-class ComboboxContainer extends HTMLElement {
+class SelectEnhancer extends HTMLElement {
   // Internals
   #mounted = false;
 
@@ -75,16 +75,16 @@ class ComboboxContainer extends HTMLElement {
     }
 
     /* -------------------- Setup Event Listeners -------------------- */
-    this.#listbox.addEventListener("mouseover", ComboboxContainer.#handleDelegatedOptionHover, { passive: true });
-    this.#listbox.addEventListener("click", ComboboxContainer.#handleDelegatedOptionClick, { passive: true });
-    this.addEventListener("mousedown", ComboboxContainer.#handleDelegatedMousedown);
+    this.#listbox.addEventListener("mouseover", SelectEnhancer.#handleDelegatedOptionHover, { passive: true });
+    this.#listbox.addEventListener("click", SelectEnhancer.#handleDelegatedOptionClick, { passive: true });
+    this.addEventListener("mousedown", SelectEnhancer.#handleDelegatedMousedown);
   }
 
   // "On Unmount" for Custom Elements
   disconnectedCallback() {
-    this.#listbox.removeEventListener("mouseover", ComboboxContainer.#handleDelegatedOptionHover);
-    this.#listbox.removeEventListener("click", ComboboxContainer.#handleDelegatedOptionClick);
-    this.removeEventListener("mousedown", ComboboxContainer.#handleDelegatedMousedown);
+    this.#listbox.removeEventListener("mouseover", SelectEnhancer.#handleDelegatedOptionHover);
+    this.#listbox.removeEventListener("click", SelectEnhancer.#handleDelegatedOptionClick);
+    this.removeEventListener("mousedown", SelectEnhancer.#handleDelegatedMousedown);
   }
 
   /* -------------------- Listbox Handlers -------------------- */
@@ -130,4 +130,4 @@ class ComboboxContainer extends HTMLElement {
   }
 }
 
-export default ComboboxContainer;
+export default SelectEnhancer;

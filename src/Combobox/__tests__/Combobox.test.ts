@@ -1,6 +1,6 @@
 import { test as it, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
-import type ComboboxContainer from "../ComboboxContainer.js";
+import type SelectEnhancer from "../SelectEnhancer.js";
 import type ComboboxField from "../ComboboxField.js";
 import type ComboboxOption from "../ComboboxOption.js";
 
@@ -55,9 +55,9 @@ it.describe("Combobox Web Component", () => {
         const app = document.getElementById("app") as HTMLDivElement;
 
         app.innerHTML = `
-          <combobox-container id="component" name="my-name">
+          <select-enhancer id="component" name="my-name">
             ${options.map((o) => `<combobox-option${value === o ? " selected" : ""}>${o}</combobox-option>`).join("")}
-          </combobox-container>
+          </select-enhancer>
           <div style="font-size: 3rem; font-weight: bold; text-align: right; background-color: red; height: 500vh;">
             Container for testing scroll prevention
           </div>
@@ -590,9 +590,9 @@ it.describe("Combobox Web Component", () => {
 
             app.innerHTML = `
               <dialog>
-                <combobox-container>
+                <select-enhancer>
                   ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
-                </combobox-container>
+                </select-enhancer>
               </dialog>
             `;
           }, testOptions);
@@ -705,7 +705,7 @@ it.describe("Combobox Web Component", () => {
           await expectComboboxToBeClosed(page);
 
           // Surround `combobox` with focusable elements
-          await page.locator("combobox-container").evaluate((component: ComboboxContainer) => {
+          await page.locator("select-enhancer").evaluate((component: SelectEnhancer) => {
             component.insertAdjacentElement("beforebegin", document.createElement("button"));
             component.insertAdjacentElement("afterend", document.createElement("button"));
           });
@@ -719,7 +719,7 @@ it.describe("Combobox Web Component", () => {
           // Forward Tabbing Works
           await page.keyboard.press("Tab");
           await expect(combobox).not.toBeFocused();
-          await expect(page.locator("combobox-container + *")).toBeFocused();
+          await expect(page.locator("select-enhancer + *")).toBeFocused();
 
           // Backwards Tabbing Works
           await page.keyboard.press("Shift+Tab");
@@ -727,7 +727,7 @@ it.describe("Combobox Web Component", () => {
 
           await page.keyboard.press("Shift+Tab");
           await expect(combobox).not.toBeFocused();
-          await expect(page.locator(":has(+ combobox-container)")).toBeFocused();
+          await expect(page.locator(":has(+ select-enhancer)")).toBeFocused();
         });
 
         it("Selects the `active` `option`, hides the `option`s, and performs the default action", async ({ page }) => {
@@ -738,7 +738,7 @@ it.describe("Combobox Web Component", () => {
           await expectOptionToBeSelected(page, { label: initialValue });
 
           // Surround `combobox` with focusable elements
-          await page.locator("combobox-container").evaluate((component: ComboboxContainer) => {
+          await page.locator("select-enhancer").evaluate((component: SelectEnhancer) => {
             component.insertAdjacentElement("beforebegin", document.createElement("button"));
             component.insertAdjacentElement("afterend", document.createElement("button"));
           });
@@ -755,7 +755,7 @@ it.describe("Combobox Web Component", () => {
 
           await page.keyboard.press("Tab");
           await expect(combobox).not.toBeFocused();
-          await expect(page.locator("combobox-container + *")).toBeFocused();
+          await expect(page.locator("select-enhancer + *")).toBeFocused();
 
           expectComboboxToBeClosed(page);
           await expectOptionToBeSelected(page, { label: newValue });
@@ -769,7 +769,7 @@ it.describe("Combobox Web Component", () => {
 
           await page.keyboard.press("Shift+Tab");
           await expect(combobox).not.toBeFocused();
-          await expect(page.locator(":has(+ combobox-container)")).toBeFocused();
+          await expect(page.locator(":has(+ select-enhancer)")).toBeFocused();
 
           expectComboboxToBeClosed(page);
           await expectOptionToBeSelected(page, { label: secondNewValue });
@@ -796,7 +796,7 @@ it.describe("Combobox Web Component", () => {
           return page.evaluate(
             ([assoc, attr, id]) => {
               // Find/Create Elements
-              const component = document.querySelector("combobox-container") as ComboboxContainer;
+              const component = document.querySelector("select-enhancer") as SelectEnhancer;
               const combobox = component.querySelector("[role='combobox']") as ComboboxField;
               if (assoc === "explicit") combobox.setAttribute("form", id);
               else combobox.removeAttribute("form");
@@ -1268,7 +1268,7 @@ it.describe("Combobox Web Component", () => {
          */
         const offset = 1;
         const displayCount = 4;
-        const container = page.locator("combobox-container");
+        const container = page.locator("select-enhancer");
         await container.evaluate((e, blocks) => e.style.setProperty("--blocks", blocks), `${displayCount}` as const);
 
         // Initially, Lower Option Is NOT in View
@@ -1309,9 +1309,9 @@ it.describe("Combobox Web Component", () => {
               const app = document.getElementById("app") as HTMLDivElement;
 
               app.innerHTML = `
-                <combobox-container disabled>
+                <select-enhancer disabled>
                   ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
-                </combobox-container>
+                </select-enhancer>
               `;
             }, testOptions);
 
@@ -1341,9 +1341,9 @@ it.describe("Combobox Web Component", () => {
               const app = document.getElementById("app") as HTMLDivElement;
 
               app.innerHTML = `
-                <combobox-container required>
+                <select-enhancer required>
                   ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
-                </combobox-container>
+                </select-enhancer>
               `;
             }, testOptions);
 
@@ -1372,10 +1372,10 @@ it.describe("Combobox Web Component", () => {
               const app = document.getElementById("app") as HTMLDivElement;
 
               app.innerHTML = `
-                <combobox-container>
+                <select-enhancer>
                   <combobox-option value="">Select an Option</combobox-option>
                   ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
-                </combobox-container>
+                </select-enhancer>
               `;
             }, testOptions);
 
@@ -1411,10 +1411,10 @@ it.describe("Combobox Web Component", () => {
               const app = document.getElementById("app") as HTMLDivElement;
 
               app.innerHTML = `
-                <combobox-container required>
+                <select-enhancer required>
                   <combobox-option value="">Select an Option</combobox-option>
                   ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
-                </combobox-container>
+                </select-enhancer>
               `;
             }, testOptions);
 
@@ -1427,10 +1427,10 @@ it.describe("Combobox Web Component", () => {
               const app = document.getElementById("app") as HTMLDivElement;
 
               app.innerHTML = `
-                <combobox-container required>
+                <select-enhancer required>
                   <combobox-option value="">Select an Option</combobox-option>
                   ${options.map((o, i) => `<combobox-option${!i ? " selected" : ""}>${o}</combobox-option>`).join("")}
-                </combobox-container>
+                </select-enhancer>
               `;
             }, testOptions);
 
@@ -1449,9 +1449,9 @@ it.describe("Combobox Web Component", () => {
                 const app = document.getElementById("app") as HTMLDivElement;
 
                 app.innerHTML = `
-                  <combobox-container name="${name}">
+                  <select-enhancer name="${name}">
                     ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
-                  </combobox-container>
+                  </select-enhancer>
                 `;
               },
               [testOptions, initialName] as const,
@@ -1480,9 +1480,9 @@ it.describe("Combobox Web Component", () => {
               const app = document.getElementById("app") as HTMLDivElement;
 
               app.innerHTML = `
-                <combobox-container>
+                <select-enhancer>
                   ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
-                </combobox-container>
+                </select-enhancer>
               `;
             }, testOptions);
 
@@ -1509,10 +1509,10 @@ it.describe("Combobox Web Component", () => {
               const app = document.getElementById("app") as HTMLDivElement;
 
               app.innerHTML = `
-                <combobox-container>
+                <select-enhancer>
                   <combobox-option value="">Select a Value</combobox-option>
                   ${options.map((o, i) => `<combobox-option value="${i}">${o}</combobox-option>`).join("")}
-                </combobox-container>
+                </select-enhancer>
               `;
             }, testOptions);
 
@@ -1541,10 +1541,10 @@ it.describe("Combobox Web Component", () => {
               const app = document.getElementById("app") as HTMLDivElement;
 
               app.innerHTML = `
-                <combobox-container required>
+                <select-enhancer required>
                   <combobox-option value="">Select a Value</combobox-option>
                   ${options.map((o, i) => `<combobox-option value="${i}">${o}</combobox-option>`).join("")}
-                </combobox-container>
+                </select-enhancer>
               `;
             }, testOptions);
 
@@ -1598,7 +1598,7 @@ it.describe("Combobox Web Component", () => {
             await renderComponent(page);
             const combobox = page.getByRole("combobox");
             const listboxId = await combobox.evaluate((n: ComboboxField) => n.listbox.id);
-            const ariaControls = await combobox.evaluate((n: ComboboxContainer) => n.getAttribute("aria-controls"));
+            const ariaControls = await combobox.evaluate((n: SelectEnhancer) => n.getAttribute("aria-controls"));
 
             expect(ariaControls).toBe(listboxId);
             expect(await combobox.evaluate((n: ComboboxField) => n.listbox instanceof HTMLElement)).toBe(true);
@@ -1620,9 +1620,9 @@ it.describe("Combobox Web Component", () => {
 
                 app.innerHTML = `
                   <label for="${id}">${label1}</label>
-                  <combobox-container id="${id}">
+                  <select-enhancer id="${id}">
                     ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
-                  </combobox-container>
+                  </select-enhancer>
                 `;
               },
               [testOptions, [comboboxId, firstLabel]] as const,
@@ -1673,9 +1673,9 @@ it.describe("Combobox Web Component", () => {
 
               app.innerHTML = `
                 <form>
-                  <combobox-container>
+                  <select-enhancer>
                     ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
-                  </combobox-container>
+                  </select-enhancer>
                 </form>
               `;
             }, testOptions);
@@ -1708,10 +1708,10 @@ it.describe("Combobox Web Component", () => {
               const app = document.getElementById("app") as HTMLDivElement;
 
               app.innerHTML = `
-                <combobox-container>
+                <select-enhancer>
                   <combobox-option value="">Select an Option</combobox-option>
                   ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
-                </combobox-container>
+                </select-enhancer>
               `;
             }, testOptions);
 
@@ -1744,10 +1744,10 @@ it.describe("Combobox Web Component", () => {
               const app = document.getElementById("app") as HTMLDivElement;
 
               app.innerHTML = `
-                <combobox-container>
+                <select-enhancer>
                   <combobox-option value="">Select an Option</combobox-option>
                   ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
-                </combobox-container>
+                </select-enhancer>
               `;
             }, testOptions);
 
@@ -1796,10 +1796,10 @@ it.describe("Combobox Web Component", () => {
               const app = document.getElementById("app") as HTMLDivElement;
 
               app.innerHTML = `
-                <combobox-container required>
+                <select-enhancer required>
                   <combobox-option value="">Select an Option</combobox-option>
                   ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
-                </combobox-container>
+                </select-enhancer>
               `;
             }, testOptions);
 
@@ -1922,9 +1922,9 @@ it.describe("Combobox Web Component", () => {
               const app = document.getElementById("app") as HTMLDivElement;
 
               app.innerHTML = `
-                <combobox-container>
+                <select-enhancer>
                   ${options.map((o, i) => `<combobox-option value="${i + 1}">${o}</combobox-option>`).join("")}
-                </combobox-container>
+                </select-enhancer>
               `;
             }, testOptions);
 
@@ -1976,9 +1976,9 @@ it.describe("Combobox Web Component", () => {
               const app = document.getElementById("app") as HTMLDivElement;
 
               app.innerHTML = `
-                <combobox-container>
+                <select-enhancer>
                   <combobox-option value="${o.value}">${o.label}</combobox-option>
-                </combobox-container>
+                </select-enhancer>
               `;
             }, option);
 
@@ -2085,11 +2085,11 @@ it.describe("Combobox Web Component", () => {
               const app = document.getElementById("app") as HTMLDivElement;
 
               app.innerHTML = `
-                <combobox-container>
+                <select-enhancer>
                   <combobox-option>${options[0]}</combobox-option>
                   <combobox-option selected>${options[1]}</combobox-option>
                   <combobox-option selected>${options[2]}</combobox-option>
-                </combobox-container>
+                </select-enhancer>
               `;
             }, localOptions);
 
@@ -2141,9 +2141,9 @@ it.describe("Combobox Web Component", () => {
               const app = document.getElementById("app") as HTMLDivElement;
 
               app.innerHTML = `
-                <combobox-container>
+                <select-enhancer>
                   ${options.map((o) => `<combobox-option selected>${o}</combobox-option>`).join("")}
-                </combobox-container>
+                </select-enhancer>
               `;
             }, testOptions);
 
@@ -2177,9 +2177,9 @@ it.describe("Combobox Web Component", () => {
               const app = document.getElementById("app") as HTMLDivElement;
 
               app.innerHTML = `
-                <combobox-container>
+                <select-enhancer>
                   <combobox-option aria-disabled="true">${o}</combobox-option>
-                </combobox-container>
+                </select-enhancer>
               `;
             }, option);
 
@@ -2257,9 +2257,9 @@ it.describe("Combobox Web Component", () => {
 
               app.innerHTML = `
                 <form>
-                  <combobox-container>
+                  <select-enhancer>
                     ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
-                  </combobox-container>
+                  </select-enhancer>
                 </form>
               `;
             }, testOptions);
@@ -2298,15 +2298,15 @@ it.describe("Combobox Web Component", () => {
           const app = document.getElementById("app") as HTMLDivElement;
 
           app.innerHTML = `
-            <combobox-container id="combobox" name="my-name" required disabled>
+            <select-enhancer id="combobox" name="my-name" required disabled>
               <combobox-option>Choose Me!!!</combobox-option>
-            </combobox-container>
+            </select-enhancer>
           `;
         });
 
         /* ---------- Assertions ---------- */
         const combobox = page.getByRole("combobox");
-        const container = page.locator("combobox-container");
+        const container = page.locator("select-enhancer");
 
         // The `combobox` has inherited the attributes
         await expect(combobox).toHaveAttribute("id", "combobox");
@@ -2329,17 +2329,17 @@ it.describe("Combobox Web Component", () => {
           const app = document.getElementById("app") as HTMLDivElement;
 
           app.innerHTML = `
-            <combobox-container>
+            <select-enhancer>
               <div class="${c}">I am rejected</div>
               <combobox-option>Choose Me!!!</combobox-option>
               <span class="${c}" role="option">I am rejected even though I have a proper role</span>
               <div class="${c}" role="listbox">I am rejected even though a \`listbox\` will be put here</div>
-            </combobox-container>
+            </select-enhancer>
           `;
         }, className);
 
         // Unrelated elements (i.e., the `div`s and `span`s) should have been removed
-        const container = page.locator("combobox-container");
+        const container = page.locator("select-enhancer");
         expect(await container.locator(".invalid").count()).toBe(0);
         expect(await container.locator("combobox-option").count()).toBe(1);
       });
@@ -2351,14 +2351,14 @@ it.describe("Combobox Web Component", () => {
           const app = document.getElementById("app") as HTMLDivElement;
 
           app.innerHTML = `
-            <combobox-container>
+            <select-enhancer>
               <combobox-option>Choose Me!!!</combobox-option>
-            </combobox-container>
+            </select-enhancer>
           `;
         });
 
         // Container should not have an accessible `role`
-        await expect(page.locator("combobox-container")).toHaveAttribute("role", "none");
+        await expect(page.locator("select-enhancer")).toHaveAttribute("role", "none");
       });
     });
   });
