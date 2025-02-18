@@ -75,59 +75,59 @@ class ComboboxContainer extends HTMLElement {
     }
 
     /* -------------------- Setup Event Listeners -------------------- */
-    this.#listbox.addEventListener("mouseover", handleDelegatedOptionHover, { passive: true });
-    this.#listbox.addEventListener("click", handleDelegatedOptionClick, { passive: true });
-    this.addEventListener("mousedown", handleDelegatedMousedown);
+    this.#listbox.addEventListener("mouseover", ComboboxContainer.#handleDelegatedOptionHover, { passive: true });
+    this.#listbox.addEventListener("click", ComboboxContainer.#handleDelegatedOptionClick, { passive: true });
+    this.addEventListener("mousedown", ComboboxContainer.#handleDelegatedMousedown);
   }
 
   // "On Unmount" for Custom Elements
   disconnectedCallback() {
-    this.#listbox.removeEventListener("mouseover", handleDelegatedOptionHover);
-    this.#listbox.removeEventListener("click", handleDelegatedOptionClick);
-    this.removeEventListener("mousedown", handleDelegatedMousedown);
+    this.#listbox.removeEventListener("mouseover", ComboboxContainer.#handleDelegatedOptionHover);
+    this.#listbox.removeEventListener("click", ComboboxContainer.#handleDelegatedOptionClick);
+    this.removeEventListener("mousedown", ComboboxContainer.#handleDelegatedMousedown);
+  }
+
+  /* -------------------- Listbox Handlers -------------------- */
+  /**
+   * @param {MouseEvent} event
+   * @returns {void}
+   */
+  static #handleDelegatedOptionHover(event) {
+    const listbox = /** @type {HTMLElement} */ (event.currentTarget);
+    const option = /** @type {ComboboxOption} */ (event.target);
+    if (option === listbox) return; // We hovered the `listbox`, not an `option`
+
+    const combobox = /** @type {ComboboxField} */ (listbox.previousElementSibling);
+    setAttributeFor(combobox, attrs["aria-activedescendant"], option.id);
+  }
+
+  /**
+   * @param {MouseEvent} event
+   * @returns {void}
+   */
+  static #handleDelegatedOptionClick(event) {
+    const listbox = /** @type {HTMLElement} */ (event.currentTarget);
+    const option = /** @type {ComboboxOption} */ (event.target);
+    if (option === listbox) return; // We clicked the `listbox`, not an `option`
+    if (option.disabled) return;
+
+    const combobox = /** @type {ComboboxField} */ (listbox.previousElementSibling);
+    combobox.setAttribute(attrs["aria-expanded"], String(false));
+
+    if (option.selected) return;
+    combobox.value = option.value;
+    combobox.dispatchEvent(new Event("input", { bubbles: true, composed: true, cancelable: false }));
+    combobox.dispatchEvent(new Event("change", { bubbles: true, composed: false, cancelable: false }));
+  }
+
+  /* -------------------- Container Handlers -------------------- */
+  /**
+   * @param {MouseEvent} event
+   * @returns {void}
+   */
+  static #handleDelegatedMousedown(event) {
+    if (event.target instanceof ComboboxOption) return event.preventDefault();
   }
 }
 
 export default ComboboxContainer;
-
-/* -------------------- Listbox Handlers -------------------- */
-/**
- * @param {MouseEvent} event
- * @returns {void}
- */
-function handleDelegatedOptionHover(event) {
-  const listbox = /** @type {HTMLElement} */ (event.currentTarget);
-  const option = /** @type {ComboboxOption} */ (event.target);
-  if (option === listbox) return; // We hovered the `listbox`, not an `option`
-
-  const combobox = /** @type {ComboboxField} */ (listbox.previousElementSibling);
-  setAttributeFor(combobox, attrs["aria-activedescendant"], option.id);
-}
-
-/**
- * @param {MouseEvent} event
- * @returns {void}
- */
-function handleDelegatedOptionClick(event) {
-  const listbox = /** @type {HTMLElement} */ (event.currentTarget);
-  const option = /** @type {ComboboxOption} */ (event.target);
-  if (option === listbox) return; // We clicked the `listbox`, not an `option`
-  if (option.disabled) return;
-
-  const combobox = /** @type {ComboboxField} */ (listbox.previousElementSibling);
-  combobox.setAttribute(attrs["aria-expanded"], String(false));
-
-  if (option.selected) return;
-  combobox.value = option.value;
-  combobox.dispatchEvent(new Event("input", { bubbles: true, composed: true, cancelable: false }));
-  combobox.dispatchEvent(new Event("change", { bubbles: true, composed: false, cancelable: false }));
-}
-
-/* -------------------- Container Handlers -------------------- */
-/**
- * @param {MouseEvent} event
- * @returns {void}
- */
-function handleDelegatedMousedown(event) {
-  if (event.target instanceof ComboboxOption) return event.preventDefault();
-}
