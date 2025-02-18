@@ -33,15 +33,13 @@ class ComboboxContainer extends HTMLElement {
       this.#combobox.setAttribute("aria-controls", `${comboboxId}-listbox`);
 
       // Transfer relevant attributes from `container` to `combobox`
-      for (let i = 0; this.attributes.length > 2; ) {
-        const attr = this.attributes[i];
-        if (attr.name === "id" || attr.name === "role") {
-          i += 1;
-          continue;
-        }
+      const attributeNames = this.getAttributeNames();
+      for (let i = 0; i < attributeNames.length; i++) {
+        const attrName = attributeNames[i];
+        if (attrName === "id" || attrName === "role") continue;
 
-        this.removeAttributeNode(attr);
-        this.#combobox.setAttributeNode(attr);
+        this.#combobox.setAttribute(attrName, /** @type {string} */ (this.getAttribute(attrName)));
+        this.removeAttribute(attrName);
       }
 
       // Listbox
