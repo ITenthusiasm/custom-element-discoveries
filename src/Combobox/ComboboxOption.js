@@ -31,7 +31,19 @@ class ComboboxOption extends HTMLElement {
       this.#mounted = true;
     }
 
-    // TODO: Do we need the `closest` check anymore?
+    /*
+     * TODO: Do we need the `closest` check anymore?
+     *
+     * UPDATE: This is probably due to the fact that in the HTML, `<combobox-option>`s start off as direct descendants
+     * of the `<combobox-container` itself. However, this will change when we change the `<combobox-container>` to
+     * accept _ONLY_ a regular `<select>` element, which is replaced with our Combobox Component when JS is available
+     * in the browser. So... we should do some remaining minor cleanups in `ComboboxField`. Then we should immediately
+     * update our code to expect `<select>` as the sole child to `<combobox-container>` so that we can know how to
+     * reason about the rest of our code.
+     *
+     * ... On that note, maybe we should rename `<combobox-container>` to something like `<combobox-enhancer>` or
+     * `<enhanced-combobox>`? I dunno... Think about it.
+     */
     // Require a Corresponding `listbox`
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Verification needed on mount
     if (!this.#listbox && !this.closest("combobox-container")) {
