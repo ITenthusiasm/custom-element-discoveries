@@ -53,6 +53,10 @@ select-enhancer {
       overflow: auto;
       background-color: white;
 
+      &:is([role="combobox"]:not([aria-expanded="true"]) + [role="listbox"]) {
+        display: none;
+      }
+
       & > [role="option"] {
         display: block;
         box-sizing: border-box;

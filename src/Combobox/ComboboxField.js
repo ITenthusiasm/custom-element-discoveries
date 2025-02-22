@@ -387,7 +387,6 @@ function handleExpansionChange(mutation) {
 
   // Open Combobox
   if (expanded) {
-    listbox.removeAttribute("hidden");
     if (combobox.getAttribute(attrs["aria-activedescendant"]) !== "") return;
 
     const activeOption =
@@ -396,7 +395,6 @@ function handleExpansionChange(mutation) {
   }
   // Close Combobox
   else {
-    listbox.setAttribute("hidden", "");
     combobox.setAttribute(attrs["aria-activedescendant"], "");
   }
 }

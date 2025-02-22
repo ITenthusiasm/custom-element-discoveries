@@ -45,7 +45,6 @@ class SelectEnhancer extends HTMLElement {
       // Listbox
       this.#listbox.setAttribute("id", `${comboboxId}-listbox`);
       this.#listbox.setAttribute("role", "listbox");
-      this.#listbox.setAttribute("hidden", ""); // TODO: This should be handled by CSS, not JavaScript
 
       /* -------------------- Render Elements -------------------- */
       // Setup Children (Aggressively)
