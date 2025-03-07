@@ -38,6 +38,9 @@ class ComboboxField extends HTMLElement {
    */
   #value = null;
 
+  /** The DOM Node which contains the Label Text displayed by the `ComboboxField`. */
+  #label = document.createTextNode("");
+
   /* ------------------------------ Lifecycle Callbacks ------------------------------ */
   /**
    * @param {typeof ComboboxField.observedAttributes[number]} _name
@@ -60,8 +63,7 @@ class ComboboxField extends HTMLElement {
       this.setAttribute(attrs["aria-expanded"], String(false));
       this.setAttribute(attrs["aria-activedescendant"], "");
 
-      // TODO: Internally track "Label" node instead of assuming its position in the DOM throughout the code?
-      this.insertAdjacentText("afterbegin", "");
+      this.prepend(this.#label);
       this.#mounted = true;
     }
 
@@ -147,24 +149,22 @@ class ComboboxField extends HTMLElement {
   }
 
   set value(v) {
-    if (v === this.#value) return;
-
-    const options = this.listbox.children;
-    const newOption = /** @type {typeof previousOption} */ (Array.prototype.find.call(options, (o) => o.value === v));
-    const previousOption = /** @type {typeof options[number] | undefined} */ (
-      Array.prototype.find.call(options, (o) => o.selected && o !== newOption)
-    );
+    const newOption = /** @type {ComboboxOption | null} */ (document.getElementById(`${this.id}-option-${v}`));
+    if (v === this.#value && newOption?.selected === true) return;
 
     /* ---------- Update Values ---------- */
     if (!newOption) return; // Ignore invalid values
+    const prevOption = /** @type {ComboboxOption | null} */ (
+      document.getElementById(`${this.id}-option-${this.#value}`)
+    );
 
     this.#value = v;
     this.#internals.setFormValue(this.#value);
-    this.childNodes[0].textContent = newOption.label;
+    this.#label.textContent = newOption.label;
 
     // Update `option`s AFTER updating `value`
     newOption.selected = true;
-    if (previousOption) previousOption.selected = false;
+    if (prevOption?.selected && prevOption !== newOption) prevOption.selected = false;
     this.#validateRequiredConstraint();
   }
 

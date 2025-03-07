@@ -55,8 +55,10 @@ it.describe("Combobox Web Component", () => {
         const app = document.getElementById("app") as HTMLDivElement;
 
         app.innerHTML = `
-          <select-enhancer id="component" name="my-name">
-            ${options.map((o) => `<combobox-option${value === o ? " selected" : ""}>${o}</combobox-option>`).join("")}
+          <select-enhancer>
+            <select id="component" name="my-name">
+              ${options.map((o) => `<option${value === o ? " selected" : ""}>${o}</option>`).join("")}
+            </select>
           </select-enhancer>
           <div style="font-size: 3rem; font-weight: bold; text-align: right; background-color: red; height: 500vh;">
             Container for testing scroll prevention
@@ -73,6 +75,7 @@ it.describe("Combobox Web Component", () => {
   }
 
   /* -------------------- Local Assertion Utilities -------------------- */
+  // TODO: Should we provide the ability to pass in options besides `testOptions`?
   /** Asserts that the `combobox` is closed, and that none of the `option`s in the `listbox` are visible. */
   async function expectComboboxToBeClosed(page: Page): Promise<void> {
     await expect(page.getByRole("combobox")).toHaveAttribute(attrs["aria-expanded"], String(false));
@@ -81,6 +84,7 @@ it.describe("Combobox Web Component", () => {
     await Promise.all(testOptions.map((o) => expect(page.getByRole("option", { name: o })).not.toBeVisible()));
   }
 
+  // TODO: Should we provide the ability to pass in options besides `testOptions`?
   /** Asserts that the `combobox` is open, and that all of the `option`s inside the `listbox` are accessible. */
   async function expectOptionsToBeVisible(page: Page): Promise<void> {
     await expect(page.getByRole("combobox")).toHaveAttribute(attrs["aria-expanded"], String(true));
@@ -120,7 +124,8 @@ it.describe("Combobox Web Component", () => {
       await expect(combobox).not.toHaveText(label);
     }
 
-    // Verify that the `option` has the correct attributes/properties WITHOUT disrupting other tests
+    // Verify that the `option` has the correct attributes/properties WITHOUT disrupting other tests.
+    // This approach allows us to verify the accessible state of `option`s without requiring an expanded `combobox`.
     const option = page.getByText(optionLabel).and(page.locator("[role='option']"));
     await expect(option).toHaveAttribute(attrs["aria-selected"], String(selected));
     await expect(option).toHaveJSProperty("selected", selected);
@@ -591,7 +596,9 @@ it.describe("Combobox Web Component", () => {
             app.innerHTML = `
               <dialog>
                 <select-enhancer>
-                  ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
+                  <select>
+                    ${options.map((o) => `<option>${o}</option>`).join("")}
+                  </select>
                 </select-enhancer>
               </dialog>
             `;
@@ -786,9 +793,10 @@ it.describe("Combobox Web Component", () => {
         const submissionCountAttr = "data-submission-count";
 
         /**
-         * Associates the `combobox` on a page with the form element on the same page for testing. The association can
-         * be * `implicit` (moving the `combobox` _inside_ the form element and removing the `form` attribute) or
-         * `explicit` (moving the `combobox` _outside_ the form element and giving it a valid `form` attribute).
+         * Associates the `combobox` on the provided page with the form element on the same page for testing. The
+         * association can be `implicit` (moving the `combobox` _inside_ the form element and removing the `form`
+         * attribute) or `explicit` (moving the `combobox` _outside_ the form element and giving it a valid `form`
+         * attribute).
          *
          * If no form element exists on the page when this function is called, then one will be created.
          */
@@ -815,7 +823,7 @@ it.describe("Combobox Web Component", () => {
         }
 
         /**
-         * Registers the provided `onsubmit` event `handler` with the form element on the page.
+         * Registers the provided `onsubmit` event `handler` with the form element on the provided page.
          *
          * Note: If you only want to track how many times a form was submitted, use the
          * {@link defaultSubmissionHandler}.
@@ -860,6 +868,7 @@ it.describe("Combobox Web Component", () => {
           // Attempt submission when `combobox` is a CHILD of the form
           await associateComboboxWithForm(page, "implicit");
           await registerSubmissionHandler(page, defaultSubmissionHandler);
+          await expect(page.getByRole("form")).toHaveAttribute(submissionCountAttr, String(0));
 
           const combobox = page.getByRole("combobox");
           await combobox.focus();
@@ -892,13 +901,17 @@ it.describe("Combobox Web Component", () => {
 
           /* ---------- Assertions ---------- */
           let error: Error | undefined;
-          page.once("pageerror", (e) => (error = e));
+          const trackEmittedError = (e: Error) => (error = e);
+          page.once("pageerror", trackEmittedError);
 
           // Nothing should break when `Enter` is pressed without an owning form element
           await expect(page.locator("form")).not.toBeAttached();
           await page.getByRole("combobox").focus();
           await page.keyboard.press("Enter");
+          await new Promise((resolve) => setTimeout(resolve, 250));
+
           expect(error).toBe(undefined);
+          page.off("pageerror", trackEmittedError);
         });
 
         it("Selects the `active` `option` and hides the `option`s without submitting the form", async ({ page }) => {
@@ -941,15 +954,15 @@ it.describe("Combobox Web Component", () => {
             await expectOptionToBeSelected(page, { label: initialValue });
 
             // Setup Form + Submission Handler
-            await associateComboboxWithForm(page, "implicit");
-            await registerSubmissionHandler(page, defaultSubmissionHandler);
-            await registerSubmissionHandler(page, submitHandlerAssertInput);
-
             function submitHandlerAssertInput(event: SubmitEvent): void {
               event.preventDefault();
               if (event.submitter instanceof HTMLInputElement && event.submitter.type === "submit") return;
               throw new Error("Expected `submitter` to be an `input` of type `submit`");
             }
+
+            await associateComboboxWithForm(page, "implicit");
+            await registerSubmissionHandler(page, defaultSubmissionHandler);
+            await registerSubmissionHandler(page, submitHandlerAssertInput);
 
             /* ---------- Assertions ---------- */
             // Create and Attach `input` Submitter
@@ -963,12 +976,15 @@ it.describe("Combobox Web Component", () => {
 
             // Submit Form
             let error: Error | undefined;
-            page.once("pageerror", (e) => (error = e));
+            const trackEmittedError = (e: Error) => (error = e);
+            page.once("pageerror", trackEmittedError);
 
             await page.getByRole("combobox").focus();
             await page.keyboard.press("Enter");
             await expect(page.getByRole("form")).toHaveAttribute(submissionCountAttr, String(1));
+
             expect(error).toBe(undefined);
+            page.off("pageerror", trackEmittedError);
           });
 
           // See: https://developer.mozilla.org/en-US/docs/Web/API/HTMLButtonElement#htmlbuttonelement.type
@@ -981,15 +997,15 @@ it.describe("Combobox Web Component", () => {
             await expectOptionToBeSelected(page, { label: initialValue });
 
             // Setup Form + Submission Handler
-            await associateComboboxWithForm(page, "implicit");
-            await registerSubmissionHandler(page, defaultSubmissionHandler);
-            await registerSubmissionHandler(page, submitHandlerAssertButton);
-
             function submitHandlerAssertButton(event: SubmitEvent): void {
               event.preventDefault();
               if (event.submitter instanceof HTMLButtonElement && event.submitter.type === "submit") return;
               throw new Error("Expected `submitter` to be a `button` of type `submit`");
             }
+
+            await associateComboboxWithForm(page, "implicit");
+            await registerSubmissionHandler(page, defaultSubmissionHandler);
+            await registerSubmissionHandler(page, submitHandlerAssertButton);
 
             /* ---------- Assertions ---------- */
             // Create and Attach EXPLICIT `button` Submitter
@@ -1004,7 +1020,8 @@ it.describe("Combobox Web Component", () => {
 
             // Submit Form with EXPLICIT `button` Submitter
             let error: Error | undefined;
-            page.once("pageerror", (e) => (error = e));
+            const trackEmittedError = (e: Error) => (error = e);
+            page.once("pageerror", trackEmittedError);
 
             await page.getByRole("combobox").focus();
             await page.keyboard.press("Enter");
@@ -1022,6 +1039,8 @@ it.describe("Combobox Web Component", () => {
             await page.keyboard.press("Enter");
             await expect(page.getByRole("form")).toHaveAttribute(submissionCountAttr, String(3));
             expect(error).toBe(undefined);
+
+            page.off("pageerror", trackEmittedError);
           });
 
           it("Submits forms lacking a `submitter`", async ({ page }) => {
@@ -1033,23 +1052,26 @@ it.describe("Combobox Web Component", () => {
             await expectOptionToBeSelected(page, { label: initialValue });
 
             // Setup Form + Submission Handler
-            await associateComboboxWithForm(page, "explicit");
-            await registerSubmissionHandler(page, defaultSubmissionHandler);
-            await registerSubmissionHandler(page, submitHandlerAssertNoSubmitter);
-
             function submitHandlerAssertNoSubmitter(event: SubmitEvent): void {
               event.preventDefault();
               if (event.submitter) throw new Error("Expected `form` NOT to have a `submitter`");
             }
 
+            await associateComboboxWithForm(page, "explicit");
+            await registerSubmissionHandler(page, defaultSubmissionHandler);
+            await registerSubmissionHandler(page, submitHandlerAssertNoSubmitter);
+
             /* ---------- Assertions ---------- */
             let error: Error | undefined;
-            page.once("pageerror", (e) => (error = e));
+            const trackEmittedError = (e: Error) => (error = e);
+            page.once("pageerror", trackEmittedError);
 
             await page.getByRole("combobox").focus();
             await page.keyboard.press("Enter");
             await expect(page.getByRole("form")).toHaveAttribute(submissionCountAttr, String(1));
+
             expect(error).toBe(undefined);
+            page.off("pageerror", trackEmittedError);
           });
 
           it("Respects `disabled` submit buttons", async ({ page }) => {
@@ -1065,17 +1087,13 @@ it.describe("Combobox Web Component", () => {
             await registerSubmissionHandler(page, defaultSubmissionHandler);
 
             // Create an _enabled_ `submitter`
-            await page.evaluate((id) => {
+            await page.evaluate(() => {
               const submitter = document.createElement("button");
               submitter.textContent = "Enabled Submitter";
-              submitter.setAttribute("form", id);
-
               document.querySelector("form")?.appendChild(submitter);
-            }, formId);
+            });
 
             /* -------------------- Assertions -------------------- */
-            const combobox = page.getByRole("combobox");
-
             /* ---------- Disabled `button` Submitter ---------- */
             await page.evaluate((id) => {
               const disabledSubmitterButton = document.createElement("button");
@@ -1085,13 +1103,14 @@ it.describe("Combobox Web Component", () => {
               document.body.insertAdjacentElement("afterbegin", disabledSubmitterButton);
             }, formId);
 
-            // Implicit Submission fails when disabled
+            // Implicit Submission fails when the default `submitter` is disabled
+            const combobox = page.getByRole("combobox");
             await combobox.focus();
             await page.keyboard.press("Enter");
             await expect(page.getByRole("form")).toHaveAttribute(submissionCountAttr, String(0));
 
-            // Implicit Submission works when enabled
-            await page.locator(":disabled").evaluate((node) => node.remove());
+            // Implicit Submission works when enabled (disabled default `submitter` removed)
+            await page.getByRole("button", { disabled: true }).evaluate((node) => node.remove());
             await page.keyboard.press("Enter");
             await expect(page.getByRole("form")).toHaveAttribute(submissionCountAttr, String(1));
 
@@ -1105,13 +1124,21 @@ it.describe("Combobox Web Component", () => {
               document.body.insertAdjacentElement("afterbegin", disabledSubmitterInput);
             }, formId);
 
-            // Implicit Submission fails when disabled
+            // Implicit Submission fails when the default `submitter` is disabled
             await combobox.focus();
             await page.keyboard.press("Enter");
             await expect(page.getByRole("form")).toHaveAttribute(submissionCountAttr, String(1));
 
-            // Implicit Submission works when enabled
-            await page.locator(":disabled").evaluate((node) => node.remove());
+            // Implicit Submission works when the default `submitter` is enabled (disabled default `submitter` moved)
+            await page.getByRole("button", { disabled: true }).evaluate((disabledSubmitter: HTMLButtonElement) => {
+              const form = disabledSubmitter.form as HTMLFormElement;
+              const enabledSubmitter: HTMLButtonElement = Array.prototype.find.call(form.elements, (e) => {
+                return e instanceof HTMLButtonElement && e.type === "submit" && !e.disabled;
+              });
+
+              enabledSubmitter.insertAdjacentElement("afterend", disabledSubmitter);
+            });
+
             await page.keyboard.press("Enter");
             await expect(page.getByRole("form")).toHaveAttribute(submissionCountAttr, String(2));
           });
@@ -1263,7 +1290,7 @@ it.describe("Combobox Web Component", () => {
 
         /* ---------- Assertion ---------- */
         /**
-         * The additional number of times to press `ArrowUp`/`ArrowDown` so that the remant of the previous
+         * The additional number of times to press `ArrowUp`/`ArrowDown` so that the remnant of the previous
          * option is no longer visible. (This is needed because of the `safetyOffset` in `ComboboxField`).
          */
         const offset = 1;
@@ -1309,8 +1336,10 @@ it.describe("Combobox Web Component", () => {
               const app = document.getElementById("app") as HTMLDivElement;
 
               app.innerHTML = `
-                <select-enhancer disabled>
-                  ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
+                <select-enhancer>
+                  <select disabled>
+                    ${options.map((o) => `<option>${o}</option>`).join("")}
+                  </select>
                 </select-enhancer>
               `;
             }, testOptions);
@@ -1322,7 +1351,7 @@ it.describe("Combobox Web Component", () => {
 
             // `attribute` responds to `property` updates
             await combobox.evaluate((node: ComboboxField) => (node.disabled = false));
-            await expect(combobox).not.toHaveAttribute("disabled", /.*/);
+            await expect(combobox).not.toHaveAttribute("disabled");
 
             await combobox.evaluate((node: ComboboxField) => (node.disabled = true));
             await expect(combobox).toHaveAttribute("disabled", "");
@@ -1341,8 +1370,10 @@ it.describe("Combobox Web Component", () => {
               const app = document.getElementById("app") as HTMLDivElement;
 
               app.innerHTML = `
-                <select-enhancer required>
-                  ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
+                <select-enhancer>
+                  <select required>
+                    ${options.map((o) => `<option>${o}</option>`).join("")}
+                  </select>
                 </select-enhancer>
               `;
             }, testOptions);
@@ -1354,7 +1385,7 @@ it.describe("Combobox Web Component", () => {
 
             // `attribute` responds to `property` updates
             await combobox.evaluate((node: ComboboxField) => (node.required = false));
-            await expect(combobox).not.toHaveAttribute("required", /.*/);
+            await expect(combobox).not.toHaveAttribute("required");
 
             await combobox.evaluate((node: ComboboxField) => (node.required = true));
             await expect(combobox).toHaveAttribute("required", "");
@@ -1373,8 +1404,10 @@ it.describe("Combobox Web Component", () => {
 
               app.innerHTML = `
                 <select-enhancer>
-                  <combobox-option value="">Select an Option</combobox-option>
-                  ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
+                  <select>
+                    <option value="">Select an Option</option>
+                    ${options.map((o) => `<option>${o}</option>`).join("")}
+                  </select>
                 </select-enhancer>
               `;
             }, testOptions);
@@ -1411,9 +1444,11 @@ it.describe("Combobox Web Component", () => {
               const app = document.getElementById("app") as HTMLDivElement;
 
               app.innerHTML = `
-                <select-enhancer required>
-                  <combobox-option value="">Select an Option</combobox-option>
-                  ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
+                <select-enhancer>
+                  <select required>
+                    <option value="">Select an Option</option>
+                    ${options.map((o) => `<option>${o}</option>`).join("")}
+                  </select>
                 </select-enhancer>
               `;
             }, testOptions);
@@ -1427,9 +1462,11 @@ it.describe("Combobox Web Component", () => {
               const app = document.getElementById("app") as HTMLDivElement;
 
               app.innerHTML = `
-                <select-enhancer required>
-                  <combobox-option value="">Select an Option</combobox-option>
-                  ${options.map((o, i) => `<combobox-option${!i ? " selected" : ""}>${o}</combobox-option>`).join("")}
+                <select-enhancer>
+                  <select required>
+                    <option value="">Select an Option</option>
+                    ${options.map((o, i) => `<option${!i ? " selected" : ""}>${o}</option>`).join("")}
+                  </select>
                 </select-enhancer>
               `;
             }, testOptions);
@@ -1449,8 +1486,10 @@ it.describe("Combobox Web Component", () => {
                 const app = document.getElementById("app") as HTMLDivElement;
 
                 app.innerHTML = `
-                  <select-enhancer name="${name}">
-                    ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
+                  <select-enhancer>
+                    <select name="${name}">
+                      ${options.map((o) => `<option>${o}</option>`).join("")}
+                    </select>
                   </select-enhancer>
                 `;
               },
@@ -1481,7 +1520,9 @@ it.describe("Combobox Web Component", () => {
 
               app.innerHTML = `
                 <select-enhancer>
-                  ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
+                  <select>
+                    ${options.map((o) => `<option>${o}</option>`).join("")}
+                  </select>
                 </select-enhancer>
               `;
             }, testOptions);
@@ -1510,8 +1551,10 @@ it.describe("Combobox Web Component", () => {
 
               app.innerHTML = `
                 <select-enhancer>
-                  <combobox-option value="">Select a Value</combobox-option>
-                  ${options.map((o, i) => `<combobox-option value="${i}">${o}</combobox-option>`).join("")}
+                  <select>
+                    <option value="">Select a Value</option>
+                    ${options.map((o, i) => `<option value="${i}">${o}</option>`).join("")}
+                  </select>
                 </select-enhancer>
               `;
             }, testOptions);
@@ -1541,9 +1584,11 @@ it.describe("Combobox Web Component", () => {
               const app = document.getElementById("app") as HTMLDivElement;
 
               app.innerHTML = `
-                <select-enhancer required>
-                  <combobox-option value="">Select a Value</combobox-option>
-                  ${options.map((o, i) => `<combobox-option value="${i}">${o}</combobox-option>`).join("")}
+                <select-enhancer>
+                  <select required>
+                    <option value="">Select a Value</option>
+                    ${options.map((o, i) => `<option value="${i}">${o}</option>`).join("")}
+                  </select>
                 </select-enhancer>
               `;
             }, testOptions);
@@ -1620,8 +1665,10 @@ it.describe("Combobox Web Component", () => {
 
                 app.innerHTML = `
                   <label for="${id}">${label1}</label>
-                  <select-enhancer id="${id}">
-                    ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
+                  <select-enhancer>
+                    <select id="${id}">
+                      ${options.map((o) => `<option>${o}</option>`).join("")}
+                    </select>
                   </select-enhancer>
                 `;
               },
@@ -1674,7 +1721,9 @@ it.describe("Combobox Web Component", () => {
               app.innerHTML = `
                 <form>
                   <select-enhancer>
-                    ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
+                    <select>
+                      ${options.map((o) => `<option>${o}</option>`).join("")}
+                    </select>
                   </select-enhancer>
                 </form>
               `;
@@ -1709,8 +1758,10 @@ it.describe("Combobox Web Component", () => {
 
               app.innerHTML = `
                 <select-enhancer>
-                  <combobox-option value="">Select an Option</combobox-option>
-                  ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
+                  <select>
+                    <option value="">Select an Option</option>
+                    ${options.map((o) => `<option>${o}</option>`).join("")}
+                  </select>
                 </select-enhancer>
               `;
             }, testOptions);
@@ -1745,8 +1796,10 @@ it.describe("Combobox Web Component", () => {
 
               app.innerHTML = `
                 <select-enhancer>
-                  <combobox-option value="">Select an Option</combobox-option>
-                  ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
+                  <select>
+                    <option value="">Select an Option</option>
+                    ${options.map((o) => `<option>${o}</option>`).join("")}
+                  </select>
                 </select-enhancer>
               `;
             }, testOptions);
@@ -1785,8 +1838,8 @@ it.describe("Combobox Web Component", () => {
 
       it.describe("Validation Methods", () => {
         /*
-         * NOTE: Currently, according to our knowledge, there's no way to run assertions on the native
-         * error bubbles that browsers create.
+         * NOTE: Currently, according to our knowledge, there's no way to run assertions on the native error bubbles
+         * created by browsers.
          */
         for (const method of ["checkValidity", "reportValidity"] as const) {
           it(`Performs field validation when \`${method}\` is called`, async ({ page }) => {
@@ -1796,9 +1849,11 @@ it.describe("Combobox Web Component", () => {
               const app = document.getElementById("app") as HTMLDivElement;
 
               app.innerHTML = `
-                <select-enhancer required>
-                  <combobox-option value="">Select an Option</combobox-option>
-                  ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
+                <select-enhancer>
+                  <select required>
+                    <option value="">Select an Option</option>
+                    ${options.map((o) => `<option>${o}</option>`).join("")}
+                  </select>
                 </select-enhancer>
               `;
             }, testOptions);
@@ -1808,7 +1863,7 @@ it.describe("Combobox Web Component", () => {
             const combobox = page.getByRole("combobox");
             const invalidEventEmitted = combobox.evaluate((node: ComboboxField) => {
               return new Promise<boolean>((resolve, reject) => {
-                const timeout = setTimeout(reject, 3000, "The `invalid` event was never emitted by a combobox-field");
+                const timeout = setTimeout(reject, 3000, "The `invalid` event was never emitted by a <combobox-field>");
 
                 node.addEventListener(
                   "invalid",
@@ -1834,7 +1889,7 @@ it.describe("Combobox Web Component", () => {
                   "invalid",
                   () => {
                     clearTimeout(timeout);
-                    reject(new Error("The `invalid` event should not have been emitted by the combobox-field"));
+                    reject(new Error("The `invalid` event should not have been emitted by the <combobox-field>"));
                   },
                   { once: true },
                 );
@@ -1864,7 +1919,7 @@ it.describe("Combobox Web Component", () => {
 
             const eventEmitted = page.evaluate((e) => {
               return new Promise<boolean>((resolve, reject) => {
-                const timeout = setTimeout(reject, 3000, `The \`${e}\` event was never emitted by a combobox-field.`);
+                const timeout = setTimeout(reject, 3000, `The \`${e}\` event was never emitted by a <combobox-field>.`);
 
                 document.addEventListener(
                   e,
@@ -1895,7 +1950,7 @@ it.describe("Combobox Web Component", () => {
                   e,
                   () => {
                     clearTimeout(timeout);
-                    reject(new Error(`The \`${e}\` event should not have been emitted by the combobox-field`));
+                    reject(new Error(`The \`${e}\` event should not have been emitted by the <combobox-field>`));
                   },
                   { once: true },
                 );
@@ -1923,7 +1978,9 @@ it.describe("Combobox Web Component", () => {
 
               app.innerHTML = `
                 <select-enhancer>
-                  ${options.map((o, i) => `<combobox-option value="${i + 1}">${o}</combobox-option>`).join("")}
+                  <select>
+                    ${options.map((o, i) => `<option value="${i + 1}">${o}</option>`).join("")}
+                  </select>
                 </select-enhancer>
               `;
             }, testOptions);
@@ -1936,17 +1993,26 @@ it.describe("Combobox Web Component", () => {
             const optionsCount = await options.count();
             expect(optionsCount).toBeGreaterThan(1);
 
-            // Check `option` labels
             await Promise.all(
-              [...Array(optionsCount)].map((_, i) => expect(options.nth(i)).toHaveJSProperty("label", testOptions[i])),
+              [...Array(optionsCount)].map(async (_, i): Promise<void> => {
+                const option = options.nth(i);
+                await expect(option).toHaveJSProperty("label", testOptions[i]);
+                await expect(option).toHaveJSProperty("label", await option.textContent());
+
+                const newTextContent = await option.evaluate((o) => (o.textContent = `${Math.random()}`));
+                expect(newTextContent).not.toBe(testOptions[i]);
+                await expect(option).toHaveJSProperty("label", newTextContent);
+              }),
             );
           });
         });
 
         it.describe("value (Attribute)", () => {
-          it("Updates the value of the `combobox` when changed on the selected `option`", async ({ page }) => {
+          it("Updates the value of the owning `combobox` when changed on a selected `option`", async ({ page }) => {
             // Setup
             const value = "1st";
+            expect(value).not.toBe(testOptions[0]);
+
             await renderComponent(page);
             await page.getByRole("combobox").click();
 
@@ -1977,7 +2043,9 @@ it.describe("Combobox Web Component", () => {
 
               app.innerHTML = `
                 <select-enhancer>
-                  <combobox-option value="${o.value}">${o.label}</combobox-option>
+                  <select>
+                    <option value="${o.value}">${o.label}</option>
+                  </select>
                 </select-enhancer>
               `;
             }, option);
@@ -1989,20 +2057,24 @@ it.describe("Combobox Web Component", () => {
             // `property` matches initial `attribute`
             const optionElement = page.getByRole("option");
             await expect(optionElement).toHaveJSProperty("value", option.value);
+            await expectOptionToBeSelected(page, option);
 
             // `attribute` responds to `property` updates
             const newValueProperty = "my-property";
             await optionElement.evaluate((node: ComboboxOption, v) => (node.value = v), newValueProperty);
             await expect(optionElement).toHaveAttribute("value", newValueProperty);
+            await expectOptionToBeSelected(page, { label: option.label, value: newValueProperty });
 
             // `property` responds to `attribute` updates
             const newValueAttribute = "my-attribute";
             await optionElement.evaluate((node: ComboboxField, v) => node.setAttribute("value", v), newValueAttribute);
             await expect(optionElement).toHaveJSProperty("value", newValueAttribute);
+            await expectOptionToBeSelected(page, { label: option.label, value: newValueAttribute });
 
             // `property` defaults to text content in lieu of an `attribute`
             await optionElement.evaluate((node: ComboboxField) => node.removeAttribute("value"));
             await expect(optionElement).toHaveJSProperty("value", option.label);
+            await expectOptionToBeSelected(page, { label: option.label, value: option.label });
           });
         });
 
@@ -2051,6 +2123,7 @@ it.describe("Combobox Web Component", () => {
             await expect(page.getByRole("option").first()).toHaveJSProperty("selected", false);
           });
 
+          // Note: This is the behavior of the native <select> element, even when trying to unselect the 1st option.
           it("Reverts the `combobox` value to the 1st option when changed from `true` to `false`", async ({ page }) => {
             // Setup
             const firstOption = testOptions[0];
@@ -2060,6 +2133,7 @@ it.describe("Combobox Web Component", () => {
             // Display Options
             await page.getByRole("combobox").click();
             await expectOptionToBeSelected(page, { label: firstOption }, false);
+            await expectOptionToBeSelected(page, { label: lastOption }, false);
 
             // Select last `option`, then deselect it
             const lastOptionElement = page.getByRole("option", { name: lastOption });
@@ -2072,11 +2146,19 @@ it.describe("Combobox Web Component", () => {
 
             await expectOptionToBeSelected(page, { label: lastOption }, false);
             await expect(lastOptionElement).toHaveJSProperty("selected", false);
+
+            // First `option` will still be the default even if someone unselects it
+            const firstOptionElement = page.getByRole("option", { name: firstOption });
+            await firstOptionElement.evaluate((node: ComboboxOption) => (node.selected = false));
+
+            await expectOptionToBeSelected(page, { label: firstOption }, true);
+            await expect(firstOptionElement).toHaveJSProperty("selected", true);
           });
         });
 
         // NOTE: This attribute represents the `option` that should be selected by default
         it.describe("selected (Attribute)", () => {
+          // Note: This is the behavior of the native <select> element (for :not([multiple])).
           it("Initializes the `combobox` value to the last `selected` `option` that was rendered", async ({ page }) => {
             /* ---------- Setup ---------- */
             const localOptions = testOptions.slice(0, 3);
@@ -2086,9 +2168,11 @@ it.describe("Combobox Web Component", () => {
 
               app.innerHTML = `
                 <select-enhancer>
-                  <combobox-option>${options[0]}</combobox-option>
-                  <combobox-option selected>${options[1]}</combobox-option>
-                  <combobox-option selected>${options[2]}</combobox-option>
+                  <select>
+                    <option>${options[0]}</option>
+                    <option selected>${options[1]}</option>
+                    <option selected>${options[2]}</option>
+                  </select>
                 </select-enhancer>
               `;
             }, localOptions);
@@ -2105,7 +2189,7 @@ it.describe("Combobox Web Component", () => {
             await expectOptionToBeSelected(page, { label: localOptions.at(-1) as string });
           });
 
-          // NOTE: The native `<select>` element disables this functionality once it is modified. However,
+          // NOTE: The native <select> element (somewhat) disables this functionality once it is modified.
           // We don't currently have a way to support that behavior without leaking implementation details.
           it("Updates the `option`'s `selected` PROPERTY when its value changes", async ({ page }) => {
             /* ---------- Setup ---------- */
@@ -2142,7 +2226,9 @@ it.describe("Combobox Web Component", () => {
 
               app.innerHTML = `
                 <select-enhancer>
-                  ${options.map((o) => `<combobox-option selected>${o}</combobox-option>`).join("")}
+                  <select>
+                    ${options.map((o) => `<option selected>${o}<option>`).join("")}
+                  </select>
                 </select-enhancer>
               `;
             }, testOptions);
@@ -2178,7 +2264,9 @@ it.describe("Combobox Web Component", () => {
 
               app.innerHTML = `
                 <select-enhancer>
-                  <combobox-option aria-disabled="true">${o}</combobox-option>
+                  <select>
+                    <option disabled="true">${o}</option>
+                  </select>
                 </select-enhancer>
               `;
             }, option);
@@ -2258,7 +2346,9 @@ it.describe("Combobox Web Component", () => {
               app.innerHTML = `
                 <form>
                   <select-enhancer>
-                    ${options.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
+                    <select>
+                      ${options.map((o) => `<option>${o}</option>`).join("")}
+                    </select>
                   </select-enhancer>
                 </form>
               `;
@@ -2290,38 +2380,58 @@ it.describe("Combobox Web Component", () => {
       });
     });
 
-    it.describe("Combobox Container (Web Component Part)", () => {
-      it("Transfers its (user-provided) attributes to the `combobox` during initialization", async ({ page }) => {
+    // NOTE: This is the necessary wrapper for the entire component
+    it.describe("Select Enhancer (Web Component Part)", () => {
+      it("Transfers the provided <select>'s attributes to the `combobox` during initialization", async ({ page }) => {
         /* ---------- Setup ---------- */
         await page.goto(url);
         await page.evaluate(() => {
           const app = document.getElementById("app") as HTMLDivElement;
 
           app.innerHTML = `
-            <select-enhancer id="combobox" name="my-name" required disabled>
-              <combobox-option>Choose Me!!!</combobox-option>
+            <select-enhancer>
+              <select id="combobox" name="my-name" required disabled>
+                <option>Choose Me!!!</option>
+              </select>
             </select-enhancer>
           `;
         });
 
         /* ---------- Assertions ---------- */
-        const combobox = page.getByRole("combobox");
-        const container = page.locator("select-enhancer");
+        // The <select> and its corresponding attributes have been replaced altogether
+        const select = page.locator("select");
+        await expect(select).toHaveCount(0);
 
-        // The `combobox` has inherited the attributes
+        // The `combobox` has inherited the <select>'s attributes
+        const combobox = page.getByRole("combobox");
         await expect(combobox).toHaveAttribute("id", "combobox");
         await expect(combobox).toHaveAttribute("name", "my-name");
         await expect(combobox).toHaveAttribute("required", "");
         await expect(combobox).toHaveAttribute("disabled", "");
-
-        // The container has lost (or updated) its attributes
-        await expect(container).toHaveAttribute("id", "combobox-container");
-        await expect(container).not.toHaveAttribute("name");
-        await expect(container).not.toHaveAttribute("required");
-        await expect(container).not.toHaveAttribute("disabled");
       });
 
-      it("Rejects unsupported nodes/elements during initialization", async ({ page }) => {
+      it('Creates a "unique" (random) ID for the `combobox` if one did not exist on the <select>', async ({ page }) => {
+        /* ---------- Setup ---------- */
+        await page.goto(url);
+        await page.evaluate(() => {
+          const app = document.getElementById("app") as HTMLDivElement;
+
+          app.innerHTML = `
+            <select-enhancer>
+              <select>
+                <option>Choose Me!!!</option>
+              </select>
+            </select-enhancer>
+          `;
+        });
+
+        /* ---------- Assertions ---------- */
+        const id = await page.getByRole("combobox").getAttribute("id");
+        expect(id).toEqual(expect.any(String));
+        expect(id?.length).toBeGreaterThan(1);
+      });
+
+      it("Removes unsupported nodes/elements during initialization", async ({ page }) => {
         // Setup
         const className = "invalid";
         await page.goto(url);
@@ -2330,15 +2440,17 @@ it.describe("Combobox Web Component", () => {
 
           app.innerHTML = `
             <select-enhancer>
-              <div class="${c}">I am rejected</div>
-              <combobox-option>Choose Me!!!</combobox-option>
-              <span class="${c}" role="option">I am rejected even though I have a proper role</span>
-              <div class="${c}" role="listbox">I am rejected even though a \`listbox\` will be put here</div>
+              <div class="${c}">I am ignored</div>
+              <select>
+                <option>Choose Me!!!</option>
+              </select>
+              <span class="${c}" role="option">I am ignored even though I have a proper role</span>
+              <div class="${c}" role="listbox">I am ignored even though a \`listbox\` will be put here</div>
             </select-enhancer>
           `;
         }, className);
 
-        // Unrelated elements (i.e., the `div`s and `span`s) should have been removed
+        // Unsupported elements (e.g., the `div`s and `span`s) should have been removed
         const container = page.locator("select-enhancer");
         expect(await container.locator(".invalid").count()).toBe(0);
         expect(await container.locator("combobox-option").count()).toBe(1);
@@ -2352,13 +2464,15 @@ it.describe("Combobox Web Component", () => {
 
           app.innerHTML = `
             <select-enhancer>
-              <combobox-option>Choose Me!!!</combobox-option>
+              <select>
+                <option>Choose Me!!!</option>
+              </select>
             </select-enhancer>
           `;
         });
 
         // Container should not have an accessible `role`
-        await expect(page.locator("select-enhancer")).toHaveAttribute("role", "none");
+        await expect(page.locator("select-enhancer")).toHaveRole("none");
       });
     });
   });
@@ -2375,10 +2489,10 @@ it.describe("Combobox Web Component", () => {
       await combobox.click();
       await expectOptionsToBeVisible(page);
 
-      // Assert that `combobox` has a meaningful ID (even if one isn't provided)
+      // Assert that the `combobox` has a meaningful ID (even if one isn't provided)
       await expect(combobox).toHaveAttribute("id", expect.stringMatching(/\w+/));
 
-      // Assert that `combobox` has correct static ARIA attributes
+      // Assert that the `combobox` has the correct static ARIA attributes
       await expect(combobox).toHaveAttribute("aria-haspopup", "listbox");
 
       // Assert proper relationship between `combobox` and `listbox`

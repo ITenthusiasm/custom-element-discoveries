@@ -16,8 +16,11 @@ class ComboboxOption extends HTMLElement {
    */
   attributeChangedCallback(name, oldValue, newValue) {
     if (!this.#mounted) return;
-    if (name === "value" && newValue !== oldValue) return this.#syncWithCombobox();
     if (name === "selected" && (newValue === null) !== (oldValue === null)) return (this.selected = newValue !== null);
+    if (name === "value" && newValue !== oldValue) {
+      this.id = `${this.#combobox.id}-option-${newValue ?? this.textContent}`;
+      return this.#syncWithCombobox();
+    }
   }
 
   // TODO: Do we want to use `ElementInternals` for ARIA? Would Playwright/Testing Library be able to detect that?
@@ -31,22 +34,9 @@ class ComboboxOption extends HTMLElement {
       this.#mounted = true;
     }
 
-    /*
-     * TODO: Do we need the `closest` check anymore?
-     *
-     * UPDATE: This is probably due to the fact that in the HTML, `<combobox-option>`s start off as direct descendants
-     * of the `<select-enhancer` itself. However, this will change when we change the `<select-enhancer>` to
-     * accept _ONLY_ a regular `<select>` element, which is replaced with our Combobox Component when JS is available
-     * in the browser. So... we should do some remaining minor cleanups in `ComboboxField`. Then we should immediately
-     * update our code to expect `<select>` as the sole child to `<select-enhancer>` so that we can know how to
-     * reason about the rest of our code.
-     *
-     * ... On that note, maybe we should rename `<select-enhancer>` to something like `<combobox-enhancer>` or
-     * `<enhanced-combobox>`? I dunno... Think about it.
-     */
     // Require a Corresponding `listbox`
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Verification needed on mount
-    if (!this.#listbox && !this.closest("select-enhancer")) {
+    if (!this.#listbox) {
       throw new Error(`A ${this.constructor.name} must be placed inside a valid \`[role="listbox"]\` element.`);
     }
   }

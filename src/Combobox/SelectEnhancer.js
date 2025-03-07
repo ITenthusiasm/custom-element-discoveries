@@ -13,7 +13,7 @@ class SelectEnhancer extends HTMLElement {
 
   constructor() {
     super();
-    this.#combobox = /** @type {ComboboxField} */ (document.createElement("combobox-field"));
+    this.#combobox = document.createElement("combobox-field");
     this.#listbox = document.createElement("div");
   }
 
@@ -22,54 +22,71 @@ class SelectEnhancer extends HTMLElement {
     if (!this.isConnected) return;
 
     if (!this.#mounted) {
+      /** @type {HTMLSelectElement | null} */
+      const select = this.querySelector(":scope > select");
+      if (!select) throw new TypeError(`<${this.constructor.name}> must contain one (and only one) <select> element`);
+
       /* -------------------- Setup Elements -------------------- */
       // Root Element
-      const comboboxId = this.id || Math.random().toString(36).slice(2);
-      this.id = `${comboboxId}-container`;
       this.setAttribute("role", "none");
 
       // Combobox
-      this.#combobox.setAttribute("id", comboboxId);
-      this.#combobox.setAttribute("aria-controls", `${comboboxId}-listbox`);
-
-      // Transfer relevant attributes from `container` to `combobox`
-      const attributeNames = this.getAttributeNames();
+      const attributeNames = select.getAttributeNames();
       for (let i = 0; i < attributeNames.length; i++) {
         const attrName = attributeNames[i];
-        if (attrName === "id" || attrName === "role") continue;
-
-        this.#combobox.setAttribute(attrName, /** @type {string} */ (this.getAttribute(attrName)));
-        this.removeAttribute(attrName);
+        this.#combobox.setAttribute(attrName, /** @type {string} */ (select.getAttribute(attrName)));
       }
 
       // Listbox
+      if (!this.#combobox.id) this.#combobox.id = Math.random().toString(36).slice(2);
+      const comboboxId = this.#combobox.id;
+
+      this.#combobox.setAttribute("aria-controls", `${comboboxId}-listbox`);
       this.#listbox.setAttribute("id", `${comboboxId}-listbox`);
       this.#listbox.setAttribute("role", "listbox");
 
-      /* -------------------- Render Elements -------------------- */
-      // Setup Children (Aggressively)
-      /** @type {ComboboxOption | undefined} */
-      let initialOption;
+      // Listbox Options
+      /** @type {ComboboxOption | undefined} */ let initialOption;
 
-      while (this.childNodes.length > 0) {
-        const node = this.childNodes[0];
-        customElements.upgrade(node);
+      for (let i = 0; i < select.options.length; i++) {
+        const option = select.options[i];
+        const comboboxOption = this.#listbox.appendChild(document.createElement("combobox-option"));
 
-        if (!(node instanceof ComboboxOption)) {
-          node.remove();
-          continue;
-        }
+        comboboxOption.textContent = option.label;
+        comboboxOption.value = option.value;
+        comboboxOption.disabled = option.disabled;
+        comboboxOption.defaultSelected = option.defaultSelected;
+        /*
+         * TODO: Moving this logic to `ComboboxOption.connectedCallback` will better help with options added
+         * after mounting. Then add a test to verify this use case. Also, should we add support for updating the
+         * `combobox` if a selected option is removed?
+         */
+        comboboxOption.setAttribute("id", `${comboboxId}-option-${comboboxOption.value}`);
 
-        this.#listbox.appendChild(node);
-        node.setAttribute("id", `${comboboxId}-option-${node.value}`);
-        if (node.defaultSelected || !initialOption) initialOption = node;
+        if (comboboxOption.defaultSelected || !initialOption) initialOption = comboboxOption;
       }
 
-      // Setup Primary Elements
-      this.appendChild(this.#listbox);
-      this.#listbox.insertAdjacentElement("beforebegin", this.#combobox);
-      if (initialOption) this.#combobox.value = initialOption.value;
+      /* -------------------- Render Elements -------------------- */
+      /*
+       * TODO:
+       * 1) It seems like the ordering of when we `connect` the `ComboboxOption`s to the DOM matters, because
+       * `aria-selected` is set to `"false"` when the options are connected to the DOM. Is there a way that we
+       * could make this setup logic less finicky?
+       *
+       * 2) Separately, don't the native `<option>` elements allow safe attribute changes even if they aren't connected
+       * to the DOM? Should we allow something similar? (For example, early return on `!this.combobox`?) This might
+       * make life easier for us... Need to investigate.
+       *
+       * 3) Far-off thought: Should we give developers an easy way to set this component up themselves? We'd also want
+       * to make sure that frameworks can create our Web Component just fine, without running into any problems.
+       * (There would only be a concern if people wanted to provide `<combobox-option>` and `<combobox-field>` directly
+       * instead of using `<select-enhancer>` in conjunction with `<select>` -- at least, that's our assumption).
+       */
+      const fragment = document.createDocumentFragment();
+      fragment.append(this.#combobox, this.#listbox);
 
+      this.replaceChildren(fragment);
+      if (initialOption) this.#combobox.value = initialOption.value;
       this.#mounted = true;
     }
 
