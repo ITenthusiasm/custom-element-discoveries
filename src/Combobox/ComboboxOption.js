@@ -29,6 +29,7 @@ class ComboboxOption extends HTMLElement {
     if (!this.isConnected) return;
 
     if (!this.#mounted) {
+      this.setAttribute("id", `${this.#combobox.id}-option-${this.value}`);
       this.setAttribute("role", "option");
       this.setAttribute("aria-selected", String(false));
       this.#mounted = true;

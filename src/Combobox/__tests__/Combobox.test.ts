@@ -2497,7 +2497,7 @@ it.describe("Combobox Web Component", () => {
 
       // Assert proper relationship between `combobox` and `listbox`
       await expect(combobox).toHaveAttribute("aria-controls", await listbox.evaluate((l) => l.id));
-      await expect(listbox).toHaveAttribute("id", `${await combobox.evaluate((c) => c.id)}-listbox`);
+      await expect(listbox).toHaveAttribute("id", `${await combobox.getAttribute("id")}-listbox`);
 
       // Assert proper relationship between `combobox`, `listbox`, and `option`s
       for (const option of testOptions) {
@@ -2506,8 +2506,19 @@ it.describe("Combobox Web Component", () => {
 
         const optionEl = listbox.getByRole("option", { name: option });
         await expect(combobox).toHaveAttribute("aria-activedescendant", await optionEl.evaluate((o) => o.id));
-        await expect(optionEl).toHaveAttribute("id", `${await combobox.evaluate((c) => c.id)}-option-${option}`);
+        await expect(optionEl).toHaveAttribute("id", `${await combobox.getAttribute("id")}-option-${option}`);
       }
+
+      // Assert proper relationship between `combobox` and any `option`s added _after_ mounting
+      const newOptionValue = "Eleventh";
+      await combobox.evaluate((node: ComboboxField, value) => {
+        node.listbox.insertAdjacentHTML("beforeend", `<combobox-option>${value}</combobox-option>`);
+      }, newOptionValue);
+
+      await page.keyboard.type(newOptionValue);
+      const optionEl = listbox.getByRole("option", { name: newOptionValue });
+      await expect(combobox).toHaveAttribute("aria-activedescendant", await optionEl.evaluate((o) => o.id));
+      await expect(optionEl).toHaveAttribute("id", `${await combobox.getAttribute("id")}-option-${newOptionValue}`);
     });
   });
 });

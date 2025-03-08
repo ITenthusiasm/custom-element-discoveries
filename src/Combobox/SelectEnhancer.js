@@ -56,12 +56,6 @@ class SelectEnhancer extends HTMLElement {
         comboboxOption.value = option.value;
         comboboxOption.disabled = option.disabled;
         comboboxOption.defaultSelected = option.defaultSelected;
-        /*
-         * TODO: Moving this logic to `ComboboxOption.connectedCallback` will better help with options added
-         * after mounting. Then add a test to verify this use case. Also, should we add support for updating the
-         * `combobox` if a selected option is removed?
-         */
-        comboboxOption.setAttribute("id", `${comboboxId}-option-${comboboxOption.value}`);
 
         if (comboboxOption.defaultSelected || !initialOption) initialOption = comboboxOption;
       }
