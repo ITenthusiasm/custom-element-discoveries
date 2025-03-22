@@ -1,5 +1,5 @@
-/** @import ComboboxOption from "./ComboboxOption.js" */
 import { setAttributeFor } from "../utils/dom.js";
+import ComboboxOption from "./ComboboxOption.js";
 import attrs from "./attrs.js";
 
 /** 
@@ -28,6 +28,30 @@ class ComboboxField extends HTMLElement {
   /** @type {number | undefined} */ #searchTimeout;
   /** @readonly */ #expansionObserver = new MutationObserver(watchExpansion);
   /** @readonly */ #activeOptionObserver = new MutationObserver(watchActiveDescendant);
+  /** @readonly */ #optionNodesObserver = new MutationObserver((mutations) => {
+    for (let i = 0; i < mutations.length; i++) {
+      const mutation = mutations[i];
+
+      if (!this.listbox.children.length) {
+        this.#value = null;
+        this.#internals.setFormValue("");
+        this.#label.textContent = "";
+        return;
+      }
+
+      // Handle added nodes first. This keeps us from running redundant Deselect Logic if a newly-added node is `selected`.
+      mutation.addedNodes.forEach((node, j) => {
+        if (!(node instanceof ComboboxOption)) return;
+        if (node.defaultSelected) return (this.value = node.value);
+        if (j === 0 && this.#value === null) this.value = node.value;
+      });
+
+      mutation.removedNodes.forEach((node) => {
+        if (!(node instanceof ComboboxOption)) return;
+        if (node.selected) this.value = this.listbox.children[0].value;
+      });
+    }
+  });
 
   /**
    * @type {string | null} The Custom Element's internal value. **DO NOT** use directly.
@@ -73,6 +97,7 @@ class ComboboxField extends HTMLElement {
     }
 
     // Setup Mutation Observers
+    this.#optionNodesObserver.observe(this.listbox, { childList: true });
     this.#expansionObserver.observe(this, { attributes: true, attributeFilter: [attrs["aria-expanded"]] });
     this.#activeOptionObserver.observe(this, {
       attributes: true,
@@ -89,6 +114,7 @@ class ComboboxField extends HTMLElement {
 
   // "On Unmount" for Custom Elements
   disconnectedCallback() {
+    this.#optionNodesObserver.disconnect();
     this.#expansionObserver.disconnect();
     this.#activeOptionObserver.disconnect();
 
@@ -149,14 +175,17 @@ class ComboboxField extends HTMLElement {
   }
 
   set value(v) {
-    const newOption = /** @type {ComboboxOption | null} */ (document.getElementById(`${this.id}-option-${v}`));
+    /*
+     * TODO: Figure out if `getRootNode().getElementById`, or `querySelector()` is faster.
+     * (We won't be able to do `Array.prototype.find` as neatly/cleanly if we ever support grouped options.)
+     */
+    const root = /** @type {Document | DocumentFragment | ShadowRoot} */ (this.getRootNode());
+    const newOption = /** @type {ComboboxOption | null} */ (root.getElementById(`${this.id}-option-${v}`));
     if (v === this.#value && newOption?.selected === true) return;
 
     /* ---------- Update Values ---------- */
     if (!newOption) return; // Ignore invalid values
-    const prevOption = /** @type {ComboboxOption | null} */ (
-      document.getElementById(`${this.id}-option-${this.#value}`)
-    );
+    const prevOption = /** @type {ComboboxOption | null} */ (root.getElementById(`${this.id}-option-${this.#value}`));
 
     this.#value = v;
     this.#internals.setFormValue(this.#value);
@@ -414,6 +443,7 @@ function watchActiveDescendant(mutations) {
 function handleActiveDescendantChange(mutation) {
   const combobox = /** @type {ComboboxField} */ (mutation.target);
 
+  // TODO: Replace `getElementById` with `listbox.querySelector` to avoid errors in Shadow DOMs
   // Deactivate Previous Option
   const lastOptionId = mutation.oldValue;
   const lastOption = lastOptionId ? document.getElementById(lastOptionId) : null;

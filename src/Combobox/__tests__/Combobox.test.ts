@@ -1965,6 +1965,186 @@ it.describe("Combobox Web Component", () => {
           });
         }
       });
+
+      it.describe("Dynamic `option` Management (Complies with Native <select>)", () => {
+        it("Updates its value when a new `defaultSelected` `option` is added", async ({ page }) => {
+          /* ---------- Setup ---------- */
+          await page.goto(url);
+          await page.evaluate(() => {
+            const app = document.getElementById("app") as HTMLDivElement;
+            app.innerHTML = `
+              <select-enhancer>
+                <select>
+                  <option value="1">One</option>
+                  <option value="2" selected>Two</option>
+                  <option value="3">Three</option>
+                </select>
+              </select-enhancer>
+            `;
+          });
+
+          /* ---------- Assertions ---------- */
+          // Display `option`s (Not necessary, but makes this test easier to write)
+          const combobox = page.getByRole("combobox");
+          await combobox.click();
+
+          // Intial value should match the `defaultSelected` `option`
+          const firstOption = page.getByRole("option").first();
+          await expect(firstOption.and(page.getByRole("option", { selected: true }))).not.toBeAttached();
+
+          await expectOptionToBeSelected(page, { label: "Two", value: "2" });
+          await expect(page.getByRole("option", { selected: true })).toHaveAttribute("selected");
+
+          // After adding a _new_ `defaultSelected` `option`, the `combobox` value should update
+          await combobox.evaluate((node: ComboboxField) => {
+            node.listbox.insertAdjacentHTML("beforeend", '<combobox-option value="4" selected>Four</combobox-option>');
+          });
+
+          await expectOptionToBeSelected(page, { label: "Four", value: "4" });
+        });
+
+        it("Resets its value to the first `option` if the selected one is removed", async ({ page }) => {
+          /* ---------- Setup ---------- */
+          await page.goto(url);
+          await page.evaluate(() => {
+            const app = document.getElementById("app") as HTMLDivElement;
+            app.innerHTML = `
+              <select-enhancer>
+                <select>
+                  <option value="1">One</option>
+                  <option value="2">Two</option>
+                  <option value="3">Three</option>
+                  <option value="4" selected>Four</option>
+                </select>
+              </select-enhancer>
+            `;
+          });
+
+          /* ---------- Assertions ---------- */
+          // Display Options (Not necessary, but makes this test easier to write)
+          const combobox = page.getByRole("combobox");
+          await combobox.click();
+
+          // Intial value should match the `defaultSelected` `option`
+          const firstOption = page.getByRole("option").first();
+          const selectedOption = page.getByRole("option", { selected: true });
+
+          await expectOptionToBeSelected(page, { label: "Four", value: "4" });
+          await expect(firstOption.and(selectedOption)).not.toBeAttached();
+
+          // `combobox` value changes to first `option` when the selected `option` is removed
+          await selectedOption.evaluate((node) => node.remove());
+          await expect(firstOption.and(selectedOption)).toBeAttached();
+
+          await expect(firstOption).toHaveAttribute("value", "1");
+          await expect(combobox).toHaveJSProperty("value", (await firstOption.getAttribute("value")) as string);
+
+          // This behavior still works even if the first `option` is removed after being selected
+          await selectedOption.evaluate((node) => node.remove());
+          await expect(firstOption.and(selectedOption)).toBeVisible();
+
+          await expect(firstOption).toHaveAttribute("value", "2");
+          await expect(combobox).toHaveJSProperty("value", (await firstOption.getAttribute("value")) as string);
+        });
+
+        it("Resets its value to an empty string if all `option`s are removed", async ({ page }) => {
+          /* ---------- Setup ---------- */
+          await renderComponent(page);
+          await expectOptionToBeSelected(page, { label: testOptions[0] });
+
+          /* ---------- Asertions ---------- */
+          // Display `option`s (for test-writing convenience)
+          const combobox = page.getByRole("combobox");
+          await combobox.click();
+
+          // Remove all nodes 1-BY-1
+          await combobox.evaluate((node: ComboboxField) => {
+            while (node.listbox.children.length) node.listbox.children[0].remove();
+          });
+
+          await expect(page.getByRole("listbox")).toBeEmpty();
+          await expect(combobox).toHaveJSProperty("value", "");
+          await expect(combobox).toHaveText("");
+
+          // Add all the `option`s back in and verify that the value updates
+          await combobox.evaluate((node: ComboboxField, options) => {
+            const { listbox } = node;
+            options.forEach((o) => listbox.insertAdjacentHTML("beforeend", `<combobox-option>${o}</combobox-option>`));
+          }, testOptions);
+
+          await expectOptionToBeSelected(page, { label: testOptions[0] });
+
+          // Remove all the options again, but SIMULTANEOUSLY. Then verify that the `combobox` value resets again.
+          await combobox.evaluate((node: ComboboxField) => node.listbox.replaceChildren());
+          await expect(page.getByRole("listbox")).toBeEmpty();
+          await expect(combobox).toHaveJSProperty("value", "");
+          await expect(combobox).toHaveText("");
+        });
+
+        it("Updates its value if a new `option` is added and there are no pre-existing `option`s", async ({ page }) => {
+          /* ---------- Setup ---------- */
+          await renderComponent(page);
+
+          /* ---------- Assertions ---------- */
+          // Display `option`s for test-writing convenience
+          const combobox = page.getByRole("combobox");
+          await combobox.click();
+
+          // Remove all `option`s, then add new ones 1-BY-1
+          await combobox.evaluate((node: ComboboxField) => node.listbox.replaceChildren());
+          const newOptions = Object.freeze(["10", "20", "30", "40", "50"] as const);
+          await combobox.evaluate((node: ComboboxField, options) => {
+            const { listbox } = node;
+            options.forEach((o) => listbox.insertAdjacentHTML("afterbegin", `<combobox-option>${o}</combobox-option>`));
+          }, newOptions);
+
+          // The first _inserted_ `option` should now be the selected one (not necessarily the first `option` itself)
+          const firstOption = page.getByRole("option").first();
+          await expect(firstOption.and(page.getByRole("option", { selected: true }))).not.toBeAttached();
+          await expectOptionToBeSelected(page, { label: newOptions[0] });
+
+          // Remove all `option`s, then add new one's SIMULTANEOUSLY
+          await combobox.evaluate((node: ComboboxField) => node.listbox.replaceChildren());
+          await combobox.evaluate((node: ComboboxField, values) => {
+            const fragment = document.createDocumentFragment();
+
+            values.forEach((v) => {
+              const option = document.createElement("combobox-option");
+              fragment.prepend(option);
+              option.textContent = v;
+            });
+
+            node.listbox.replaceChildren(fragment);
+          }, newOptions);
+
+          // The first _inserted_ `option` should again be the selected one. (Due to batching, first `option` is selected now.)
+          await expect(firstOption.and(page.getByRole("option", { selected: true }))).toBeAttached();
+          await expectOptionToBeSelected(page, { label: newOptions.at(-1) as string });
+
+          // REPLACE all `option`s SIMULTANEOUSLY
+          const letterOptions = Object.freeze(["A", "B", "C", "D", "E"] as const);
+          const middleLetterIndex = Math.floor(letterOptions.length / 2);
+          expect(await page.getByRole("option").count()).toBeGreaterThan(0);
+          await combobox.evaluate(
+            (node: ComboboxField, [values, startIndex]) => {
+              const fragment = document.createDocumentFragment();
+
+              for (let i = startIndex; i < values.length + startIndex; i++) {
+                const v = values[i % values.length];
+                const option = fragment.appendChild(document.createElement("combobox-option"));
+                option.textContent = v;
+              }
+
+              node.listbox.replaceChildren(fragment);
+            },
+            [letterOptions, middleLetterIndex] as const,
+          );
+
+          // The first _inserted_ `option` should again be the selected one. (Due to batching, first `option` is selected now.)
+          await expect(firstOption.and(page.getByRole("option", { selected: true }))).toBeAttached();
+          await expectOptionToBeSelected(page, { label: letterOptions[middleLetterIndex] });
+        });
+      });
     });
 
     it.describe("Combobox Option (Web Component Part)", () => {
@@ -2429,6 +2609,89 @@ it.describe("Combobox Web Component", () => {
         const id = await page.getByRole("combobox").getAttribute("id");
         expect(id).toEqual(expect.any(String));
         expect(id?.length).toBeGreaterThan(1);
+      });
+
+      it("Properly creates `option`s from the provided <option>s, preserving all relevant data", async ({ page }) => {
+        /* ---------- Setup ---------- */
+        await page.goto(url);
+        await page.evaluate(() => {
+          const app = document.getElementById("app") as HTMLDivElement;
+
+          // NOTE: <option>s are created dynamically to account for preservation of the `Option.selected` _property_
+          const optionsContainer = document.createElement("template");
+          optionsContainer.innerHTML = `
+            <option label="1st" value="1" disabled selected>First</option>
+            <option>Second</option>
+            <option value="3" disabled>Third</option>
+          `;
+
+          (optionsContainer.content.lastElementChild as HTMLOptionElement).selected = true;
+
+          const selectEnhancer = document.createElement("select-enhancer");
+          const select = selectEnhancer.appendChild(document.createElement("select"));
+          select.replaceChildren(...optionsContainer.content.children);
+
+          app.replaceChildren(selectEnhancer);
+        });
+
+        /* ---------- Assertions ---------- */
+        // Display options (for test-writing convenience)
+        const combobox = page.getByRole("combobox");
+        await combobox.click();
+
+        // Option with All Attributes
+        const optionAllAttributes = page.getByRole("option", { name: "1st" });
+        await expect(optionAllAttributes).toHaveText("1st");
+        await expect(optionAllAttributes).toHaveJSProperty("label", "1st");
+
+        await expect(optionAllAttributes).toHaveAttribute("value", "1");
+        await expect(optionAllAttributes).toHaveJSProperty("value", "1");
+
+        await expect(optionAllAttributes).toHaveAttribute("aria-disabled", String(true));
+        await expect(optionAllAttributes).not.toHaveAttribute("disabled");
+        await expect(optionAllAttributes).toHaveJSProperty("disabled", true);
+
+        await expect(optionAllAttributes).toHaveAttribute("selected", "");
+        await expect(optionAllAttributes).toHaveJSProperty("defaultSelected", true);
+
+        await expect(optionAllAttributes).toHaveJSProperty("selected", false);
+        await expectOptionToBeSelected(page, { label: "1st", value: "1" }, false);
+
+        // Option with No Attributes
+        const optionWithoutAttributes = page.getByRole("option", { name: "Second" });
+        await expect(optionWithoutAttributes).toHaveText("Second");
+        await expect(optionWithoutAttributes).toHaveJSProperty("label", "Second");
+
+        await expect(optionWithoutAttributes).not.toHaveAttribute("value");
+        await expect(optionWithoutAttributes).toHaveJSProperty("value", "Second");
+
+        await expect(optionWithoutAttributes).not.toHaveAttribute("aria-disabled");
+        await expect(optionWithoutAttributes).not.toHaveAttribute("disabled");
+        await expect(optionWithoutAttributes).toHaveJSProperty("disabled", false);
+
+        await expect(optionWithoutAttributes).not.toHaveAttribute("selected", "");
+        await expect(optionWithoutAttributes).toHaveJSProperty("defaultSelected", false);
+
+        await expect(optionWithoutAttributes).toHaveJSProperty("selected", false);
+        await expectOptionToBeSelected(page, { label: "Second" }, false);
+
+        // Pre-Selected Option (via DOM manipulation _pre-mount_)
+        const selectedOption = page.getByRole("option", { name: "Third", selected: true });
+        await expect(selectedOption).toHaveText("Third");
+        await expect(selectedOption).toHaveJSProperty("label", "Third");
+
+        await expect(selectedOption).toHaveAttribute("value", "3");
+        await expect(selectedOption).toHaveJSProperty("value", "3");
+
+        await expect(selectedOption).toHaveAttribute("aria-disabled", String(true));
+        await expect(selectedOption).not.toHaveAttribute("disabled");
+        await expect(selectedOption).toHaveJSProperty("disabled", true);
+
+        await expect(selectedOption).not.toHaveAttribute("selected");
+        await expect(selectedOption).toHaveJSProperty("defaultSelected", false);
+
+        await expect(selectedOption).toHaveJSProperty("selected", true);
+        await expectOptionToBeSelected(page, { label: "Third", value: "3" });
       });
 
       it("Removes unsupported nodes/elements during initialization", async ({ page }) => {

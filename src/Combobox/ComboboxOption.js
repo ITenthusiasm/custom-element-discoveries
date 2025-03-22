@@ -29,9 +29,9 @@ class ComboboxOption extends HTMLElement {
     if (!this.isConnected) return;
 
     if (!this.#mounted) {
-      this.setAttribute("id", `${this.#combobox.id}-option-${this.value}`);
+      if (!this.id) this.setAttribute("id", `${this.#combobox.id}-option-${this.value}`);
       this.setAttribute("role", "option");
-      this.setAttribute("aria-selected", String(false));
+      this.setAttribute("aria-selected", String(this.selected));
       this.#mounted = true;
     }
 
@@ -106,7 +106,16 @@ class ComboboxOption extends HTMLElement {
   #syncWithCombobox() {
     const combobox = this.#combobox;
 
-    if (this.selected && combobox.value !== this.value) combobox.value = this.value;
+    /*
+     * TODO: Maybe we should just rip the bandaid off and expose `Combobox.value` as `string | null`.
+     * This would make our life easier because we (and other developers) would know when the Combobox
+     * is not initialized for any reason. When it comes to managing _form data_, devs will probably be
+     * relying on `FormData.get(...)`, not `ComboboxField.value`. So this should be fine.
+     *
+     * Actually... It should be fine to `setFormValue(null)` too, I think. 🤔
+     */
+    if (this.selected && !this.isConnected) combobox.value = this.value;
+    else if (this.selected && combobox.value !== this.value) combobox.value = this.value;
     else if (!this.selected && combobox.value === this.value) {
       combobox.value = /** @type {this}  */ (this.#listbox.firstElementChild).value;
     }

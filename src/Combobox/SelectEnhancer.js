@@ -27,6 +27,9 @@ class SelectEnhancer extends HTMLElement {
       if (!select) throw new TypeError(`<${this.constructor.name}> must contain one (and only one) <select> element`);
 
       /* -------------------- Setup Elements -------------------- */
+      const fragment = document.createDocumentFragment();
+      fragment.append(this.#combobox, this.#listbox);
+
       // Root Element
       this.setAttribute("role", "none");
 
@@ -46,41 +49,22 @@ class SelectEnhancer extends HTMLElement {
       this.#listbox.setAttribute("role", "listbox");
 
       // Listbox Options
-      /** @type {ComboboxOption | undefined} */ let initialOption;
-
       for (let i = 0; i < select.options.length; i++) {
         const option = select.options[i];
         const comboboxOption = this.#listbox.appendChild(document.createElement("combobox-option"));
 
         comboboxOption.textContent = option.label;
-        comboboxOption.value = option.value;
-        comboboxOption.disabled = option.disabled;
         comboboxOption.defaultSelected = option.defaultSelected;
+        if (option.hasAttribute("disabled")) comboboxOption.disabled = true;
+        if (option.hasAttribute("value")) comboboxOption.setAttribute("value", option.value);
 
-        if (comboboxOption.defaultSelected || !initialOption) initialOption = comboboxOption;
+        // NOTE: `value` MUST be set BEFORE `id`, which is set BEFORE `selected`. (Due to A11y and Value Selection Logic.)
+        comboboxOption.setAttribute("id", `${this.#combobox.id}-option-${comboboxOption.value}`);
+        comboboxOption.selected = option.selected;
       }
 
       /* -------------------- Render Elements -------------------- */
-      /*
-       * TODO:
-       * 1) It seems like the ordering of when we `connect` the `ComboboxOption`s to the DOM matters, because
-       * `aria-selected` is set to `"false"` when the options are connected to the DOM. Is there a way that we
-       * could make this setup logic less finicky?
-       *
-       * 2) Separately, don't the native `<option>` elements allow safe attribute changes even if they aren't connected
-       * to the DOM? Should we allow something similar? (For example, early return on `!this.combobox`?) This might
-       * make life easier for us... Need to investigate.
-       *
-       * 3) Far-off thought: Should we give developers an easy way to set this component up themselves? We'd also want
-       * to make sure that frameworks can create our Web Component just fine, without running into any problems.
-       * (There would only be a concern if people wanted to provide `<combobox-option>` and `<combobox-field>` directly
-       * instead of using `<select-enhancer>` in conjunction with `<select>` -- at least, that's our assumption).
-       */
-      const fragment = document.createDocumentFragment();
-      fragment.append(this.#combobox, this.#listbox);
-
       this.replaceChildren(fragment);
-      if (initialOption) this.#combobox.value = initialOption.value;
       this.#mounted = true;
     }
 
