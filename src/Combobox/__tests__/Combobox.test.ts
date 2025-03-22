@@ -1545,71 +1545,91 @@ it.describe("Combobox Web Component", () => {
         it.describe("value (Property)", () => {
           it("Exposes the `value` of the `combobox`", async ({ page }) => {
             // Setup
+            const name = "my-combobox";
             await page.goto(url);
-            await page.evaluate((options) => {
-              const app = document.getElementById("app") as HTMLDivElement;
+            await page.evaluate(
+              ([options, fieldName]) => {
+                const app = document.getElementById("app") as HTMLDivElement;
 
-              app.innerHTML = `
-                <select-enhancer>
-                  <select>
-                    <option value="">Select a Value</option>
-                    ${options.map((o, i) => `<option value="${i}">${o}</option>`).join("")}
-                  </select>
-                </select-enhancer>
-              `;
-            }, testOptions);
+                app.innerHTML = `
+                  <form aria-label="Test Form">
+                    <select-enhancer>
+                      <select name="${fieldName}">
+                        <option value="">Select a Value</option>
+                        ${options.map((o, i) => `<option value="${i}">${o}</option>`).join("")}
+                      </select>
+                    </select-enhancer>
+                  </form>
+                `;
+              },
+              [testOptions, name] as const,
+            );
 
             // Assertions
+            const form = page.getByRole("form");
             const combobox = page.getByRole("combobox");
-            expectOptionToBeSelected(page, { value: "", label: "Select a Value" });
-            expect(await combobox.evaluate((n: ComboboxField) => n.value)).toBe("");
+            await expectOptionToBeSelected(page, { value: "", label: "Select a Value" });
+            expect(await combobox.evaluate((node: ComboboxField) => node.value)).toBe("");
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("");
 
             const userValue = testOptions[0];
             await combobox.click();
             await page.getByRole("option", { name: userValue }).click();
-            expectOptionToBeSelected(page, { value: "0", label: "First" });
-            expect(await combobox.evaluate((n: ComboboxField) => n.value)).toBe("0");
+            await expectOptionToBeSelected(page, { value: "0", label: "First" });
+            expect(await combobox.evaluate((node: ComboboxField) => node.value)).toBe("0");
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("0");
 
             const secondUserValue = testOptions[7];
             await combobox.click();
             await page.getByRole("option", { name: secondUserValue }).click();
-            expectOptionToBeSelected(page, { value: "7", label: "Eigth" });
-            expect(await combobox.evaluate((n: ComboboxField) => n.value)).toBe("7");
+            await expectOptionToBeSelected(page, { value: "7", label: "Eigth" });
+            expect(await combobox.evaluate((node: ComboboxField) => node.value)).toBe("7");
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("7");
           });
 
           it("Updates the `value` of the `combobx`, including its `option`s and validity state", async ({ page }) => {
             // Setup
+            const name = "my-combobox";
             await page.goto(url);
-            await page.evaluate((options) => {
-              const app = document.getElementById("app") as HTMLDivElement;
+            await page.evaluate(
+              ([options, fieldName]) => {
+                const app = document.getElementById("app") as HTMLDivElement;
 
-              app.innerHTML = `
-                <select-enhancer>
-                  <select required>
-                    <option value="">Select a Value</option>
-                    ${options.map((o, i) => `<option value="${i}">${o}</option>`).join("")}
-                  </select>
-                </select-enhancer>
-              `;
-            }, testOptions);
+                app.innerHTML = `
+                  <form aria-label="Test Form">
+                    <select-enhancer>
+                      <select name="${fieldName}" required>
+                        <option value="">Select a Value</option>
+                        ${options.map((o, i) => `<option value="${i}">${o}</option>`).join("")}
+                      </select>
+                    </select-enhancer>
+                  </form>
+                `;
+              },
+              [testOptions, name] as const,
+            );
 
             // Assertions
+            const form = page.getByRole("form");
             const combobox = page.getByRole("combobox");
 
             const empty = { value: "", label: "Select a Value" };
-            expectOptionToBeSelected(page, { value: empty.value, label: empty.label });
-            expect(await combobox.evaluate((n: ComboboxField) => n.validity.valid)).toBe(false);
+            await expectOptionToBeSelected(page, { value: empty.value, label: empty.label });
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("");
+            expect(await combobox.evaluate((node: ComboboxField) => node.validity.valid)).toBe(false);
 
             // Manually Make Value Valid
             const userValue = "7";
-            await combobox.evaluate((n: ComboboxField, value) => (n.value = value), userValue);
-            expectOptionToBeSelected(page, { value: userValue, label: testOptions[userValue] });
-            expect(await combobox.evaluate((n: ComboboxField) => n.checkValidity())).toBe(true);
+            await combobox.evaluate((node: ComboboxField, value) => (node.value = value), userValue);
+            await expectOptionToBeSelected(page, { value: userValue, label: testOptions[userValue] });
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(userValue);
+            expect(await combobox.evaluate((node: ComboboxField) => node.checkValidity())).toBe(true);
 
             // Manually Make Value Invalid
-            expect(await combobox.evaluate((n: ComboboxField, value) => (n.value = value), empty.value));
-            expectOptionToBeSelected(page, { value: empty.value, label: empty.label });
-            expect(await combobox.evaluate((n: ComboboxField) => n.reportValidity())).toBe(false);
+            expect(await combobox.evaluate((node: ComboboxField, value) => (node.value = value), empty.value));
+            await expectOptionToBeSelected(page, { value: empty.value, label: empty.label });
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("");
+            expect(await combobox.evaluate((node: ComboboxField) => node.reportValidity())).toBe(false);
           });
 
           it("Rejects values that are not found in the available `option`s", async ({ page }) => {
@@ -1618,23 +1638,69 @@ it.describe("Combobox Web Component", () => {
             await renderComponent(page);
             await expectOptionToBeSelected(page, { label: initialValue });
 
-            /* ---------- Assertions ---------- */
+            // Associate Combobox with a `form`
+            const name = "my-combobox";
             const combobox = page.getByRole("combobox");
+            await combobox.evaluate((node: ComboboxField, fieldName) => {
+              const formId = "test-form";
+              node.setAttribute("name", fieldName);
+              node.setAttribute("form", formId);
+              document.body.insertAdjacentHTML("beforeend", `<form id="${formId}" aria-label="Test Form"></form>`);
+            }, name);
 
+            const form = page.getByRole("form");
+            await expect(form).toHaveJSProperty(`elements.${name}.name`, name);
+
+            /* ---------- Assertions ---------- */
             // Invalid values are rejected
             const invalidValue = Math.random().toString(36).slice(2);
-            await combobox.evaluate((n: ComboboxField, value) => (n.value = value), invalidValue);
+            await combobox.evaluate((node: ComboboxField, value) => (node.value = value), invalidValue);
 
-            expect(await combobox.evaluate((n: ComboboxField) => n.value)).not.toBe(invalidValue);
+            expect(await combobox.evaluate((node: ComboboxField) => node.value)).not.toBe(invalidValue);
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).not.toBe(invalidValue);
+
             await expectOptionToBeSelected(page, { label: initialValue });
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(initialValue);
 
             // Valid values are accepted
             const goodValue = getRandomOption(testOptions.slice(1));
-            await combobox.evaluate((n: ComboboxField, value) => (n.value = value), goodValue);
+            await combobox.evaluate((node: ComboboxField, value) => (node.value = value), goodValue);
 
-            expect(await combobox.evaluate((n: ComboboxField) => n.value)).toBe(goodValue);
+            expect(await combobox.evaluate((node: ComboboxField) => node.value)).toBe(goodValue);
             await expectOptionToBeSelected(page, { label: initialValue }, false);
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).not.toBe(initialValue);
+
             await expectOptionToBeSelected(page, { label: goodValue });
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(goodValue);
+          });
+
+          it("Is `null` when the `combobox` is uninitialized (e.g., when there are no `option`s)", async ({ page }) => {
+            // Setup
+            const name = "my-combobox";
+            await page.goto(url);
+            await page.evaluate((fieldName) => {
+              const app = document.getElementById("app") as HTMLDivElement;
+
+              app.innerHTML = `
+                <form aria-label="Test Form">
+                  <select-enhancer>
+                    <select name="${fieldName}" required></select>
+                  </select-enhancer>
+                </form>
+              `;
+            }, name);
+
+            // Assertions
+            const form = page.getByRole("form");
+            const combobox = page.getByRole("combobox");
+
+            expect(await combobox.evaluate((node: ComboboxField) => node.value)).toBe(null);
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(null);
+
+            // NOTE: `combobox` should be valid because it isn't the user's fault that the field isn't initialized
+            await expect(combobox).toHaveAttribute("required");
+            await expect(combobox).toHaveJSProperty("required", true);
+            expect(await combobox.evaluate((node: ComboboxField) => node.validity.valid)).toBe(true);
           });
         });
 
@@ -1969,19 +2035,22 @@ it.describe("Combobox Web Component", () => {
       it.describe("Dynamic `option` Management (Complies with Native <select>)", () => {
         it("Updates its value when a new `defaultSelected` `option` is added", async ({ page }) => {
           /* ---------- Setup ---------- */
+          const name = "my-combobox";
           await page.goto(url);
-          await page.evaluate(() => {
+          await page.evaluate((fieldName) => {
             const app = document.getElementById("app") as HTMLDivElement;
             app.innerHTML = `
-              <select-enhancer>
-                <select>
-                  <option value="1">One</option>
-                  <option value="2" selected>Two</option>
-                  <option value="3">Three</option>
-                </select>
-              </select-enhancer>
+              <form aria-label="Test Form">
+                <select-enhancer>
+                  <select name="${fieldName}">
+                    <option value="1">One</option>
+                    <option value="2" selected>Two</option>
+                    <option value="3">Three</option>
+                  </select>
+                </select-enhancer>
+              </form>
             `;
-          });
+          }, name);
 
           /* ---------- Assertions ---------- */
           // Display `option`s (Not necessary, but makes this test easier to write)
@@ -1992,7 +2061,9 @@ it.describe("Combobox Web Component", () => {
           const firstOption = page.getByRole("option").first();
           await expect(firstOption.and(page.getByRole("option", { selected: true }))).not.toBeAttached();
 
+          const form = page.getByRole("form");
           await expectOptionToBeSelected(page, { label: "Two", value: "2" });
+          expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("2");
           await expect(page.getByRole("option", { selected: true })).toHaveAttribute("selected");
 
           // After adding a _new_ `defaultSelected` `option`, the `combobox` value should update
@@ -2001,24 +2072,28 @@ it.describe("Combobox Web Component", () => {
           });
 
           await expectOptionToBeSelected(page, { label: "Four", value: "4" });
+          expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("4");
         });
 
         it("Resets its value to the first `option` if the selected one is removed", async ({ page }) => {
           /* ---------- Setup ---------- */
+          const name = "my-combobox";
           await page.goto(url);
-          await page.evaluate(() => {
+          await page.evaluate((fieldName) => {
             const app = document.getElementById("app") as HTMLDivElement;
             app.innerHTML = `
-              <select-enhancer>
-                <select>
-                  <option value="1">One</option>
-                  <option value="2">Two</option>
-                  <option value="3">Three</option>
-                  <option value="4" selected>Four</option>
-                </select>
-              </select-enhancer>
+              <form aria-label="Test Form">
+                <select-enhancer>
+                  <select name="${fieldName}">
+                    <option value="1">One</option>
+                    <option value="2">Two</option>
+                    <option value="3">Three</option>
+                    <option value="4" selected>Four</option>
+                  </select>
+                </select-enhancer>
+              </form>
             `;
-          });
+          }, name);
 
           /* ---------- Assertions ---------- */
           // Display Options (Not necessary, but makes this test easier to write)
@@ -2029,7 +2104,9 @@ it.describe("Combobox Web Component", () => {
           const firstOption = page.getByRole("option").first();
           const selectedOption = page.getByRole("option", { selected: true });
 
+          const form = page.getByRole("form");
           await expectOptionToBeSelected(page, { label: "Four", value: "4" });
+          expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("4");
           await expect(firstOption.and(selectedOption)).not.toBeAttached();
 
           // `combobox` value changes to first `option` when the selected `option` is removed
@@ -2038,6 +2115,9 @@ it.describe("Combobox Web Component", () => {
 
           await expect(firstOption).toHaveAttribute("value", "1");
           await expect(combobox).toHaveJSProperty("value", (await firstOption.getAttribute("value")) as string);
+          expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(
+            await firstOption.getAttribute("value"),
+          );
 
           // This behavior still works even if the first `option` is removed after being selected
           await selectedOption.evaluate((node) => node.remove());
@@ -2045,9 +2125,12 @@ it.describe("Combobox Web Component", () => {
 
           await expect(firstOption).toHaveAttribute("value", "2");
           await expect(combobox).toHaveJSProperty("value", (await firstOption.getAttribute("value")) as string);
+          expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(
+            await firstOption.getAttribute("value"),
+          );
         });
 
-        it("Resets its value to an empty string if all `option`s are removed", async ({ page }) => {
+        it("Resets its value to `null` if all `option`s are removed", async ({ page }) => {
           /* ---------- Setup ---------- */
           await renderComponent(page);
           await expectOptionToBeSelected(page, { label: testOptions[0] });
@@ -2057,14 +2140,27 @@ it.describe("Combobox Web Component", () => {
           const combobox = page.getByRole("combobox");
           await combobox.click();
 
+          // Associate `combobox` with a `form`
+          const name = "my-combobox";
+          await combobox.evaluate((node: ComboboxField, fieldName) => {
+            const formId = "test-form";
+            node.setAttribute("name", fieldName);
+            node.setAttribute("form", formId);
+            document.body.insertAdjacentHTML("beforeend", `<form id="${formId}" aria-label="Test Form"></form>`);
+          }, name);
+
+          const form = page.getByRole("form");
+          await expect(form).toHaveJSProperty(`elements.${name}.name`, name);
+
           // Remove all nodes 1-BY-1
           await combobox.evaluate((node: ComboboxField) => {
             while (node.listbox.children.length) node.listbox.children[0].remove();
           });
 
           await expect(page.getByRole("listbox")).toBeEmpty();
-          await expect(combobox).toHaveJSProperty("value", "");
           await expect(combobox).toHaveText("");
+          await expect(combobox).toHaveJSProperty("value", null);
+          expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(null);
 
           // Add all the `option`s back in and verify that the value updates
           await combobox.evaluate((node: ComboboxField, options) => {
@@ -2073,21 +2169,32 @@ it.describe("Combobox Web Component", () => {
           }, testOptions);
 
           await expectOptionToBeSelected(page, { label: testOptions[0] });
+          expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(testOptions[0]);
 
           // Remove all the options again, but SIMULTANEOUSLY. Then verify that the `combobox` value resets again.
           await combobox.evaluate((node: ComboboxField) => node.listbox.replaceChildren());
           await expect(page.getByRole("listbox")).toBeEmpty();
-          await expect(combobox).toHaveJSProperty("value", "");
           await expect(combobox).toHaveText("");
+          await expect(combobox).toHaveJSProperty("value", null);
+          expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(null);
         });
 
         it("Updates its value if a new `option` is added and there are no pre-existing `option`s", async ({ page }) => {
           /* ---------- Setup ---------- */
           await renderComponent(page);
 
+          // Associate Combobox with a `form`
+          const name = "my-combobox";
+          const combobox = page.getByRole("combobox");
+          await combobox.evaluate((node: ComboboxField, fieldName) => {
+            const formId = "test-form";
+            node.setAttribute("name", fieldName);
+            node.setAttribute("form", formId);
+            document.body.insertAdjacentHTML("beforeend", `<form id="${formId}" aria-label="Test Form"></form>`);
+          }, name);
+
           /* ---------- Assertions ---------- */
           // Display `option`s for test-writing convenience
-          const combobox = page.getByRole("combobox");
           await combobox.click();
 
           // Remove all `option`s, then add new ones 1-BY-1
@@ -2099,9 +2206,11 @@ it.describe("Combobox Web Component", () => {
           }, newOptions);
 
           // The first _inserted_ `option` should now be the selected one (not necessarily the first `option` itself)
+          const form = page.getByRole("form");
           const firstOption = page.getByRole("option").first();
           await expect(firstOption.and(page.getByRole("option", { selected: true }))).not.toBeAttached();
           await expectOptionToBeSelected(page, { label: newOptions[0] });
+          expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(newOptions[0]);
 
           // Remove all `option`s, then add new one's SIMULTANEOUSLY
           await combobox.evaluate((node: ComboboxField) => node.listbox.replaceChildren());
@@ -2120,6 +2229,7 @@ it.describe("Combobox Web Component", () => {
           // The first _inserted_ `option` should again be the selected one. (Due to batching, first `option` is selected now.)
           await expect(firstOption.and(page.getByRole("option", { selected: true }))).toBeAttached();
           await expectOptionToBeSelected(page, { label: newOptions.at(-1) as string });
+          expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(newOptions.at(-1));
 
           // REPLACE all `option`s SIMULTANEOUSLY
           const letterOptions = Object.freeze(["A", "B", "C", "D", "E"] as const);
@@ -2143,12 +2253,33 @@ it.describe("Combobox Web Component", () => {
           // The first _inserted_ `option` should again be the selected one. (Due to batching, first `option` is selected now.)
           await expect(firstOption.and(page.getByRole("option", { selected: true }))).toBeAttached();
           await expectOptionToBeSelected(page, { label: letterOptions[middleLetterIndex] });
+          expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(
+            letterOptions[middleLetterIndex],
+          );
         });
       });
     });
 
     it.describe("Combobox Option (Web Component Part)", () => {
       it.describe("Exposed Properties and Attributes", () => {
+        /*
+         * TODO: We have another function like this one somewhere else within our test file.
+         * We should probably just make that function available to all of our tests.
+         */
+        /**
+         * Associates the provided `combobox` with a newly-created `<form>` element and
+         * gives the `combobox` the provided `name`.
+         */
+        async function associateComboboxWithForm(combobox: ReturnType<Page["locator"]>, name?: string): Promise<void> {
+          await expect(combobox).toHaveRole("combobox");
+          return combobox.evaluate((node: ComboboxField, fieldName) => {
+            const formId = Math.random().toString(36).slice(2);
+            node.setAttribute("form", formId);
+            if (fieldName) node.setAttribute("name", fieldName);
+            document.body.insertAdjacentHTML("beforeend", `<form id="${formId}" aria-label="Test Form"></form>`);
+          }, name);
+        }
+
         it.describe("label (Property)", () => {
           it("Returns the text content of the `option`", async ({ page }) => {
             /* ---------- Setup ---------- */
@@ -2192,43 +2323,63 @@ it.describe("Combobox Web Component", () => {
             // Setup
             const value = "1st";
             expect(value).not.toBe(testOptions[0]);
-
             await renderComponent(page);
-            await page.getByRole("combobox").click();
+
+            const name = "my-combobox";
+            const combobox = page.getByRole("combobox");
+            await associateComboboxWithForm(combobox, name);
+
+            const form = page.getByRole("form");
+            await combobox.click();
 
             // Adding the attribute
             const firstOption = page.getByRole("option").first();
             await firstOption.evaluate((node, v) => node.setAttribute("value", v), value);
             await expectOptionToBeSelected(page, { label: testOptions[0], value });
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(value);
 
             // Removing the attribute
             await firstOption.evaluate((node) => node.removeAttribute("value"));
             await expectOptionToBeSelected(page, { label: testOptions[0] });
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(testOptions[0]);
 
             // Updating an unselected `option`'s value does nothing to the `combobox` value
             const lastOption = page.getByRole("option").last();
             await lastOption.evaluate((node) => node.setAttribute("value", "ignored"));
             await expectOptionToBeSelected(page, { label: testOptions.at(-1) as string, value: "ignored" }, false);
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).not.toBe(
+              testOptions.at(-1),
+            );
+
             await expectOptionToBeSelected(page, { label: testOptions[0] });
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(testOptions[0]);
           });
         });
 
         it.describe("value (Property)", () => {
           it("Exposes the underlying `value` attribute (defaults to `option`'s text content)", async ({ page }) => {
             /* ---------- Setup ---------- */
+            const name = "my-combobox";
             const option = Object.freeze({ label: "My Value", value: "my-value" });
             await page.goto(url);
-            await page.evaluate((o) => {
-              const app = document.getElementById("app") as HTMLDivElement;
+            await page.evaluate(
+              ([o, fieldName]) => {
+                const app = document.getElementById("app") as HTMLDivElement;
 
-              app.innerHTML = `
-                <select-enhancer>
-                  <select>
-                    <option value="${o.value}">${o.label}</option>
-                  </select>
-                </select-enhancer>
-              `;
-            }, option);
+                app.innerHTML = `
+                  <form aria-label="Test Form">
+                    <select-enhancer>
+                      <select name="${fieldName}">
+                        <option value="${o.value}">${o.label}</option>
+                      </select>
+                    </select-enhancer>
+                  </form>
+                `;
+              },
+              [option, name] as const,
+            );
+
+            const form = page.getByRole("form");
 
             /* ---------- Assertions ---------- */
             // Display Options
@@ -2238,23 +2389,29 @@ it.describe("Combobox Web Component", () => {
             const optionElement = page.getByRole("option");
             await expect(optionElement).toHaveJSProperty("value", option.value);
             await expectOptionToBeSelected(page, option);
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(option.value);
 
             // `attribute` responds to `property` updates
             const newValueProperty = "my-property";
             await optionElement.evaluate((node: ComboboxOption, v) => (node.value = v), newValueProperty);
             await expect(optionElement).toHaveAttribute("value", newValueProperty);
             await expectOptionToBeSelected(page, { label: option.label, value: newValueProperty });
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(newValueProperty);
 
             // `property` responds to `attribute` updates
             const newValueAttribute = "my-attribute";
             await optionElement.evaluate((node: ComboboxField, v) => node.setAttribute("value", v), newValueAttribute);
             await expect(optionElement).toHaveJSProperty("value", newValueAttribute);
             await expectOptionToBeSelected(page, { label: option.label, value: newValueAttribute });
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(
+              newValueAttribute,
+            );
 
             // `property` defaults to text content in lieu of an `attribute`
             await optionElement.evaluate((node: ComboboxField) => node.removeAttribute("value"));
             await expect(optionElement).toHaveJSProperty("value", option.label);
             await expectOptionToBeSelected(page, { label: option.label, value: option.label });
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(option.label);
           });
         });
 
@@ -2285,12 +2442,18 @@ it.describe("Combobox Web Component", () => {
             const lastOption = testOptions.at(-1) as string;
             await renderComponent(page);
 
+            const name = "my-combobox";
+            const combobox = page.getByRole("combobox");
+            await associateComboboxWithForm(combobox, name);
+            const form = page.getByRole("form");
+
             // Display Options
-            await page.getByRole("combobox").click();
+            await combobox.click();
 
             // Initially, the first `option` is selected
             await expectOptionToBeSelected(page, { label: firstOption });
             await expect(page.getByRole("option").first()).toHaveJSProperty("selected", true);
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(firstOption);
 
             // The `selected` PROPERTY changes the `combobox` value
             const lastOptionElement = page.getByRole("option", { name: lastOption });
@@ -2298,9 +2461,11 @@ it.describe("Combobox Web Component", () => {
 
             await expectOptionToBeSelected(page, { label: lastOption });
             await expect(lastOptionElement).toHaveJSProperty("selected", true);
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(lastOption);
 
             await expectOptionToBeSelected(page, { label: firstOption }, false);
             await expect(page.getByRole("option").first()).toHaveJSProperty("selected", false);
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).not.toBe(firstOption);
           });
 
           // Note: This is the behavior of the native <select> element, even when trying to unselect the 1st option.
@@ -2310,10 +2475,18 @@ it.describe("Combobox Web Component", () => {
             const lastOption = testOptions.at(-1) as string;
             await renderComponent(page, getRandomOption(testOptions.slice(1, -1)));
 
+            const name = "my-combobox";
+            const combobox = page.getByRole("combobox");
+            await associateComboboxWithForm(combobox, name);
+            const form = page.getByRole("form");
+
             // Display Options
-            await page.getByRole("combobox").click();
+            await combobox.click();
             await expectOptionToBeSelected(page, { label: firstOption }, false);
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).not.toBe(firstOption);
+
             await expectOptionToBeSelected(page, { label: lastOption }, false);
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).not.toBe(lastOption);
 
             // Select last `option`, then deselect it
             const lastOptionElement = page.getByRole("option", { name: lastOption });
@@ -2323,9 +2496,11 @@ it.describe("Combobox Web Component", () => {
             // First `option` should now be selected
             await expectOptionToBeSelected(page, { label: firstOption });
             await expect(page.getByRole("option").first()).toHaveJSProperty("selected", true);
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(firstOption);
 
             await expectOptionToBeSelected(page, { label: lastOption }, false);
             await expect(lastOptionElement).toHaveJSProperty("selected", false);
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).not.toBe(lastOption);
 
             // First `option` will still be the default even if someone unselects it
             const firstOptionElement = page.getByRole("option", { name: firstOption });
@@ -2333,6 +2508,7 @@ it.describe("Combobox Web Component", () => {
 
             await expectOptionToBeSelected(page, { label: firstOption }, true);
             await expect(firstOptionElement).toHaveJSProperty("selected", true);
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(firstOption);
           });
         });
 
@@ -2342,31 +2518,44 @@ it.describe("Combobox Web Component", () => {
           it("Initializes the `combobox` value to the last `selected` `option` that was rendered", async ({ page }) => {
             /* ---------- Setup ---------- */
             const localOptions = testOptions.slice(0, 3);
+            const name = "my-combobox";
             await page.goto(url);
-            await page.evaluate((options) => {
-              const app = document.getElementById("app") as HTMLDivElement;
+            await page.evaluate(
+              ([options, fieldName]) => {
+                const app = document.getElementById("app") as HTMLDivElement;
 
-              app.innerHTML = `
-                <select-enhancer>
-                  <select>
-                    <option>${options[0]}</option>
-                    <option selected>${options[1]}</option>
-                    <option selected>${options[2]}</option>
-                  </select>
-                </select-enhancer>
-              `;
-            }, localOptions);
+                app.innerHTML = `
+                  <form aria-label="Test Form">
+                    <select-enhancer>
+                      <select name="${fieldName}">
+                        <option>${options[0]}</option>
+                        <option selected>${options[1]}</option>
+                        <option selected>${options[2]}</option>
+                      </select>
+                    </select-enhancer>
+                  </form>
+                `;
+              },
+              [localOptions, name] as const,
+            );
 
             /* ---------- Assertions ---------- */
             // Display `option`s
             await page.getByRole("combobox").click();
+            const form = page.getByRole("form");
 
             // Only the last `selected` option is marked as chosen
             await expect(page.getByRole("option").nth(-2)).toHaveAttribute("selected");
             await expectOptionToBeSelected(page, { label: localOptions.at(-2) as string }, false);
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).not.toBe(
+              localOptions.at(-2),
+            );
 
             await expect(page.getByRole("option").last()).toHaveAttribute("selected");
             await expectOptionToBeSelected(page, { label: localOptions.at(-1) as string });
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(
+              localOptions.at(-1),
+            );
           });
 
           // NOTE: The native <select> element (somewhat) disables this functionality once it is modified.
@@ -2380,6 +2569,11 @@ it.describe("Combobox Web Component", () => {
             await expectOptionToBeSelected(page, { label: firstOption });
             await expectOptionToBeSelected(page, { label: lastOption }, false);
 
+            const name = "my-combobox";
+            const combobox = page.getByRole("combobox");
+            await associateComboboxWithForm(combobox, name);
+            const form = page.getByRole("form");
+
             /* ---------- Assertions ---------- */
             // Display `option`s
             await page.getByRole("combobox").click();
@@ -2388,49 +2582,67 @@ it.describe("Combobox Web Component", () => {
             const lastOptionElement = page.getByRole("option").last();
             await lastOptionElement.evaluate((node: ComboboxOption) => node.setAttribute("selected", ""));
             await expectOptionToBeSelected(page, { label: firstOption }, false);
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).not.toBe(firstOption);
+
             await expectOptionToBeSelected(page, { label: lastOption });
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(lastOption);
 
             // Making a _selected_ + _defaultSelected_ `option` unselected by default
             await lastOptionElement.evaluate((node: ComboboxOption) => node.removeAttribute("selected"));
             await expectOptionToBeSelected(page, { label: lastOption }, false);
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).not.toBe(lastOption);
+
             await expectOptionToBeSelected(page, { label: firstOption });
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(firstOption);
           });
         });
 
         it.describe("defaultSelected (Property)", () => {
           it("Exposes the underlying `selected` attribute", async ({ page }) => {
             /* ---------- Setup ---------- */
+            const name = "my-combobox";
             await page.goto(url);
-            await page.evaluate((options) => {
-              const app = document.getElementById("app") as HTMLDivElement;
+            await page.evaluate(
+              ([options, fieldName]) => {
+                const app = document.getElementById("app") as HTMLDivElement;
 
-              app.innerHTML = `
-                <select-enhancer>
-                  <select>
-                    ${options.map((o) => `<option selected>${o}<option>`).join("")}
-                  </select>
-                </select-enhancer>
-              `;
-            }, testOptions);
+                app.innerHTML = `
+                  <form aria-label="Test Form">
+                    <select-enhancer>
+                      <select name="${fieldName}">
+                        ${options.map((o) => `<option selected>${o}<option>`).join("")}
+                      </select>
+                    </select-enhancer>
+                  </form>
+                `;
+              },
+              [testOptions, name] as const,
+            );
 
             /* ---------- Assertions ---------- */
             // Display `option`s
             await page.getByRole("combobox").click();
+            const form = page.getByRole("form");
 
             // `property` matches initial `attribute`
-            const option = page.getByRole("option", { name: testOptions.at(-1) as string });
+            const lastOption = testOptions.at(-1) as string;
+            const option = page.getByRole("option", { name: lastOption });
             await expect(option).toHaveJSProperty("defaultSelected", true);
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(lastOption);
 
             // `attribute` responds to `property` updates
             await option.evaluate((node: ComboboxOption) => (node.defaultSelected = false));
             await expect(option).not.toHaveAttribute("selected");
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).not.toBe(lastOption);
 
             await option.evaluate((node: ComboboxOption) => (node.defaultSelected = true));
             await expect(option).toHaveAttribute("selected");
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(lastOption);
 
             // `property` also responds to `attribute` updates
             await option.evaluate((node) => node.removeAttribute("selected"));
             await expect(option).toHaveJSProperty("defaultSelected", false);
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).not.toBe(lastOption);
           });
         });
 
@@ -2627,11 +2839,15 @@ it.describe("Combobox Web Component", () => {
 
           (optionsContainer.content.lastElementChild as HTMLOptionElement).selected = true;
 
-          const selectEnhancer = document.createElement("select-enhancer");
+          const form = document.createElement("form");
+          form.setAttribute("aria-label", "Test Form");
+
+          const selectEnhancer = form.appendChild(document.createElement("select-enhancer"));
           const select = selectEnhancer.appendChild(document.createElement("select"));
           select.replaceChildren(...optionsContainer.content.children);
+          select.setAttribute("name", "my-combobox");
 
-          app.replaceChildren(selectEnhancer);
+          app.replaceChildren(form);
         });
 
         /* ---------- Assertions ---------- */
@@ -2692,6 +2908,12 @@ it.describe("Combobox Web Component", () => {
 
         await expect(selectedOption).toHaveJSProperty("selected", true);
         await expectOptionToBeSelected(page, { label: "Third", value: "3" });
+
+        // The pre-selected `option` is also recognized by the owning `<form>`
+        const form = page.getByRole("form");
+        expect(await form.evaluate((f: HTMLFormElement) => new FormData(f).get("my-combobox"))).toBe(
+          await selectedOption.getAttribute("value"),
+        );
       });
 
       it("Removes unsupported nodes/elements during initialization", async ({ page }) => {

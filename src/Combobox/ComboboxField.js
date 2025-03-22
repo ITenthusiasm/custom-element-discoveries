@@ -34,7 +34,7 @@ class ComboboxField extends HTMLElement {
 
       if (!this.listbox.children.length) {
         this.#value = null;
-        this.#internals.setFormValue("");
+        this.#internals.setFormValue(null);
         this.#label.textContent = "";
         return;
       }
@@ -54,8 +54,8 @@ class ComboboxField extends HTMLElement {
   });
 
   /**
-   * @type {string | null} The Custom Element's internal value. **DO NOT** use directly.
-   * Use the getter and setter instead.
+   * @type {string | null} The Custom Element's internal value. If you are updating the `combobox`'s value to anything
+   * other than `null`, then you should use the {@link value setter} instead.
    *
    * **Note**: A `null` value indicates that the `combobox` value has not yet been initialized (for instance, if
    * the `combobox` was not rendered with any `option`s).
@@ -169,14 +169,15 @@ class ComboboxField extends HTMLElement {
   };
 
   /* ------------------------------ Exposed Form Properties ------------------------------ */
-  /** Sets or retrieves the `value` of the `combobox` @returns {string} */
+  /** Sets or retrieves the `value` of the `combobox` @returns {string | null} */
   get value() {
-    return this.#value ?? "";
+    return this.#value;
   }
 
+  /** @param {string} v */
   set value(v) {
     /*
-     * TODO: Figure out if `getRootNode().getElementById`, or `querySelector()` is faster.
+     * TODO: Figure out if `getRootNode().getElementById`, or `querySelector()` w/ `CSS.escape()` is faster.
      * (We won't be able to do `Array.prototype.find` as neatly/cleanly if we ever support grouped options.)
      */
     const root = /** @type {Document | DocumentFragment | ShadowRoot} */ (this.getRootNode());

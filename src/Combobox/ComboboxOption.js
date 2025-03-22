@@ -15,7 +15,7 @@ class ComboboxOption extends HTMLElement {
    * @param {string | null} newValue
    */
   attributeChangedCallback(name, oldValue, newValue) {
-    if (!this.#mounted) return;
+    if (!this.#mounted) return; // TODO: Can/Should we change this to `if (!this.#combobox)` now? Maybe not?
     if (name === "selected" && (newValue === null) !== (oldValue === null)) return (this.selected = newValue !== null);
     if (name === "value" && newValue !== oldValue) {
       this.id = `${this.#combobox.id}-option-${newValue ?? this.textContent}`;
@@ -81,9 +81,11 @@ class ComboboxOption extends HTMLElement {
   }
 
   set disabled(value) {
+    // TODO: Should we just remove this attribute if the `option` isn't disabled?
     this.setAttribute("aria-disabled", String(Boolean(value)));
   }
 
+  // NOTE: This approach might not work anymore if we want to support grouped `option`s in the future (unlikely)
   /** The position of the option within the list of options that it belongs to. */
   get index() {
     return Array.prototype.indexOf.call(this.#listbox.children, this);
@@ -106,18 +108,9 @@ class ComboboxOption extends HTMLElement {
   #syncWithCombobox() {
     const combobox = this.#combobox;
 
-    /*
-     * TODO: Maybe we should just rip the bandaid off and expose `Combobox.value` as `string | null`.
-     * This would make our life easier because we (and other developers) would know when the Combobox
-     * is not initialized for any reason. When it comes to managing _form data_, devs will probably be
-     * relying on `FormData.get(...)`, not `ComboboxField.value`. So this should be fine.
-     *
-     * Actually... It should be fine to `setFormValue(null)` too, I think. 🤔
-     */
-    if (this.selected && !this.isConnected) combobox.value = this.value;
-    else if (this.selected && combobox.value !== this.value) combobox.value = this.value;
+    if (this.selected && combobox.value !== this.value) combobox.value = this.value;
     else if (!this.selected && combobox.value === this.value) {
-      combobox.value = /** @type {this}  */ (this.#listbox.firstElementChild).value;
+      combobox.value = /** @type {this} */ (this.#listbox.firstElementChild).value;
     }
   }
 }
