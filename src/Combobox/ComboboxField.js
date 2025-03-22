@@ -442,16 +442,16 @@ function watchActiveDescendant(mutations) {
  */
 function handleActiveDescendantChange(mutation) {
   const combobox = /** @type {ComboboxField} */ (mutation.target);
+  const root = /** @type {Document | DocumentFragment | ShadowRoot} */ (combobox.getRootNode());
 
-  // TODO: Replace `getElementById` with `listbox.querySelector` to avoid errors in Shadow DOMs
   // Deactivate Previous Option
   const lastOptionId = mutation.oldValue;
-  const lastOption = lastOptionId ? document.getElementById(lastOptionId) : null;
+  const lastOption = lastOptionId ? root.getElementById(lastOptionId) : null;
   lastOption?.removeAttribute("data-active");
 
   // Activate New Option
   const activeOptionId = /** @type {string} */ (combobox.getAttribute(attrs["aria-activedescendant"]));
-  const activeOption = document.getElementById(activeOptionId);
+  const activeOption = root.getElementById(activeOptionId);
   activeOption?.setAttribute("data-active", String(true));
 
   // If Needed, Scroll to New Active Option
