@@ -1,6 +1,5 @@
 # TODO
 
-- [ ] Verify that the `combobox` is not operable (in Major Browsers) when the `ComboboxField` has the `disabled` attribute.
 - [ ] When do we want to consider a `searchable` Combobox -- if ever? Should it be its own component? Or should the `ComboboxField` simply be configurable?
 - [ ] Do we want to add/support a Caret Icon for the Combobox component?
 - [ ] Add CSS for `select-enhancer > select` (for when JS is disabled/unavailable).

@@ -1360,6 +1360,23 @@ it.describe("Combobox Web Component", () => {
             await combobox.evaluate((node: ComboboxField) => node.removeAttribute("disabled"));
             await expect(combobox).toHaveJSProperty("disabled", false);
           });
+
+          it("Prevents the `combobox` from being interactive", async ({ page }) => {
+            // Setup
+            await renderComponent(page);
+
+            const combobox = page.getByRole("combobox");
+            await combobox.evaluate((node: ComboboxField) => (node.disabled = true));
+            await expect(combobox).toHaveAttribute("disabled", "");
+
+            // Assertions
+            await combobox.click({ force: true });
+            await expectComboboxToBeClosed(page);
+            await expect(combobox).not.toBeFocused();
+
+            await combobox.focus();
+            await expect(combobox).not.toBeFocused();
+          });
         });
 
         it.describe("required (Property)", () => {
