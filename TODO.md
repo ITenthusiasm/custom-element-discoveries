@@ -3,7 +3,6 @@
 - [ ] When do we want to consider a `searchable` Combobox -- if ever? Should it be its own component? Or should the `ComboboxField` simply be configurable?
 - [ ] Do we want to add/support a Caret Icon for the Combobox component?
 - [ ] Add CSS for `select-enhancer > select` (for when JS is disabled/unavailable).
-- [ ] Add the TypeScript ESLint rule that checks for unused `Promise`s so that we don't have jank behavior in our tests.
 - [ ] Make a note about using different kinds of Combobox "Adapters"/"Wrappers".
 - [ ] Make a note that the `value` of `<combobox-option>` (and therefore a `<select>`'s `<option>`) MUST be unique (for accessibility reasons related to `aria-activedescendant` and HTML's disallowing of duplicate `id`s). This shouldn't realistically cause problems for anyone. I don't know if duplicate values have a valid use case anyway. Duplicate values will produce unpredictable behavior.
 - [ ] Add documentation in general about how this component works, what expectations are, and what feature parity is with native `<select>`

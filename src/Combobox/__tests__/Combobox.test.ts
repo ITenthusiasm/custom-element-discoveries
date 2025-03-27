@@ -764,7 +764,7 @@ it.describe("Combobox Web Component", () => {
           await expect(combobox).not.toBeFocused();
           await expect(page.locator("select-enhancer + *")).toBeFocused();
 
-          expectComboboxToBeClosed(page);
+          await expectComboboxToBeClosed(page);
           await expectOptionToBeSelected(page, { label: newValue });
           await expectOptionToBeSelected(page, { label: initialValue }, false);
 
@@ -778,7 +778,7 @@ it.describe("Combobox Web Component", () => {
           await expect(combobox).not.toBeFocused();
           await expect(page.locator(":has(+ select-enhancer)")).toBeFocused();
 
-          expectComboboxToBeClosed(page);
+          await expectComboboxToBeClosed(page);
           await expectOptionToBeSelected(page, { label: secondNewValue });
           await expectOptionToBeSelected(page, { label: newValue }, false);
           await expectOptionToBeSelected(page, { label: initialValue }, false);
@@ -2702,8 +2702,8 @@ it.describe("Combobox Web Component", () => {
 
             // Select last `option`, then deselect it
             const lastOptionElement = page.getByRole("option", { name: lastOption });
-            lastOptionElement.evaluate((node: ComboboxOption) => (node.selected = true));
-            lastOptionElement.evaluate((node: ComboboxOption) => (node.selected = false));
+            await lastOptionElement.evaluate((node: ComboboxOption) => (node.selected = true));
+            await lastOptionElement.evaluate((node: ComboboxOption) => (node.selected = false));
 
             // First `option` should now be selected
             await expectOptionToBeSelected(page, { label: firstOption });

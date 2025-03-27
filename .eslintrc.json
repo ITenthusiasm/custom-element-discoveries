@@ -30,6 +30,7 @@
     "@typescript-eslint/consistent-type-imports": "error",
     "@typescript-eslint/no-unnecessary-condition": "error",
     "@typescript-eslint/strict-boolean-expressions": "off",
+    "@typescript-eslint/no-floating-promises": "error",
 
     // Core Configurations That Conflict with TS
     "no-undef": "off",
