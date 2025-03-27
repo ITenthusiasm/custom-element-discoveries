@@ -2258,6 +2258,145 @@ it.describe("Combobox Web Component", () => {
           );
         });
       });
+
+      it.describe("Miscellaneous form-associated behaviors", () => {
+        it("Resets its value to the default `option` when its owning `form` is reset", async ({ page }) => {
+          /* ---------- Setup ---------- */
+          // Render Component
+          const name = "my-combobox";
+          await page.goto(url);
+          await page.evaluate((fieldName) => {
+            const app = document.getElementById("app") as HTMLDivElement;
+            app.innerHTML = `
+              <form aria-label="Test Form">
+                <button type="reset">Reset</button>
+                <select-enhancer>
+                  <select name="${fieldName}">
+                    <option value="1">One</option>
+                    <option value="2" selected>Two</option>
+                    <option value="3" selected>Three</option>
+                    <option value="4" selected>Four</option>
+                    <option value="5">Five</option>
+                  </select>
+                </select-enhancer>
+              </form>
+            `;
+          }, name);
+
+          // Display Options (for test-writing convenience)
+          const combobox = page.getByRole("combobox");
+          await combobox.click();
+
+          // Verify that the first and last `option`s are not selected or `defaultSelected`
+          const options = page.getByRole("option");
+          await expect(options.first()).toHaveText("One");
+          await expect(options.first()).toHaveAttribute("value", "1");
+          await expect(options.first()).not.toHaveAttribute("selected");
+          await expectOptionToBeSelected(page, { label: "One", value: "1" }, false);
+
+          await expect(options.last()).toHaveText("Five");
+          await expect(options.last()).toHaveAttribute("value", "5");
+          await expect(options.last()).not.toHaveAttribute("selected");
+          await expectOptionToBeSelected(page, { label: "Five", value: "5" }, false);
+
+          const form = page.getByRole("form");
+          const lastDefaultOption = page.locator("[role='option']:nth-last-child(1 of [selected])");
+
+          /* ---------- Assertions ---------- */
+          await it.step("Try with default `option`s", async () => {
+            // Select last `option`
+            await combobox.evaluate((node: ComboboxField) => (node.value = "5"));
+            await expectOptionToBeSelected(page, { label: "Five", value: "5" });
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("5");
+
+            // Reset Form Value via USER INTERACTION (`<button type="reset">`)
+            await page.getByRole("button", { name: "Reset" }).and(page.locator("button[type='reset']")).click();
+            await expectOptionToBeSelected(page, { label: "Four", value: "4" });
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("4");
+            await expect(page.getByText("Four").and(lastDefaultOption)).toBeAttached();
+
+            // Display `option`s again for convenience
+            await combobox.click();
+
+            // Select last `option` again
+            await combobox.evaluate((node: ComboboxField) => (node.value = "5"));
+            await expectOptionToBeSelected(page, { label: "Five", value: "5" });
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("5");
+
+            // Remove `defaultSelected` from `Four / 4`
+            await lastDefaultOption.evaluate((node) => node.removeAttribute("selected"));
+
+            // Reset Form Value MANUALLY (`HTMLFormElement.reset()`)
+            await form.evaluate((f: HTMLFormElement) => f.reset());
+            await expectOptionToBeSelected(page, { label: "Three", value: "3" });
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("3");
+            await expect(page.getByText("Three").and(lastDefaultOption)).toBeAttached();
+
+            // Select last `option` yet again
+            await combobox.evaluate((node: ComboboxField) => (node.value = "5"));
+            await expectOptionToBeSelected(page, { label: "Five", value: "5" });
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("5");
+
+            // Remove `defaultSelected` from `Three / 3`
+            await lastDefaultOption.evaluate((node) => node.removeAttribute("selected"));
+
+            // Reset Form Value
+            await form.evaluate((f: HTMLFormElement) => f.reset());
+            await expectOptionToBeSelected(page, { label: "Two", value: "2" });
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("2");
+            await expect(page.getByText("Two").and(lastDefaultOption)).toBeAttached();
+          });
+
+          await it.step("Try WITHOUT default `option`s", async () => {
+            // Remove the last `defaultOption`
+            await lastDefaultOption.evaluate((node) => node.removeAttribute("selected"));
+            await expect(lastDefaultOption).not.toBeAttached();
+
+            // Choose last `option` for the final time
+            await combobox.evaluate((node: ComboboxField) => (node.value = "5"));
+            await expectOptionToBeSelected(page, { label: "Five", value: "5" });
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("5");
+
+            // Reset Form Value
+            await form.evaluate((f: HTMLFormElement) => f.reset());
+            await expectOptionToBeSelected(page, { label: "One", value: "1" });
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("1");
+          });
+        });
+
+        it("Does nothing when its owning `form` is reset if it has no `option`s", async ({ page }) => {
+          /* ---------- Setup ---------- */
+          const name = "my-combobox";
+          await page.goto(url);
+          await page.evaluate((fieldName) => {
+            const app = document.getElementById("app") as HTMLDivElement;
+            app.innerHTML = `
+              <form aria-label="Test Form">
+                <button type="reset">Reset</button>
+                <select-enhancer>
+                  <select name="${fieldName}"></select>
+                </select-enhancer>
+              </form>
+            `;
+          }, name);
+
+          const form = page.getByRole("form");
+          expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(null);
+
+          /* ---------- Assertions ---------- */
+          // Nothing should break OR change when the `combobox` is reset by its owning `form` without any `option`s
+          let error: Error | undefined;
+          const trackEmittedError = (e: Error) => (error = e);
+          page.once("pageerror", trackEmittedError);
+
+          await form.evaluate((f: HTMLFormElement) => f.reset());
+          await new Promise((resolve) => setTimeout(resolve, 250));
+
+          expect(error).toBe(undefined);
+          page.off("pageerror", trackEmittedError);
+          expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(null);
+        });
+      });
     });
 
     it.describe("Combobox Option (Web Component Part)", () => {

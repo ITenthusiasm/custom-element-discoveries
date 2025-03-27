@@ -279,6 +279,17 @@ class ComboboxField extends HTMLElement {
   reportValidity() {
     return this.#internals.reportValidity();
   }
+
+  /* ------------------------------ Form Control Callbacks ------------------------------ */
+  formResetCallback() {
+    const { listbox } = this;
+    const defaultOption =
+      /** @type {ComboboxOption | null} */ (listbox.querySelector(":nth-last-child(1 of [selected])")) ??
+      /** @type {ComboboxOption | null} */ (listbox.children[0]);
+
+    if (!defaultOption) return;
+    this.value = defaultOption.value;
+  }
 }
 
 /* Future Reference Note: For searchable comboboxes, a `contenteditable` div is probably the way to go. See MDN. */
