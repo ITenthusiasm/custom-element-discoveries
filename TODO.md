@@ -9,6 +9,7 @@
 - [ ] Should our tests assume that our Combobox Component is in a `<form>` by default since the custom element itself is a Form Control?
 - [ ] We should definitely add a test **_proving_** that our component works in Shadow DOMs at some future point.
 - [ ] Consider adding a GitHub CI Action to lint our code.
+- [ ] Unless we're mistaken, Playwright currently has a bug. For some reason, the tests related to `tab`bing are failing for Playwright's `WebKit` browser. However, tabbing works fine manually in Safari. Since it works manually, we can investigate this more later or open a Playwright bug. (It's probably a Playwright bug since we didn't actually change any of our code surrounding focusing/tabbing -- unless this is an Operating System issue.) **_NOTE_**: For right now, the tests still seem to be passing on CI. So this really seems to be a Playwright issue and/or an OS issue (or some other similar, inconspicuous issue).
 
 ## Potential Considerations
 
