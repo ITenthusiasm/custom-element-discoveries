@@ -2396,6 +2396,62 @@ it.describe("Combobox Web Component", () => {
           page.off("pageerror", trackEmittedError);
           expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(null);
         });
+
+        it.skip("Enables browsers to restore its value when needed", async ({ page }) => {
+          /* ---------- Setup ---------- */
+          const name = "my-combobox";
+          await page.goto(url);
+          await page.evaluate(
+            ([options, fieldName]) => {
+              const app = document.getElementById("app") as HTMLDivElement;
+              app.innerHTML = `
+                <form aria-label="Test Form">
+                  <a href="https://example.com">Example Domain</a>
+                  <input name="text" type="text" />
+                  <select-enhancer>
+                    <select name="${fieldName}">
+                      ${options.map((o) => `<option>${o}</option>`).join("")}
+                    </select>
+                  </select-enhancer>
+                </form>
+              `;
+            },
+            [testOptions, name] as const,
+          );
+
+          await expectOptionToBeSelected(page, { label: testOptions[0] });
+
+          /* ---------- Assertions ---------- */
+          // Select an Option
+          await page.getByRole("combobox").click();
+          const comboboxValue = getRandomOption(testOptions.slice(1));
+          await page.getByRole("option", { name: comboboxValue }).click();
+
+          const form = page.getByRole("form");
+          await expectOptionToBeSelected(page, { label: comboboxValue });
+          expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(comboboxValue);
+
+          // Fill in some other field values
+          const textbox = page.getByRole("textbox");
+          const textboxValue = "some-text";
+          await textbox.fill(textboxValue);
+
+          // Navigate to a new page, then go back to previous page
+          await page.getByRole("link", { name: "Example Domain" }).click();
+          await page.waitForURL("https://example.com"); // TODO: Remove when debugging finishes
+          await page.goBack();
+
+          // Form values should have been restored
+          await page.waitForURL(url); // TODO: Remove when debugging finishes
+          await expect(textbox).toHaveValue(textboxValue);
+          await expectOptionToBeSelected(page, { label: comboboxValue });
+          expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(comboboxValue);
+        });
+
+        // TODO: Playwright does not yet support testing autofill: https://github.com/microsoft/playwright/issues/26831.
+        it.skip("Supports browser autofilling", () => {
+          throw new Error("Implement This Test!");
+        });
       });
     });
 

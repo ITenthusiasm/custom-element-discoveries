@@ -290,6 +290,14 @@ class ComboboxField extends HTMLElement {
     if (!defaultOption) return;
     this.value = defaultOption.value;
   }
+
+  /**
+   * @param {string} state
+   * @param {"restore" | "autocomplete"} _mode
+   */
+  formStateRestoreCallback(state, _mode) {
+    this.value = state;
+  }
 }
 
 /* Future Reference Note: For searchable comboboxes, a `contenteditable` div is probably the way to go. See MDN. */

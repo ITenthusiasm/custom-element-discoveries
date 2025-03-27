@@ -1,6 +1,5 @@
 # TODO
 
-- [ ] See if there's a way to get Browser AutoFill working. (See: https://web.dev/articles/more-capable-form-controls#lifecycle_callbacks)
 - [ ] Verify that the `combobox` is not operable (in Major Browsers) when the `ComboboxField` has the `disabled` attribute.
 - [ ] When do we want to consider a `searchable` Combobox -- if ever? Should it be its own component? Or should the `ComboboxField` simply be configurable?
 - [ ] Do we want to add/support a Caret Icon for the Combobox component?

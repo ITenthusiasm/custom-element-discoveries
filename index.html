@@ -9,26 +9,46 @@
   <body>
     <div id="app">
       <form id="my-form">
-        <label for="combobox">Options</label>
-        <select-enhancer>
-          <select id="combobox" name="my-option">
-            <option value="">Select Something</option>
-            <option value="100">1</option>
-            <option>2</option>
-            <option>3</option>
-            <option>4</option>
-            <option>5</option>
-            <option>6</option>
-            <option>7</option>
-            <option>8</option>
-            <option>9</option>
-            <option>10</option>
-          </select>
-        </select-enhancer>
+        <div>
+          <label for="street-address">Street Address</label>
+          <input id="street-address" name="street-address" type="text" autocomplete="street-address" />
+        </div>
+
+        <div>
+          <label for="city">City</label>
+          <input id="city" name="city" type="text" autocomplete="address-level2" />
+        </div>
+
+        <!-- TODO: `autofill` still doesn't seem to be supported for `form-associated` Web Components yet... -->
+        <div>
+          <label for="combobox">State</label>
+          <select-enhancer>
+            <select id="combobox" name="state" autocomplete="address-level1">
+              <option value="">Choose a State</option>
+              <option>TX</option>
+              <option>RI</option>
+              <option>IL</option>
+              <option>FL</option>
+              <option>DC</option>
+              <option>CA</option>
+              <option>AL</option>
+              <option>OH</option>
+              <option>NH</option>
+              <option>CT</option>
+            </select>
+          </select-enhancer>
+        </div>
+
+        <div>
+          <label for="zip">Zip Code</label>
+          <input id="zip" name="zip" type="text" maxlength="5" autocomplete="postal-code" />
+        </div>
 
         <button type="submit">Submit</button>
         <button type="reset">Reset</button>
       </form>
+
+      <a href="https://example.com">Example Domain</a>
 
       <!-- Note: Use this to verify that we aren't accidentally scrolling users during combobox interaction -->
       <!-- This trick will also be needed when we write our Playwright tests. -->
