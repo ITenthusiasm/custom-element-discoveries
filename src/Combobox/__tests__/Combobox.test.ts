@@ -1433,7 +1433,7 @@ it.describe("Combobox Web Component", () => {
 
           it("Marks the `combobox` as `invalid` when the `required` constraint is broken", async ({ page }) => {
             /* ---------- Setup ---------- */
-            const error = "Please fill out this field.";
+            const error = "Please select an item in the list.";
             await page.goto(url);
             await page.evaluate((options) => {
               const app = document.getElementById("app") as HTMLDivElement;
@@ -1913,7 +1913,7 @@ it.describe("Combobox Web Component", () => {
 
             // Error message exists if a constraint is broken
             await combobox.evaluate((node: ComboboxField) => node.setAttribute("required", ""));
-            await expect(combobox).toHaveJSProperty("validationMessage", "Please fill out this field.");
+            await expect(combobox).toHaveJSProperty("validationMessage", "Please select an item in the list.");
           });
         });
 

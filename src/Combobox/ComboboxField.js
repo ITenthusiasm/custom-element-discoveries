@@ -27,17 +27,17 @@ class ComboboxField extends HTMLElement {
   #searchString = "";
   /** @type {number | undefined} */ #searchTimeout;
   /** @readonly */ #expansionObserver = new MutationObserver(watchExpansion);
-  /** @readonly */ #activeOptionObserver = new MutationObserver(watchActiveDescendant);
+  /** @readonly */ #activeDescendantObserver = new MutationObserver(watchActiveDescendant);
   /** @readonly */ #optionNodesObserver = new MutationObserver((mutations) => {
+    if (!this.listbox.children.length) {
+      this.#value = null;
+      this.#internals.setFormValue(null);
+      this.#label.textContent = "";
+      return;
+    }
+
     for (let i = 0; i < mutations.length; i++) {
       const mutation = mutations[i];
-
-      if (!this.listbox.children.length) {
-        this.#value = null;
-        this.#internals.setFormValue(null);
-        this.#label.textContent = "";
-        return;
-      }
 
       // Handle added nodes first. This keeps us from running redundant Deselect Logic if a newly-added node is `selected`.
       mutation.addedNodes.forEach((node, j) => {
@@ -99,7 +99,7 @@ class ComboboxField extends HTMLElement {
     // Setup Mutation Observers
     this.#optionNodesObserver.observe(this.listbox, { childList: true });
     this.#expansionObserver.observe(this, { attributes: true, attributeFilter: [attrs["aria-expanded"]] });
-    this.#activeOptionObserver.observe(this, {
+    this.#activeDescendantObserver.observe(this, {
       attributes: true,
       attributeFilter: [attrs["aria-activedescendant"]],
       attributeOldValue: true,
@@ -116,7 +116,7 @@ class ComboboxField extends HTMLElement {
   disconnectedCallback() {
     this.#optionNodesObserver.disconnect();
     this.#expansionObserver.disconnect();
-    this.#activeOptionObserver.disconnect();
+    this.#activeDescendantObserver.disconnect();
 
     this.removeEventListener("click", handleComboboxClick);
     this.removeEventListener("blur", handleComboboxBlur);
@@ -130,21 +130,22 @@ class ComboboxField extends HTMLElement {
    * @returns {void}
    */
   #handleTypeahead = (event) => {
-    const combobox = /** @type {ComboboxField} */ (event.target);
+    const combobox = /** @type {ComboboxField} */ (event.currentTarget);
     const { listbox } = combobox;
-    const activeOption = listbox.querySelector(":scope [role='option'][data-active='true']");
+    const activeOption = /** @type {ComboboxOption | null} */ (
+      listbox.querySelector(":scope [role='option'][data-active='true']")
+    );
 
     // TODO: Should we allow matching multi-word `option`s by removing empty spaces during a search comparison?
-    // NOTE: The native `<select>` element does not support such functionality.
+    //       (NOTE: The native `<select>` element does not support such functionality.)
     if (event.key.length === 1 && event.key !== " " && !event.altKey && !event.ctrlKey && !event.metaKey) {
       setAttributeFor(combobox, attrs["aria-expanded"], String(true));
       this.#searchString += event.key;
 
       /* -------------------- Determine Next Active `option` -------------------- */
-      /** @type {Element | undefined} */
+      /** @type {ComboboxOption | undefined} */
       let nextActiveOption;
-      // TODO: Change to `ComboboxOption.index` + 1?
-      const start = Array.prototype.indexOf.call(listbox.children, activeOption) + 1;
+      const start = (activeOption?.index ?? -1) + 1;
 
       for (let i = start; i < listbox.children.length + start; i++) {
         const index = i % listbox.children.length;
@@ -157,7 +158,6 @@ class ComboboxField extends HTMLElement {
 
       /* -------------------- Update `search` and Active `option` -------------------- */
       clearTimeout(this.#searchTimeout);
-      // TODO: Maybe do invert the logic? That is, early return for positive case instead of negative case?
       if (!nextActiveOption) {
         this.#searchString = "";
         return;
@@ -229,8 +229,9 @@ class ComboboxField extends HTMLElement {
 
   /** @returns {void} */
   #validateRequiredConstraint() {
+    // NOTE: We don't check for `this.value == null` here because that would only be Developer Error, not User Error
     if (this.required && this.value === "") {
-      return this.#internals.setValidity({ valueMissing: true }, "Please fill out this field.");
+      return this.#internals.setValidity({ valueMissing: true }, "Please select an item in the list.");
     }
 
     this.#internals.setValidity({});
@@ -305,7 +306,7 @@ class ComboboxField extends HTMLElement {
   }
 }
 
-/* Future Reference Note: For searchable comboboxes, a `contenteditable` div is probably the way to go. See MDN. */
+/* TODO / Future Reference Note: For searchable comboboxes, a `contenteditable` div is probably the way to go. See MDN. */
 export default ComboboxField;
 
 /* ------------------------------ Combobox Event Handlers ------------------------------ */
@@ -314,7 +315,7 @@ export default ComboboxField;
  * @returns {void}
  */
 function handleComboboxClick(event) {
-  const combobox = /** @type {ComboboxField} */ (event.target);
+  const combobox = /** @type {ComboboxField} */ (event.currentTarget);
   const expanded = combobox.getAttribute("aria-expanded") === String(true);
   combobox.setAttribute(attrs["aria-expanded"], String(!expanded));
 }
@@ -324,7 +325,7 @@ function handleComboboxClick(event) {
  * @returns {void}
  */
 function handleComboboxBlur(event) {
-  const combobox = /** @type {ComboboxField} */ (event.target);
+  const combobox = /** @type {ComboboxField} */ (event.currentTarget);
   setAttributeFor(combobox, attrs["aria-expanded"], String(false));
 }
 
@@ -333,9 +334,11 @@ function handleComboboxBlur(event) {
  * @returns {void}
  */
 function handleComboboxKeydown(event) {
-  const combobox = /** @type {ComboboxField} */ (event.target);
+  const combobox = /** @type {ComboboxField} */ (event.currentTarget);
   const { listbox } = combobox;
-  const activeOption = /** @type {HTMLElement | null} */ (listbox.querySelector("[data-active='true']"));
+  const activeOption = /** @type {ComboboxOption | null} */ (
+    listbox.querySelector(":scope [role='option'][data-active='true']")
+  );
 
   if (event.altKey && event.key === "ArrowDown") {
     event.preventDefault(); // Don't scroll
