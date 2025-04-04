@@ -430,29 +430,23 @@ function handleComboboxKeydown(event) {
  * @returns {void}
  */
 function watchExpansion(mutations) {
-  mutations.forEach(handleExpansionChange);
-}
+  for (let i = 0; i < mutations.length; i++) {
+    const mutation = mutations[i];
 
-/**
- * @param {MutationRecord} mutation
- * @returns {void}
- */
-function handleExpansionChange(mutation) {
-  const combobox = /** @type {ComboboxField} */ (mutation.target);
-  const { listbox } = combobox;
-  const expanded = combobox.getAttribute(attrs["aria-expanded"]) === String(true);
+    const combobox = /** @type {ComboboxField} */ (mutation.target);
+    const { listbox } = combobox;
+    const expanded = combobox.getAttribute(attrs["aria-expanded"]) === String(true);
 
-  // Open Combobox
-  if (expanded) {
-    if (combobox.getAttribute(attrs["aria-activedescendant"]) !== "") return;
+    // Open Combobox
+    if (expanded) {
+      if (combobox.getAttribute(attrs["aria-activedescendant"]) !== "") return;
 
-    const activeOption =
-      listbox.querySelector("[aria-selected='true']") ?? /** @type {HTMLElement} */ (listbox.firstElementChild);
-    combobox.setAttribute(attrs["aria-activedescendant"], activeOption.id);
-  }
-  // Close Combobox
-  else {
-    combobox.setAttribute(attrs["aria-activedescendant"], "");
+      const activeOption =
+        listbox.querySelector("[aria-selected='true']") ?? /** @type {ComboboxOption} */ (listbox.firstElementChild);
+      combobox.setAttribute(attrs["aria-activedescendant"], activeOption.id);
+    }
+    // Close Combobox
+    else combobox.setAttribute(attrs["aria-activedescendant"], "");
   }
 }
 
@@ -461,50 +455,45 @@ function handleExpansionChange(mutation) {
  * @returns {void}
  */
 function watchActiveDescendant(mutations) {
-  mutations.forEach(handleActiveDescendantChange);
-}
+  for (let i = 0; i < mutations.length; i++) {
+    const mutation = mutations[i];
+    const combobox = /** @type {ComboboxField} */ (mutation.target);
+    const root = /** @type {Document | DocumentFragment | ShadowRoot} */ (combobox.getRootNode());
 
-/**
- * @param {MutationRecord} mutation
- * @returns {void}
- */
-function handleActiveDescendantChange(mutation) {
-  const combobox = /** @type {ComboboxField} */ (mutation.target);
-  const root = /** @type {Document | DocumentFragment | ShadowRoot} */ (combobox.getRootNode());
+    // Deactivate Previous Option
+    const lastOptionId = mutation.oldValue;
+    const lastOption = lastOptionId ? root.getElementById(lastOptionId) : null;
+    lastOption?.removeAttribute("data-active");
 
-  // Deactivate Previous Option
-  const lastOptionId = mutation.oldValue;
-  const lastOption = lastOptionId ? root.getElementById(lastOptionId) : null;
-  lastOption?.removeAttribute("data-active");
+    // Activate New Option
+    const activeOptionId = /** @type {string} */ (combobox.getAttribute(attrs["aria-activedescendant"]));
+    const activeOption = root.getElementById(activeOptionId);
+    activeOption?.setAttribute("data-active", String(true));
 
-  // Activate New Option
-  const activeOptionId = /** @type {string} */ (combobox.getAttribute(attrs["aria-activedescendant"]));
-  const activeOption = root.getElementById(activeOptionId);
-  activeOption?.setAttribute("data-active", String(true));
+    // If Needed, Scroll to New Active Option
+    if (!activeOption) return;
+    const { listbox } = combobox;
+    const bounds = listbox.getBoundingClientRect();
+    const { top, bottom, height } = activeOption.getBoundingClientRect();
 
-  // If Needed, Scroll to New Active Option
-  if (!activeOption) return;
-  const { listbox } = combobox;
-  const bounds = listbox.getBoundingClientRect();
-  const { top, bottom, height } = activeOption.getBoundingClientRect();
+    /**
+     * The offset used to prevent unwanted, rapid scrolling caused by hovering an element at the infinitesimal limit where
+     * the very edge of the `listbox` border intersects the very edge of the `element` outside the scroll container.
+     */
+    const safetyOffset = 0.5;
 
-  /**
-   * The offset used to prevent unwanted, rapid scrolling caused by hovering an element at the infinitesimal limit where
-   * the very edge of the `listbox` border intersects the very edge of the `element` outside the scroll container.
-   */
-  const safetyOffset = 0.5;
-
-  // Align preceding `option` with top of listbox
-  if (top < bounds.top) {
-    if (activeOption === listbox.firstElementChild) listbox.scrollTop = 0;
-    else listbox.scrollTop = activeOption.offsetTop + safetyOffset;
-  }
-  // Align succeeding `option` with bottom of listbox
-  else if (bottom > bounds.bottom) {
-    if (activeOption === listbox.lastElementChild) listbox.scrollTop = listbox.scrollHeight;
-    else {
-      const borderWidth = parseFloat(getComputedStyle(listbox).getPropertyValue("border-width"));
-      listbox.scrollTop = activeOption.offsetTop - (bounds.height - borderWidth * 2) + height - safetyOffset;
+    // Align preceding `option` with top of listbox
+    if (top < bounds.top) {
+      if (activeOption === listbox.firstElementChild) listbox.scrollTop = 0;
+      else listbox.scrollTop = activeOption.offsetTop + safetyOffset;
+    }
+    // Align succeeding `option` with bottom of listbox
+    else if (bottom > bounds.bottom) {
+      if (activeOption === listbox.lastElementChild) listbox.scrollTop = listbox.scrollHeight;
+      else {
+        const borderWidth = parseFloat(getComputedStyle(listbox).getPropertyValue("border-width"));
+        listbox.scrollTop = activeOption.offsetTop - (bounds.height - borderWidth * 2) + height - safetyOffset;
+      }
     }
   }
 }
