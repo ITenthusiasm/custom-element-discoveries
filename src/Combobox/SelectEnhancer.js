@@ -1,6 +1,5 @@
 /** @import ComboboxField from "./ComboboxField.js" */
 import { setAttributeFor } from "../utils/dom.js";
-import ComboboxOption from "./ComboboxOption.js";
 import attrs from "./attrs.js";
 
 class SelectEnhancer extends HTMLElement {
@@ -8,14 +7,8 @@ class SelectEnhancer extends HTMLElement {
   #mounted = false;
 
   // Important Elements
-  /** @readonly @type {ComboboxField} */ #combobox;
-  /** @readonly @type {HTMLElement} */ #listbox;
-
-  constructor() {
-    super();
-    this.#combobox = document.createElement("combobox-field");
-    this.#listbox = document.createElement("div");
-  }
+  /** @readonly */ #combobox = document.createElement("combobox-field");
+  /** @readonly */ #listbox = document.createElement("div");
 
   // "On Mount" for Custom Elements
   connectedCallback() {
@@ -44,9 +37,9 @@ class SelectEnhancer extends HTMLElement {
       if (!this.#combobox.id) this.#combobox.id = Math.random().toString(36).slice(2);
       const comboboxId = this.#combobox.id;
 
-      this.#combobox.setAttribute("aria-controls", `${comboboxId}-listbox`);
-      this.#listbox.setAttribute("id", `${comboboxId}-listbox`);
       this.#listbox.setAttribute("role", "listbox");
+      this.#listbox.setAttribute("id", `${comboboxId}-listbox`);
+      this.#combobox.setAttribute("aria-controls", `${comboboxId}-listbox`);
 
       // Listbox Options
       for (let i = 0; i < select.options.length; i++) {
@@ -88,8 +81,8 @@ class SelectEnhancer extends HTMLElement {
    */
   static #handleDelegatedOptionHover(event) {
     const listbox = /** @type {HTMLElement} */ (event.currentTarget);
-    const option = /** @type {ComboboxOption} */ (event.target);
-    if (option === listbox) return; // We hovered the `listbox`, not an `option`
+    const option = /** @type {HTMLElement} */ (event.target).closest("combobox-option");
+    if (!option) return; // We hovered the `listbox`, not an `option`
 
     const combobox = /** @type {ComboboxField} */ (listbox.previousElementSibling);
     setAttributeFor(combobox, attrs["aria-activedescendant"], option.id);
@@ -101,8 +94,8 @@ class SelectEnhancer extends HTMLElement {
    */
   static #handleDelegatedOptionClick(event) {
     const listbox = /** @type {HTMLElement} */ (event.currentTarget);
-    const option = /** @type {ComboboxOption} */ (event.target);
-    if (option === listbox) return; // We clicked the `listbox`, not an `option`
+    const option = /** @type {HTMLElement} */ (event.target).closest("combobox-option");
+    if (!option) return; // We clicked the `listbox`, not an `option`
     if (option.disabled) return;
 
     const combobox = /** @type {ComboboxField} */ (listbox.previousElementSibling);
@@ -120,7 +113,7 @@ class SelectEnhancer extends HTMLElement {
    * @returns {void}
    */
   static #handleDelegatedMousedown(event) {
-    if (event.target instanceof ComboboxOption) return event.preventDefault();
+    if (/** @type {HTMLElement} */ (event.target).closest("combobox-option")) return event.preventDefault();
   }
 }
 
