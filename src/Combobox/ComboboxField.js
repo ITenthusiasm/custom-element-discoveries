@@ -26,8 +26,8 @@ class ComboboxField extends HTMLElement {
 
   #searchString = "";
   /** @type {number | undefined} */ #searchTimeout;
-  /** @readonly */ #expansionObserver = new MutationObserver(watchExpansion);
-  /** @readonly */ #activeDescendantObserver = new MutationObserver(watchActiveDescendant);
+  /** @readonly */ #expansionObserver = new MutationObserver(ComboboxField.#watchExpansion);
+  /** @readonly */ #activeDescendantObserver = new MutationObserver(ComboboxField.#watchActiveDescendant);
   /** @readonly */ #optionNodesObserver = new MutationObserver((mutations) => {
     if (!this.listbox.children.length) {
       this.#value = null;
@@ -106,10 +106,10 @@ class ComboboxField extends HTMLElement {
     });
 
     // Setup Event Listeners
-    this.addEventListener("click", handleComboboxClick, { passive: true });
-    this.addEventListener("blur", handleComboboxBlur, { passive: true });
+    this.addEventListener("click", ComboboxField.#handleComboboxClick, { passive: true });
+    this.addEventListener("blur", ComboboxField.#handleComboboxBlur, { passive: true });
     this.addEventListener("keydown", this.#handleTypeahead, { passive: true });
-    this.addEventListener("keydown", handleComboboxKeydown);
+    this.addEventListener("keydown", ComboboxField.#handleComboboxKeydown);
   }
 
   // "On Unmount" for Custom Elements
@@ -118,10 +118,10 @@ class ComboboxField extends HTMLElement {
     this.#expansionObserver.disconnect();
     this.#activeDescendantObserver.disconnect();
 
-    this.removeEventListener("click", handleComboboxClick);
-    this.removeEventListener("blur", handleComboboxBlur);
+    this.removeEventListener("click", ComboboxField.#handleComboboxClick);
+    this.removeEventListener("blur", ComboboxField.#handleComboboxBlur);
     this.removeEventListener("keydown", this.#handleTypeahead);
-    this.removeEventListener("keydown", handleComboboxKeydown);
+    this.removeEventListener("keydown", ComboboxField.#handleComboboxKeydown);
   }
 
   /**
@@ -304,196 +304,196 @@ class ComboboxField extends HTMLElement {
   formDisabledCallback(disabled) {
     if (disabled) setAttributeFor(this, attrs["aria-expanded"], String(false));
   }
-}
 
-/* TODO / Future Reference Note: For searchable comboboxes, a `contenteditable` div is probably the way to go. See MDN. */
-export default ComboboxField;
-
-/* ------------------------------ Combobox Event Handlers ------------------------------ */
-/**
- * @param {MouseEvent} event
- * @returns {void}
- */
-function handleComboboxClick(event) {
-  const combobox = /** @type {ComboboxField} */ (event.currentTarget);
-  const expanded = combobox.getAttribute("aria-expanded") === String(true);
-  combobox.setAttribute(attrs["aria-expanded"], String(!expanded));
-}
-
-/**
- * @param {FocusEvent} event
- * @returns {void}
- */
-function handleComboboxBlur(event) {
-  const combobox = /** @type {ComboboxField} */ (event.currentTarget);
-  setAttributeFor(combobox, attrs["aria-expanded"], String(false));
-}
-
-/**
- * @param {KeyboardEvent} event
- * @returns {void}
- */
-function handleComboboxKeydown(event) {
-  const combobox = /** @type {ComboboxField} */ (event.currentTarget);
-  const { listbox } = combobox;
-  const activeOption = /** @type {ComboboxOption | null} */ (
-    listbox.querySelector(":scope [role='option'][data-active='true']")
-  );
-
-  if (event.altKey && event.key === "ArrowDown") {
-    event.preventDefault(); // Don't scroll
-    return setAttributeFor(combobox, attrs["aria-expanded"], String(true));
+  /* ------------------------------ Combobox Event Handlers ------------------------------ */
+  /**
+   * @param {MouseEvent} event
+   * @returns {void}
+   */
+  static #handleComboboxClick(event) {
+    const combobox = /** @type {ComboboxField} */ (event.currentTarget);
+    const expanded = combobox.getAttribute("aria-expanded") === String(true);
+    combobox.setAttribute(attrs["aria-expanded"], String(!expanded));
   }
 
-  if (event.key === "ArrowDown") {
-    event.preventDefault(); // Don't scroll
-    if (combobox.getAttribute(attrs["aria-expanded"]) !== String(true)) {
+  /**
+   * @param {FocusEvent} event
+   * @returns {void}
+   */
+  static #handleComboboxBlur(event) {
+    const combobox = /** @type {ComboboxField} */ (event.currentTarget);
+    setAttributeFor(combobox, attrs["aria-expanded"], String(false));
+  }
+
+  /**
+   * @param {KeyboardEvent} event
+   * @returns {void}
+   */
+  static #handleComboboxKeydown(event) {
+    const combobox = /** @type {ComboboxField} */ (event.currentTarget);
+    const { listbox } = combobox;
+    const activeOption = /** @type {ComboboxOption | null} */ (
+      listbox.querySelector(":scope [role='option'][data-active='true']")
+    );
+
+    if (event.altKey && event.key === "ArrowDown") {
+      event.preventDefault(); // Don't scroll
+      return setAttributeFor(combobox, attrs["aria-expanded"], String(true));
+    }
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault(); // Don't scroll
+      if (combobox.getAttribute(attrs["aria-expanded"]) !== String(true)) {
+        return combobox.setAttribute(attrs["aria-expanded"], String(true));
+      }
+
+      const nextActiveOption = activeOption?.nextElementSibling;
+      if (nextActiveOption) combobox.setAttribute(attrs["aria-activedescendant"], nextActiveOption.id);
+      return;
+    }
+
+    if (event.key === "End") {
+      event.preventDefault(); // Don't scroll
+      setAttributeFor(combobox, attrs["aria-expanded"], String(true));
+      setAttributeFor(combobox, attrs["aria-activedescendant"], /** @type {string} */ (listbox.lastElementChild?.id));
+      return;
+    }
+
+    if (event.key === "Escape") {
+      if (combobox.getAttribute(attrs["aria-expanded"]) !== String(true)) return;
+
+      event.preventDefault(); // Avoid unexpected side-effects like closing `dialog`s
+      return combobox.setAttribute(attrs["aria-expanded"], String(false));
+    }
+
+    if (event.altKey && event.key === "ArrowUp") {
+      event.preventDefault(); // Don't scroll
+      return setAttributeFor(combobox, attrs["aria-expanded"], String(false));
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault(); // Don't scroll
+      if (combobox.getAttribute(attrs["aria-expanded"]) !== String(true)) {
+        return combobox.setAttribute(attrs["aria-expanded"], String(true));
+      }
+
+      const nextActiveOption = activeOption?.previousElementSibling;
+      if (nextActiveOption) combobox.setAttribute(attrs["aria-activedescendant"], nextActiveOption.id);
+      return;
+    }
+
+    if (event.key === "Home") {
+      event.preventDefault(); // Don't scroll
+      setAttributeFor(combobox, attrs["aria-expanded"], String(true));
+      setAttributeFor(combobox, attrs["aria-activedescendant"], /** @type {string} */ (listbox.firstElementChild?.id));
+      return;
+    }
+
+    if (event.key === " ") {
+      event.preventDefault(); // Don't scroll
+      if (combobox.getAttribute(attrs["aria-expanded"]) === String(true)) return activeOption?.click();
       return combobox.setAttribute(attrs["aria-expanded"], String(true));
     }
 
-    const nextActiveOption = activeOption?.nextElementSibling;
-    if (nextActiveOption) combobox.setAttribute(attrs["aria-activedescendant"], nextActiveOption.id);
-    return;
-  }
-
-  if (event.key === "End") {
-    event.preventDefault(); // Don't scroll
-    setAttributeFor(combobox, attrs["aria-expanded"], String(true));
-    setAttributeFor(combobox, attrs["aria-activedescendant"], /** @type {string} */ (listbox.lastElementChild?.id));
-    return;
-  }
-
-  if (event.key === "Escape") {
-    if (combobox.getAttribute(attrs["aria-expanded"]) !== String(true)) return;
-
-    event.preventDefault(); // Avoid unexpected side-effects like closing `dialog`s
-    return combobox.setAttribute(attrs["aria-expanded"], String(false));
-  }
-
-  if (event.altKey && event.key === "ArrowUp") {
-    event.preventDefault(); // Don't scroll
-    return setAttributeFor(combobox, attrs["aria-expanded"], String(false));
-  }
-
-  if (event.key === "ArrowUp") {
-    event.preventDefault(); // Don't scroll
-    if (combobox.getAttribute(attrs["aria-expanded"]) !== String(true)) {
-      return combobox.setAttribute(attrs["aria-expanded"], String(true));
+    if (event.key === "Tab") {
+      if (combobox.getAttribute(attrs["aria-expanded"]) === String(true)) return activeOption?.click();
+      return;
     }
 
-    const nextActiveOption = activeOption?.previousElementSibling;
-    if (nextActiveOption) combobox.setAttribute(attrs["aria-activedescendant"], nextActiveOption.id);
-    return;
-  }
+    if (event.key === "Enter") {
+      // Select a Value (if the element is expanded)
+      if (combobox.getAttribute(attrs["aria-expanded"]) === String(true)) return activeOption?.click();
 
-  if (event.key === "Home") {
-    event.preventDefault(); // Don't scroll
-    setAttributeFor(combobox, attrs["aria-expanded"], String(true));
-    setAttributeFor(combobox, attrs["aria-activedescendant"], /** @type {string} */ (listbox.firstElementChild?.id));
-    return;
-  }
+      // Submit the Form (if the element is collapsed)
+      const { form } = combobox;
+      if (!form) return;
 
-  if (event.key === " ") {
-    event.preventDefault(); // Don't scroll
-    if (combobox.getAttribute(attrs["aria-expanded"]) === String(true)) return activeOption?.click();
-    return combobox.setAttribute(attrs["aria-expanded"], String(true));
-  }
+      // See: https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#implicit-submission
+      /** @type {HTMLButtonElement | HTMLInputElement | null} */
+      const submitter = Array.prototype.find.call(form.elements, (control) => {
+        if (!(control instanceof HTMLInputElement) && !(control instanceof HTMLButtonElement)) return false;
+        return control.type === "submit";
+      });
 
-  if (event.key === "Tab") {
-    if (combobox.getAttribute(attrs["aria-expanded"]) === String(true)) return activeOption?.click();
-    return;
-  }
-
-  if (event.key === "Enter") {
-    // Select a Value (if the element is expanded)
-    if (combobox.getAttribute(attrs["aria-expanded"]) === String(true)) return activeOption?.click();
-
-    // Submit the Form (if the element is collapsed)
-    const { form } = combobox;
-    if (!form) return;
-
-    // See: https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#implicit-submission
-    /** @type {HTMLButtonElement | HTMLInputElement | null} */
-    const submitter = Array.prototype.find.call(form.elements, (control) => {
-      if (!(control instanceof HTMLInputElement) && !(control instanceof HTMLButtonElement)) return false;
-      return control.type === "submit";
-    });
-
-    if (submitter) return submitter.disabled ? undefined : submitter.click();
-    return form.requestSubmit();
-  }
-}
-
-/* ------------------------------ Combobox Mutation Observer Details ------------------------------ */
-/**
- * @param {MutationRecord[]} mutations
- * @returns {void}
- */
-function watchExpansion(mutations) {
-  for (let i = 0; i < mutations.length; i++) {
-    const mutation = mutations[i];
-
-    const combobox = /** @type {ComboboxField} */ (mutation.target);
-    const { listbox } = combobox;
-    const expanded = combobox.getAttribute(attrs["aria-expanded"]) === String(true);
-
-    // Open Combobox
-    if (expanded) {
-      if (combobox.getAttribute(attrs["aria-activedescendant"]) !== "") return;
-
-      const activeOption =
-        listbox.querySelector("[aria-selected='true']") ?? /** @type {ComboboxOption} */ (listbox.firstElementChild);
-      combobox.setAttribute(attrs["aria-activedescendant"], activeOption.id);
+      if (submitter) return submitter.disabled ? undefined : submitter.click();
+      return form.requestSubmit();
     }
-    // Close Combobox
-    else combobox.setAttribute(attrs["aria-activedescendant"], "");
   }
-}
 
-/**
- * @param {MutationRecord[]} mutations
- * @returns {void}
- */
-function watchActiveDescendant(mutations) {
-  for (let i = 0; i < mutations.length; i++) {
-    const mutation = mutations[i];
-    const combobox = /** @type {ComboboxField} */ (mutation.target);
-    const root = /** @type {Document | DocumentFragment | ShadowRoot} */ (combobox.getRootNode());
+  /* ------------------------------ Combobox Mutation Observer Details ------------------------------ */
+  /**
+   * @param {MutationRecord[]} mutations
+   * @returns {void}
+   */
+  static #watchExpansion(mutations) {
+    for (let i = 0; i < mutations.length; i++) {
+      const mutation = mutations[i];
 
-    // Deactivate Previous Option
-    const lastOptionId = mutation.oldValue;
-    const lastOption = lastOptionId ? root.getElementById(lastOptionId) : null;
-    lastOption?.removeAttribute("data-active");
+      const combobox = /** @type {ComboboxField} */ (mutation.target);
+      const { listbox } = combobox;
+      const expanded = combobox.getAttribute(attrs["aria-expanded"]) === String(true);
 
-    // Activate New Option
-    const activeOptionId = /** @type {string} */ (combobox.getAttribute(attrs["aria-activedescendant"]));
-    const activeOption = root.getElementById(activeOptionId);
-    activeOption?.setAttribute("data-active", String(true));
+      // Open Combobox
+      if (expanded) {
+        if (combobox.getAttribute(attrs["aria-activedescendant"]) !== "") return;
 
-    // If Needed, Scroll to New Active Option
-    if (!activeOption) return;
-    const { listbox } = combobox;
-    const bounds = listbox.getBoundingClientRect();
-    const { top, bottom, height } = activeOption.getBoundingClientRect();
-
-    /**
-     * The offset used to prevent unwanted, rapid scrolling caused by hovering an element at the infinitesimal limit where
-     * the very edge of the `listbox` border intersects the very edge of the `element` outside the scroll container.
-     */
-    const safetyOffset = 0.5;
-
-    // Align preceding `option` with top of listbox
-    if (top < bounds.top) {
-      if (activeOption === listbox.firstElementChild) listbox.scrollTop = 0;
-      else listbox.scrollTop = activeOption.offsetTop + safetyOffset;
+        const activeOption =
+          listbox.querySelector("[aria-selected='true']") ?? /** @type {ComboboxOption} */ (listbox.firstElementChild);
+        combobox.setAttribute(attrs["aria-activedescendant"], activeOption.id);
+      }
+      // Close Combobox
+      else combobox.setAttribute(attrs["aria-activedescendant"], "");
     }
-    // Align succeeding `option` with bottom of listbox
-    else if (bottom > bounds.bottom) {
-      if (activeOption === listbox.lastElementChild) listbox.scrollTop = listbox.scrollHeight;
-      else {
-        const borderWidth = parseFloat(getComputedStyle(listbox).getPropertyValue("border-width"));
-        listbox.scrollTop = activeOption.offsetTop - (bounds.height - borderWidth * 2) + height - safetyOffset;
+  }
+
+  /**
+   * @param {MutationRecord[]} mutations
+   * @returns {void}
+   */
+  static #watchActiveDescendant(mutations) {
+    for (let i = 0; i < mutations.length; i++) {
+      const mutation = mutations[i];
+      const combobox = /** @type {ComboboxField} */ (mutation.target);
+      const root = /** @type {Document | DocumentFragment | ShadowRoot} */ (combobox.getRootNode());
+
+      // Deactivate Previous Option
+      const lastOptionId = mutation.oldValue;
+      const lastOption = lastOptionId ? root.getElementById(lastOptionId) : null;
+      lastOption?.removeAttribute("data-active");
+
+      // Activate New Option
+      const activeOptionId = /** @type {string} */ (combobox.getAttribute(attrs["aria-activedescendant"]));
+      const activeOption = root.getElementById(activeOptionId);
+      activeOption?.setAttribute("data-active", String(true));
+
+      // If Needed, Scroll to New Active Option
+      if (!activeOption) return;
+      const { listbox } = combobox;
+      const bounds = listbox.getBoundingClientRect();
+      const { top, bottom, height } = activeOption.getBoundingClientRect();
+
+      /**
+       * The offset used to prevent unwanted, rapid scrolling caused by hovering an element at the infinitesimal limit where
+       * the very edge of the `listbox` border intersects the very edge of the `element` outside the scroll container.
+       */
+      const safetyOffset = 0.5;
+
+      // Align preceding `option` with top of listbox
+      if (top < bounds.top) {
+        if (activeOption === listbox.firstElementChild) listbox.scrollTop = 0;
+        else listbox.scrollTop = activeOption.offsetTop + safetyOffset;
+      }
+      // Align succeeding `option` with bottom of listbox
+      else if (bottom > bounds.bottom) {
+        if (activeOption === listbox.lastElementChild) listbox.scrollTop = listbox.scrollHeight;
+        else {
+          const borderWidth = parseFloat(getComputedStyle(listbox).getPropertyValue("border-width"));
+          listbox.scrollTop = activeOption.offsetTop - (bounds.height - borderWidth * 2) + height - safetyOffset;
+        }
       }
     }
   }
 }
+
+/* TODO / Future Reference Note: For searchable comboboxes, a `contenteditable` div is probably the way to go. See MDN. */
+export default ComboboxField;
