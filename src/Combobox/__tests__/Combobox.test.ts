@@ -2888,7 +2888,7 @@ it.describe("Combobox Web Component", () => {
               app.innerHTML = `
                 <select-enhancer>
                   <select>
-                    <option disabled="true">${o}</option>
+                    <option disabled>${o}</option>
                   </select>
                 </select-enhancer>
               `;
@@ -2904,13 +2904,13 @@ it.describe("Combobox Web Component", () => {
 
             // `attribute` responds to `property` updates
             await optionElement.evaluate((node: ComboboxOption) => (node.disabled = false));
-            await expect(optionElement).toHaveAttribute("aria-disabled", String(false));
+            await expect(optionElement).not.toHaveAttribute("aria-disabled");
 
             await optionElement.evaluate((node: ComboboxOption) => (node.disabled = true));
             await expect(optionElement).toHaveAttribute("aria-disabled", String(true));
 
             // `property` also responds to `attribute` updates
-            await optionElement.evaluate((node) => node.setAttribute("aria-disabled", String(false)));
+            await optionElement.evaluate((node) => node.removeAttribute("aria-disabled"));
             await expect(optionElement).toHaveJSProperty("disabled", false);
           });
 

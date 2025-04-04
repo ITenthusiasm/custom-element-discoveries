@@ -15,7 +15,7 @@ class ComboboxOption extends HTMLElement {
    * @param {string | null} newValue
    */
   attributeChangedCallback(name, oldValue, newValue) {
-    if (!this.#mounted) return; // TODO: Can/Should we change this to `if (!this.#combobox)` now? Maybe not?
+    if (!this.#mounted) return;
     if (name === "selected" && (newValue === null) !== (oldValue === null)) return (this.selected = newValue !== null);
     if (name === "value" && newValue !== oldValue) {
       this.id = `${this.#combobox.id}-option-${newValue ?? this.textContent}`;
@@ -23,7 +23,6 @@ class ComboboxOption extends HTMLElement {
     }
   }
 
-  // TODO: Do we want to use `ElementInternals` for ARIA? Would Playwright/Testing Library be able to detect that?
   // "On Mount" for Custom Elements
   connectedCallback() {
     if (!this.isConnected) return;
@@ -81,8 +80,8 @@ class ComboboxOption extends HTMLElement {
   }
 
   set disabled(value) {
-    // TODO: Should we just remove this attribute if the `option` isn't disabled?
-    this.setAttribute("aria-disabled", String(Boolean(value)));
+    if (value) this.setAttribute("aria-disabled", String(true));
+    else this.removeAttribute("aria-disabled");
   }
 
   // NOTE: This approach might not work anymore if we want to support grouped `option`s in the future (unlikely)
@@ -100,7 +99,7 @@ class ComboboxOption extends HTMLElement {
     return /** @type {HTMLElement} */ (this.closest("[role='listbox']"));
   }
 
-  /** Retrives `combobox` that this `option` belongs to @returns {ComboboxField} */
+  /** Retrives the `combobox` that this `option` belongs to @returns {ComboboxField} */
   get #combobox() {
     return /** @type {ComboboxField} */ (this.#listbox.previousElementSibling);
   }
