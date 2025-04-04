@@ -1377,6 +1377,25 @@ it.describe("Combobox Web Component", () => {
             await combobox.focus();
             await expect(combobox).not.toBeFocused();
           });
+
+          // NOTE: This is the behavior of the regular `<select>` element, and it makes practical sense
+          it("Closes the `combobox` when turned on", async ({ page }) => {
+            /* ---------- Setup ---------- */
+            await renderComponent(page);
+
+            const combobox = page.getByRole("combobox");
+            await combobox.click();
+            await expectOptionsToBeVisible(page);
+
+            /* ---------- Assertions ---------- */
+            // Disabling the `combobox` closes it
+            await combobox.evaluate((node: ComboboxField) => (node.disabled = true));
+            await expectComboboxToBeClosed(page);
+
+            // Re-enabling the `combobox` does not automatically display the `option`s
+            await combobox.evaluate((node: ComboboxField) => (node.disabled = false));
+            await expectComboboxToBeClosed(page);
+          });
         });
 
         it.describe("required (Property)", () => {

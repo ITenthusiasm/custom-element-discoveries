@@ -298,6 +298,11 @@ class ComboboxField extends HTMLElement {
   formStateRestoreCallback(state, _mode) {
     this.value = state;
   }
+
+  /** @param {boolean} disabled */
+  formDisabledCallback(disabled) {
+    if (disabled) setAttributeFor(this, attrs["aria-expanded"], String(false));
+  }
 }
 
 /* Future Reference Note: For searchable comboboxes, a `contenteditable` div is probably the way to go. See MDN. */
