@@ -30,6 +30,10 @@ select-enhancer {
     color: currentcolor;
     background-color: white;
 
+    &[filter] {
+      cursor: auto;
+    }
+
     &:focus {
       border-color: dodgerblue;
     }
@@ -71,6 +75,15 @@ select-enhancer {
         &[aria-selected="true"] {
           color: white;
           background-color: #2684ff;
+        }
+
+        &[data-filtered-out="true"] {
+          display: none;
+        }
+
+        /* TODO: Add _full_ `disabled` styles. Should those match `inert` as well, or no? Maybe not? */
+        &:is([inert], [aria-disabled="true"]) {
+          cursor: auto;
         }
       }
     }

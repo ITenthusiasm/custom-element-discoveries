@@ -9,3 +9,9 @@ declare global {
     "combobox-option": ComboboxOption;
   }
 }
+
+export interface HTMLElementWithChildren<T extends HTMLElement> extends HTMLElement {
+  children: HTMLCollectionOf<T>;
+  firstElementChild: T | null;
+  lastElementChild: T | null;
+}
