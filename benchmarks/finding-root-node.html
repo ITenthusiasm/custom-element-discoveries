@@ -1,0 +1,98 @@
+<!doctype html>
+<html>
+  <head></head>
+  <body>
+    <button id="run-benchmark" type="button">Run Root-Finding Benchmark</button>
+    <div id="light-dom"></div>
+    <div id="shadow-dom"></div>
+
+    <!-- Environment Setup -->
+    <script>
+      const lightContainer = document.getElementById("light-dom");
+      const shadowContainer = document.getElementById("shadow-dom");
+      shadowContainer.attachShadow({ mode: "open" });
+      const elementCount = 5_000;
+
+      /** @type {ReturnType<typeof createRandomElement>} */ let deepestLightElement;
+      /** @type {typeof deepestLightElement} */ let deepestShadowElement;
+
+      function runSetup() {
+        lightContainer.replaceChildren();
+        shadowContainer.shadowRoot.replaceChildren();
+
+        const lightFragment = document.createDocumentFragment();
+        deepestLightElement = lightFragment.appendChild(createRandomElement());
+
+        const shadowFragment = document.createDocumentFragment();
+        deepestShadowElement = shadowFragment.appendChild(deepestLightElement.cloneNode(true));
+
+        for (let i = 0; i < elementCount; i++) {
+          deepestLightElement = deepestLightElement.appendChild(createRandomElement());
+          deepestShadowElement = deepestShadowElement.appendChild(deepestLightElement.cloneNode(true));
+        }
+
+        lightContainer.replaceChildren(lightFragment);
+        shadowContainer.shadowRoot.replaceChildren(shadowFragment);
+      }
+
+      function createRandomElement() {
+        const tags = /** @type {const} */ (["div", "span", "p", "section", "article"]);
+        const element = document.createElement(tags[Math.floor(Math.random() * tags.length)]);
+        element.textContent = crypto.randomUUID();
+        return element;
+      }
+    </script>
+
+    <!-- Test Functions -->
+    <script>
+      /** @param {HTMLElement} element */
+      function findRootFor(element) {
+        let root = element;
+        while (!(root instanceof Document) && !(root instanceof ShadowRoot) && root) root = root.parentNode;
+        return root;
+      }
+    </script>
+
+    <!-- Performance Testing -->
+    <script>
+      /** @type {HTMLButtonElement} */
+      const button = document.querySelector("button#run-benchmark");
+
+      button.addEventListener("click", (event) => {
+        button.disabled = true;
+        performance.clearMarks();
+        performance.clearMeasures();
+        performance.clearResourceTimings();
+        runSetup();
+
+        console.log("Preparing to Run Perf Tests...");
+        const runs = 1000;
+
+        // Run performance tests AFTER the browser has had enough time to render everything
+        setTimeout(() => {
+          let start = performance.now();
+          for (let i = 0; i < runs; i++) findRootFor(deepestLightElement);
+          const lightLoopDuration = performance.now() - start;
+
+          start = performance.now();
+          for (let i = 0; i < runs; i++) deepestLightElement.getRootNode();
+          const lightGetterDuration = performance.now() - start;
+
+          start = performance.now();
+          for (let i = 0; i < runs; i++) findRootFor(deepestShadowElement);
+          const shadowLoopDuration = performance.now() - start;
+
+          start = performance.now();
+          for (let i = 0; i < runs; i++) deepestShadowElement.getRootNode();
+          const shadowGetterDuration = performance.now() - start;
+
+          console.log("Light DOM Loop Duration: ", lightLoopDuration);
+          console.log("Light DOM `getRootNode()` Duration: ", lightGetterDuration);
+          console.log("Shadow DOM Loop Duration: ", shadowLoopDuration);
+          console.log("Shadow DOM `getRootNode()` Duration: ", shadowGetterDuration);
+          button.disabled = false;
+        }, 5000);
+      });
+    </script>
+  </body>
+</html>

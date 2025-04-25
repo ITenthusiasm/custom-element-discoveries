@@ -1,0 +1,153 @@
+<!doctype html>
+<html>
+  <head></head>
+  <body>
+    <button id="run-benchmark" type="button">Run Benchmark</button>
+    <div id="container-with-target" role="listbox"></div>
+    <div id="container-no-target" role="listbox"></div>
+
+    <!-- Environment Setup -->
+    <script>
+      const containerWithTarget = document.getElementById("container-with-target");
+      const containerNoTarget = document.getElementById("container-no-target");
+
+      const elementCount = 100_000;
+      const tags = /** @type {const} */ (["div", "span", "p", "section", "article"]);
+
+      /** @type {number} */
+      let activeIndex;
+      const activeElementId = "active-element";
+
+      function runSetup() {
+        containerWithTarget.replaceChildren();
+        containerNoTarget.replaceChildren();
+        const fragmentWithTarget = document.createDocumentFragment();
+        const fragmentNoTarget = document.createDocumentFragment();
+
+        // activeIndex = Math.floor(Math.random() * elementCount);
+        activeIndex = 0.7 * elementCount;
+        console.log("Active Index: ", activeIndex);
+
+        for (let i = 0; i < elementCount; i++) {
+          const element = document.createElement(tags[Math.floor(Math.random() * tags.length)]);
+          element.textContent = crypto.randomUUID();
+          element.role = "option";
+
+          element.setAttribute("aria-selected", String(i === activeIndex));
+          element.id = i === activeIndex ? activeElementId : crypto.randomUUID();
+          if (i === activeIndex) element.setAttribute("data-active", String(true));
+
+          const clonedNode = element.cloneNode(true);
+          clonedNode.removeAttribute("id");
+
+          fragmentWithTarget.appendChild(element);
+          fragmentNoTarget.appendChild(clonedNode);
+        }
+
+        containerWithTarget.replaceChildren(fragmentWithTarget);
+        containerNoTarget.replaceChildren(fragmentNoTarget);
+      }
+    </script>
+
+    <!-- Test Functions -->
+    <script>
+      function findWithChildrenLoop() {
+        const children = containerWithTarget.children;
+        for (let i = 0; i < children.length; i++) {
+          const child = children[i];
+          if (child.hasAttribute("data-active")) return child;
+        }
+      }
+
+      function findWithNodeTraversalLoop() {
+        let child = containerWithTarget.firstElementChild;
+        while (!child.hasAttribute("data-active")) child = child.nextElementSibling;
+        return child;
+      }
+
+      function findWithLocalQuery() {
+        return containerWithTarget.querySelector(":scope [data-active]");
+      }
+
+      function findWithDocumentQuery() {
+        return document.querySelector("[data-active]");
+      }
+
+      function findWithLocalQueryAll() {
+        return containerWithTarget.querySelectorAll(":scope [data-active]");
+      }
+
+      function findWithDocumentQueryAll() {
+        return document.querySelectorAll("[data-active]");
+      }
+
+      function findById() {
+        return document.getElementById(activeElementId);
+      }
+    </script>
+
+    <!-- Performance Testing -->
+    <script>
+      /** @type {HTMLButtonElement} */
+      const button = document.querySelector("button#run-benchmark");
+
+      button.addEventListener("click", (event) => {
+        button.disabled = true;
+        performance.clearMarks();
+        performance.clearMeasures();
+        performance.clearResourceTimings();
+        runSetup();
+
+        console.log("Preparing to Run Perf Tests...");
+        const runs = 1_000;
+
+        // Run performance tests AFTER the browser has had enough time to render everything
+        setTimeout(() => {
+          let start = performance.now();
+          for (let i = 0; i < runs; i++) findById();
+          const idDuration = performance.now() - start;
+
+          start = performance.now();
+          for (let i = 0; i < runs; i++) findWithLocalQuery();
+          const localQueryDuration = performance.now() - start;
+
+          start = performance.now();
+          for (let i = 0; i < runs; i++) findWithLocalQueryAll();
+          const localQueryAllDuration = performance.now() - start;
+
+          start = performance.now();
+          for (let i = 0; i < runs; i++) findWithChildrenLoop();
+          const childrenLoopDuration = performance.now() - start;
+
+          start = performance.now();
+          for (let i = 0; i < runs; i++) findWithNodeTraversalLoop();
+          const nodeTraversalLoopDuration = performance.now() - start;
+
+          start = performance.now();
+          for (let i = 0; i < runs; i++) findWithDocumentQuery();
+          const documentQueryDuration = performance.now() - start;
+
+          start = performance.now();
+          for (let i = 0; i < runs; i++) findWithDocumentQueryAll();
+          const documentQueryAllDuration = performance.now() - start;
+
+          console.log("Children Loop Duration: ", childrenLoopDuration);
+          console.log("Node Traversal Loop Duration: ", nodeTraversalLoopDuration);
+          console.log("Local Query Duration: ", localQueryDuration);
+          console.log("Document Query Duration: ", documentQueryDuration);
+          console.log("Local QueryAll Duration: ", localQueryAllDuration);
+          console.log("Document QueryAll Duration: ", documentQueryAllDuration);
+          console.log("ID Duration: ", idDuration);
+
+          console.log("---------- Compare Speeds to Children Loop ----------");
+          console.log("Node Traversal Loop Speed Multiplier: ", childrenLoopDuration / nodeTraversalLoopDuration);
+          console.log("Local Query Speed Multipler: ", childrenLoopDuration / localQueryDuration);
+          console.log("Local QueryAll Speed Multipler: ", childrenLoopDuration / localQueryAllDuration);
+          console.log("ID Speed Multipler: ", childrenLoopDuration / idDuration);
+
+          button.disabled = false;
+        }, 5000);
+      });
+    </script>
+  </body>
+</html>
