@@ -424,6 +424,8 @@ class ComboboxField extends HTMLElement {
       selection.setBaseAndExtent(textNode, cursorLocation, textNode, cursorLocation);
     });
 
+    // TODO: Should we skip filtering when the filter hasn't changed? (Only relevant if
+    // the user attempts to press `Backspace` at the beginning of the text content, for example.)
     const { listbox, textContent: search } = combobox;
     setAttributeFor(combobox, attrs["aria-expanded"], String(true));
 
@@ -740,6 +742,7 @@ class ComboboxField extends HTMLElement {
       return combobox.getAttribute(attrs["aria-expanded"]) === String(true) ? activeOption?.click() : undefined;
     }
 
+    // TODO: The `combobox` expands when `Enter` is pressed in `filter` mode to submit a <form> (Buggy)
     if (event.key === "Enter") {
       // Select a Value (if the element is expanded)
       if (combobox.getAttribute(attrs["aria-expanded"]) === String(true)) {
