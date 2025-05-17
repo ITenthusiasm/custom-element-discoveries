@@ -391,8 +391,10 @@ class ComboboxField extends HTMLElement {
 
     const { inputType } = event;
     let rangeShift = 0;
-    event.getTargetRanges().forEach((staticRange, i, array) => {
+    const staticRanges = event.getTargetRanges();
+    for (let i = 0; i < staticRanges.length; i++) {
       if (!inputType.startsWith("delete") && !inputType.startsWith("insert")) return;
+      const staticRange = staticRanges[i];
 
       const range = new Range();
       const textNode = /** @type {Text} */ (combobox.firstChild);
@@ -410,12 +412,12 @@ class ComboboxField extends HTMLElement {
       textNode.nodeValue = originalText.slice(0, startOffset) + data + originalText.slice(startOffset);
 
       rangeShift = rangeShift - deletedCharacters + data.length;
-      if (i !== array.length - 1) return;
+      if (i !== staticRanges.length - 1) continue;
 
       const cursorLocation = startOffset + data.length;
       const selection = /** @type {Selection} */ (combobox.ownerDocument.getSelection());
       selection.setBaseAndExtent(textNode, cursorLocation, textNode, cursorLocation);
-    });
+    }
 
     // TODO: Should we skip filtering when the filter hasn't changed? (Only relevant if
     // the user attempts to press `Backspace` at the beginning of the text content, for example.)
