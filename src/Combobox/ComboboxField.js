@@ -412,14 +412,7 @@ class ComboboxField extends HTMLElement {
       rangeShift = rangeShift - deletedCharacters + data.length;
       if (i !== array.length - 1) return;
 
-      // TODO: For the `deletedCharacters` check, is it only checking if we're deleting at the beginning of the word?
-      // Do we need subtraction at all, or is that automatically taken care of by defaulting to the `startOffset`?
-      // In fact, could _everything_ just be condensed by combining the default case and the first `if` check?
-      // (If characters are deleted, then `data.length` _should_ simply be zero.)
-      let cursorLocation = startOffset;
-      if (inputType.startsWith("insert")) cursorLocation += data.length;
-      else if (!deletedCharacters && inputType.endsWith("Backward")) cursorLocation = Math.max(0, cursorLocation - 1);
-
+      const cursorLocation = startOffset + data.length;
       const selection = /** @type {Selection} */ (combobox.ownerDocument.getSelection());
       selection.setBaseAndExtent(textNode, cursorLocation, textNode, cursorLocation);
     });
