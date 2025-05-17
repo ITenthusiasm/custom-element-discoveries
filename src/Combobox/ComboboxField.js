@@ -118,8 +118,8 @@ class ComboboxField extends HTMLElement {
         // Seems less buggy, especially if the component is disconnected, modified, and re-connected?
         if (this.#mounted) {
           this.addEventListener("keydown", this.#handleTypeahead, { passive: true });
-          this.addEventListener("click", ComboboxField.#handleComboboxClick, { passive: true });
-          this.removeEventListener("focus", ComboboxField.#handleComboboxFocus);
+          this.addEventListener("click", ComboboxField.#handleClick, { passive: true });
+          this.removeEventListener("focus", ComboboxField.#handleFocus);
         }
       } else {
         this.setAttribute("aria-autocomplete", "list");
@@ -127,8 +127,8 @@ class ComboboxField extends HTMLElement {
 
         if (this.#mounted) {
           this.removeEventListener("keydown", this.#handleTypeahead);
-          this.removeEventListener("click", ComboboxField.#handleComboboxClick);
-          this.addEventListener("focus", ComboboxField.#handleComboboxFocus, { passive: true });
+          this.removeEventListener("click", ComboboxField.#handleClick);
+          this.addEventListener("focus", ComboboxField.#handleFocus, { passive: true });
         }
       }
 
@@ -167,13 +167,13 @@ class ComboboxField extends HTMLElement {
     });
 
     // Setup Event Listeners
-    this.addEventListener("blur", ComboboxField.#handleComboboxBlur, { passive: true });
+    this.addEventListener("blur", ComboboxField.#handleBlur, { passive: true });
     this.addEventListener("input", this.#handleSearch, { passive: true });
-    this.addEventListener("keydown", ComboboxField.#handleComboboxKeydown);
+    this.addEventListener("keydown", ComboboxField.#handleKeydown);
 
-    if (this.filter) this.addEventListener("focus", ComboboxField.#handleComboboxFocus, { passive: true });
+    if (this.filter) this.addEventListener("focus", ComboboxField.#handleFocus, { passive: true });
     else {
-      this.addEventListener("click", ComboboxField.#handleComboboxClick, { passive: true });
+      this.addEventListener("click", ComboboxField.#handleClick, { passive: true });
       this.addEventListener("keydown", this.#handleTypeahead, { passive: true });
     }
   }
@@ -184,12 +184,12 @@ class ComboboxField extends HTMLElement {
     this.#expansionObserver.disconnect();
     this.#activeDescendantObserver.disconnect();
 
-    this.removeEventListener("blur", ComboboxField.#handleComboboxBlur);
+    this.removeEventListener("blur", ComboboxField.#handleBlur);
     this.removeEventListener("input", this.#handleSearch);
-    this.removeEventListener("keydown", ComboboxField.#handleComboboxKeydown);
+    this.removeEventListener("keydown", ComboboxField.#handleKeydown);
 
-    this.removeEventListener("focus", ComboboxField.#handleComboboxFocus);
-    this.removeEventListener("click", ComboboxField.#handleComboboxClick);
+    this.removeEventListener("focus", ComboboxField.#handleFocus);
+    this.removeEventListener("click", ComboboxField.#handleClick);
     this.removeEventListener("keydown", this.#handleTypeahead);
   }
 
@@ -457,7 +457,7 @@ class ComboboxField extends HTMLElement {
    * @param {MouseEvent} event
    * @returns {void}
    */
-  static #handleComboboxClick(event) {
+  static #handleClick(event) {
     const combobox = /** @type {ComboboxField} */ (event.currentTarget);
     const expanded = combobox.getAttribute(attrs["aria-expanded"]) === String(true);
     combobox.setAttribute(attrs["aria-expanded"], String(!expanded));
@@ -468,7 +468,7 @@ class ComboboxField extends HTMLElement {
    * @param {FocusEvent} event
    * @returns {void}
    */
-  static #handleComboboxFocus(event) {
+  static #handleFocus(event) {
     const combobox = /** @type {ComboboxField} */ (event.currentTarget);
     combobox.setAttribute(attrs["aria-expanded"], String(true));
   }
@@ -477,7 +477,7 @@ class ComboboxField extends HTMLElement {
    * @param {FocusEvent} event
    * @returns {void}
    */
-  static #handleComboboxBlur(event) {
+  static #handleBlur(event) {
     const combobox = /** @type {ComboboxField} */ (event.currentTarget);
     setAttributeFor(combobox, attrs["aria-expanded"], String(false));
 
@@ -491,7 +491,7 @@ class ComboboxField extends HTMLElement {
    * @param {KeyboardEvent} event
    * @returns {void}
    */
-  static #handleComboboxKeydown(event) {
+  static #handleKeydown(event) {
     const combobox = /** @type {ComboboxField} */ (event.currentTarget);
     const { listbox } = combobox;
     const activeOption = /** @type {ComboboxOption | null} */ (
