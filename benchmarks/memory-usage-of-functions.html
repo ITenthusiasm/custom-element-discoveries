@@ -1,0 +1,287 @@
+<!doctype html>
+<html>
+  <head></head>
+  <body>
+    <button id="arrow-functions">Test Arrow Function Generation</button>
+    <button id="bound-functions">Test Bound Function Generation</button>
+    <button id="reused-functions">Test Reused Functions</button>
+
+    <script>
+      const elementCount = 10_000;
+      const arrowFunctions = new Array(elementCount);
+      const boundFunctions = new Array(elementCount);
+      const reusedFunctions = new Array(elementCount);
+
+      document.body.addEventListener("click", (event) => {
+        // Don't allow anything else to run until this test completes.
+        document.body.inert = true;
+
+        // Make sure we got a valid click
+        const button = event.target;
+        if (!(button instanceof HTMLButtonElement)) return;
+        if (button.id === "reused-functions") {
+          array = reusedFunctions;
+          for (let i = 0; i < elementCount; i++) array[i] = myHandler;
+        }
+
+        if (button.id === "bound-functions") {
+          array = boundFunctions;
+          for (let i = 0; i < elementCount; i++) array[i] = myHandler.bind(window.location);
+        }
+
+        if (button.id === "arrow-functions") {
+          array = arrowFunctions;
+
+          for (let i = 0; i < elementCount; i++) {
+            array[i] = (event) => {
+              const combobox = /** @type {ComboboxField} */ (event.currentTarget);
+              const { listbox } = combobox;
+              const activeOption = /** @type {ComboboxOption | null} */ (
+                listbox.querySelector(":scope [role='option'][data-active='true']")
+              );
+
+              if (event.altKey && event.key === "ArrowDown") {
+                event.preventDefault(); // Don't scroll
+                return setAttributeFor(combobox, attrs["aria-expanded"], String(true));
+              }
+
+              if (event.key === "ArrowDown") {
+                event.preventDefault(); // Don't scroll
+                if (combobox.getAttribute(attrs["aria-expanded"]) !== String(true)) {
+                  return combobox.setAttribute(attrs["aria-expanded"], String(true));
+                }
+
+                // TODO: For some reason up/down is causing rotation back to the beginning, so we must be managing
+                // our indices wrong in some way... (Or `splice` isn't doing what we think.)
+                const nextActiveOption = combobox.filter
+                  ? // ? this.#matchingOptions[
+                    //     (this.#activeIndex = Math.min(this.#activeIndex + 1, this.#matchingOptions.length - 1))
+                    //   ]
+                    activeOption?.nextElementSibling
+                  : activeOption?.nextElementSibling;
+
+                if (nextActiveOption) setAttributeFor(combobox, attrs["aria-activedescendant"], nextActiveOption.id);
+                return;
+              }
+
+              if (event.key === "End") {
+                event.preventDefault(); // Don't scroll
+
+                const lastOption = combobox.filter
+                  ? // ? this.#matchingOptions[(this.#activeIndex = this.#matchingOptions.length - 1)]
+                    listbox.lastElementChild
+                  : listbox.lastElementChild;
+
+                setAttributeFor(combobox, attrs["aria-expanded"], String(true));
+                setAttributeFor(combobox, attrs["aria-activedescendant"], lastOption?.id ?? "");
+                return;
+              }
+
+              if (event.key === "Escape") {
+                if (combobox.getAttribute(attrs["aria-expanded"]) !== String(true)) return;
+
+                event.preventDefault(); // Avoid unexpected side-effects like closing `dialog`s
+                return combobox.setAttribute(attrs["aria-expanded"], String(false));
+              }
+
+              if (event.altKey && event.key === "ArrowUp") {
+                event.preventDefault(); // Don't scroll
+                return setAttributeFor(combobox, attrs["aria-expanded"], String(false));
+              }
+
+              if (event.key === "ArrowUp") {
+                event.preventDefault(); // Don't scroll
+                if (combobox.getAttribute(attrs["aria-expanded"]) !== String(true)) {
+                  return combobox.setAttribute(attrs["aria-expanded"], String(true));
+                }
+
+                const nextActiveOption = combobox.filter
+                  ? // ? this.#matchingOptions[(this.#activeIndex = Math.max(this.#activeIndex - 1, 0))]
+                    activeOption?.previousElementSibling
+                  : activeOption?.previousElementSibling;
+
+                if (nextActiveOption) combobox.setAttribute(attrs["aria-activedescendant"], nextActiveOption.id);
+                return;
+              }
+
+              if (event.key === "Home") {
+                event.preventDefault(); // Don't scroll
+
+                const firstOption = combobox.filter
+                  ? // ? this.#matchingOptions[(this.#activeIndex = 0)]
+                    listbox.firstElementChild
+                  : listbox.firstElementChild;
+                setAttributeFor(combobox, attrs["aria-expanded"], String(true));
+                setAttributeFor(combobox, attrs["aria-activedescendant"], firstOption?.id ?? "");
+                return;
+              }
+
+              if (event.key === " ") {
+                if (combobox.filter) return; // Defer to `#handleSearch` instead
+                event.preventDefault(); // Don't scroll
+
+                if (combobox.getAttribute(attrs["aria-expanded"]) === String(true)) return activeOption?.click();
+                return combobox.setAttribute(attrs["aria-expanded"], String(true));
+              }
+
+              if (event.key === "Tab") {
+                if (combobox.getAttribute(attrs["aria-expanded"]) === String(true)) return activeOption?.click();
+                return;
+              }
+
+              if (event.key === "Enter") {
+                // Select a Value (if the element is expanded)
+                if (combobox.getAttribute(attrs["aria-expanded"]) === String(true)) {
+                  if (combobox.filter) event.preventDefault(); // Prevent `#handleSearch` from triggering
+                  return activeOption?.click();
+                }
+
+                // Submit the Form (if the element is collapsed)
+                const { form } = combobox;
+                if (!form) return;
+
+                // See: https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#implicit-submission
+                /** @type {HTMLButtonElement | HTMLInputElement | null} */
+                const submitter = Array.prototype.find.call(form.elements, (control) => {
+                  if (!(control instanceof HTMLInputElement) && !(control instanceof HTMLButtonElement)) return false;
+                  return control.type === "submit";
+                });
+
+                if (submitter) return submitter.disabled ? undefined : submitter.click();
+                return form.requestSubmit();
+              }
+            };
+          }
+        }
+
+        return setTimeout(() => {
+          console.log("Finished Putting Functions into the Array!");
+          document.body.inert = false;
+        }, 1000);
+      });
+
+      /**
+       * The "Test Function" for the micro-benchmark. It is used directly by `reusedFunctions` and used for `bind`ing
+       * in `boundFunctions`. As for `arrowFunctions`, it simply uses the exact same function body.
+       */
+      function myHandler(event) {
+        const combobox = /** @type {ComboboxField} */ (event.currentTarget);
+        const { listbox } = combobox;
+        const activeOption = /** @type {ComboboxOption | null} */ (
+          listbox.querySelector(":scope [role='option'][data-active='true']")
+        );
+
+        if (event.altKey && event.key === "ArrowDown") {
+          event.preventDefault(); // Don't scroll
+          return setAttributeFor(combobox, attrs["aria-expanded"], String(true));
+        }
+
+        if (event.key === "ArrowDown") {
+          event.preventDefault(); // Don't scroll
+          if (combobox.getAttribute(attrs["aria-expanded"]) !== String(true)) {
+            return combobox.setAttribute(attrs["aria-expanded"], String(true));
+          }
+
+          // TODO: For some reason up/down is causing rotation back to the beginning, so we must be managing
+          // our indices wrong in some way... (Or `splice` isn't doing what we think.)
+          const nextActiveOption = combobox.filter
+            ? // ? this.#matchingOptions[
+              //     (this.#activeIndex = Math.min(this.#activeIndex + 1, this.#matchingOptions.length - 1))
+              //   ]
+              activeOption?.nextElementSibling
+            : activeOption?.nextElementSibling;
+
+          if (nextActiveOption) setAttributeFor(combobox, attrs["aria-activedescendant"], nextActiveOption.id);
+          return;
+        }
+
+        if (event.key === "End") {
+          event.preventDefault(); // Don't scroll
+
+          const lastOption = combobox.filter
+            ? // ? this.#matchingOptions[(this.#activeIndex = this.#matchingOptions.length - 1)]
+              listbox.lastElementChild
+            : listbox.lastElementChild;
+
+          setAttributeFor(combobox, attrs["aria-expanded"], String(true));
+          setAttributeFor(combobox, attrs["aria-activedescendant"], lastOption?.id ?? "");
+          return;
+        }
+
+        if (event.key === "Escape") {
+          if (combobox.getAttribute(attrs["aria-expanded"]) !== String(true)) return;
+
+          event.preventDefault(); // Avoid unexpected side-effects like closing `dialog`s
+          return combobox.setAttribute(attrs["aria-expanded"], String(false));
+        }
+
+        if (event.altKey && event.key === "ArrowUp") {
+          event.preventDefault(); // Don't scroll
+          return setAttributeFor(combobox, attrs["aria-expanded"], String(false));
+        }
+
+        if (event.key === "ArrowUp") {
+          event.preventDefault(); // Don't scroll
+          if (combobox.getAttribute(attrs["aria-expanded"]) !== String(true)) {
+            return combobox.setAttribute(attrs["aria-expanded"], String(true));
+          }
+
+          const nextActiveOption = combobox.filter
+            ? // ? this.#matchingOptions[(this.#activeIndex = Math.max(this.#activeIndex - 1, 0))]
+              activeOption?.previousElementSibling
+            : activeOption?.previousElementSibling;
+
+          if (nextActiveOption) combobox.setAttribute(attrs["aria-activedescendant"], nextActiveOption.id);
+          return;
+        }
+
+        if (event.key === "Home") {
+          event.preventDefault(); // Don't scroll
+
+          const firstOption = combobox.filter
+            ? // ? this.#matchingOptions[(this.#activeIndex = 0)]
+              listbox.firstElementChild
+            : listbox.firstElementChild;
+          setAttributeFor(combobox, attrs["aria-expanded"], String(true));
+          setAttributeFor(combobox, attrs["aria-activedescendant"], firstOption?.id ?? "");
+          return;
+        }
+
+        if (event.key === " ") {
+          if (combobox.filter) return; // Defer to `#handleSearch` instead
+          event.preventDefault(); // Don't scroll
+
+          if (combobox.getAttribute(attrs["aria-expanded"]) === String(true)) return activeOption?.click();
+          return combobox.setAttribute(attrs["aria-expanded"], String(true));
+        }
+
+        if (event.key === "Tab") {
+          if (combobox.getAttribute(attrs["aria-expanded"]) === String(true)) return activeOption?.click();
+          return;
+        }
+
+        if (event.key === "Enter") {
+          // Select a Value (if the element is expanded)
+          if (combobox.getAttribute(attrs["aria-expanded"]) === String(true)) {
+            if (combobox.filter) event.preventDefault(); // Prevent `#handleSearch` from triggering
+            return activeOption?.click();
+          }
+
+          // Submit the Form (if the element is collapsed)
+          const { form } = combobox;
+          if (!form) return;
+
+          // See: https://html.spec.whatwg.org/multipage/form-control-infrastructure.html#implicit-submission
+          /** @type {HTMLButtonElement | HTMLInputElement | null} */
+          const submitter = Array.prototype.find.call(form.elements, (control) => {
+            if (!(control instanceof HTMLInputElement) && !(control instanceof HTMLButtonElement)) return false;
+            return control.type === "submit";
+          });
+
+          if (submitter) return submitter.disabled ? undefined : submitter.click();
+          return form.requestSubmit();
+        }
+      }
+    </script>
+  </body>
+</html>
