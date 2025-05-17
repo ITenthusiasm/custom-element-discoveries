@@ -389,8 +389,8 @@ class ComboboxField extends HTMLElement {
      * `ComboboxField`.)
      */
 
-    const { inputType } = event;
     let rangeShift = 0;
+    const { inputType } = event;
     const staticRanges = event.getTargetRanges();
     for (let i = 0; i < staticRanges.length; i++) {
       if (!inputType.startsWith("delete") && !inputType.startsWith("insert")) return;
