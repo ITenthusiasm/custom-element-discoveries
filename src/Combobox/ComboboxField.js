@@ -742,13 +742,13 @@ class ComboboxField extends HTMLElement {
       return combobox.getAttribute(attrs["aria-expanded"]) === String(true) ? activeOption?.click() : undefined;
     }
 
-    // TODO: The `combobox` expands when `Enter` is pressed in `filter` mode to submit a <form> (Buggy)
+    // TODO: Test that the `combobox` doesn't expand when `Enter` is pressed in filter mode (when expanded OR collapsed)
     if (event.key === "Enter") {
+      // Prevent `#handleSearch` from triggering
+      if (combobox.filter) event.preventDefault();
+
       // Select a Value (if the element is expanded)
-      if (combobox.getAttribute(attrs["aria-expanded"]) === String(true)) {
-        if (combobox.filter) event.preventDefault(); // Prevent `#handleSearch` from triggering
-        return activeOption?.click();
-      }
+      if (combobox.getAttribute(attrs["aria-expanded"]) === String(true)) return activeOption?.click();
 
       // Submit the Form (if the element is collapsed)
       const { form } = combobox;
