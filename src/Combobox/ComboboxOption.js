@@ -90,7 +90,7 @@ class ComboboxOption extends HTMLElement {
     else this.removeAttribute("aria-disabled");
   }
 
-  // NOTE: This approach might not work anymore if we want to support grouped `option`s in the future (unlikely)
+  // NOTE: This approach might not work anymore if we want to support `group`ed `option`s in the future (unlikely)
   /** The position of the option within the list of options that it belongs to. */
   get index() {
     return Array.prototype.indexOf.call(this.#listbox.children, this);
