@@ -425,6 +425,8 @@ class ComboboxField extends HTMLElement {
     // Filter `option`s
     let matches = 0;
     this.#activeIndex = 0;
+
+    // TODO: Should be faster to loop with `element.nextElementSibling` instead, based on our (small) perf tests
     for (let i = 0; i < listbox.children.length; i++) {
       const option = listbox.children[i];
 
