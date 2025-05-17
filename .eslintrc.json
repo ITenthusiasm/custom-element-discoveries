@@ -21,7 +21,7 @@
     "consistent-return": "off", // This is usually annoying, and TS works fine as long as return types are specified.
     "arrow-body-style": "off", // Done because of formatting. Use discretion on which type of function to use.
     "no-unreachable": "error",
-    "no-plusplus": ["error", { "allowForLoopAfterthoughts": true }],
+    "no-plusplus": "off", // For keeping bundle sizes smaller, this is probably a rule that we dont't want on.
     "no-return-assign": ["error", "except-parens"],
     "no-continue": "off", // Useful for keeping conditional logic in `for` loops simpler (similar to early `return`)
 

@@ -9,6 +9,10 @@ import attrs from "./attrs.js";
    >} ExposedInternals
  */
 
+// TODO: It might be helpful to have `(add|remove)Option` methods, especially for frameworks like `React`...
+// TODO: Do we want to force a default option to exist when the `combobox` is in `filter` mode? Maybe not?
+// TODO: If a user `Tab`s to a `filter`ed `combobox`, we want cursor to move to the end. But if the user
+//       `click`s the `combobox`, then the cursor should go where they clicked it... How to accomplish this?
 /** @implements {Pick<ElementInternals, ExposedInternals>} */
 class ComboboxField extends HTMLElement {
   /* ------------------------------ Custom Element Settings ------------------------------ */
@@ -18,7 +22,7 @@ class ComboboxField extends HTMLElement {
   }
 
   static get observedAttributes() {
-    return /** @type {const} */ (["required", "empty-message", "filter"]);
+    return /** @type {const} */ (["required", "filter", "empty-message"]);
   }
 
   /* ------------------------------ Internals ------------------------------ */
@@ -28,13 +32,83 @@ class ComboboxField extends HTMLElement {
   /** @type {string} The temporary search string used for {@link filter _unfiltered_} `combobox`es */
   #searchString = "";
 
-  /** @type {number | undefined} The `id` of the latest timeout function that will clear the search string */
+  /** @type {number | undefined} The `id` of the latest timeout function that will clear the `#searchString` */
   #searchTimeout;
 
-  /** @readonly */ #expansionObserver = new MutationObserver(ComboboxField.#watchExpansion);
+  /**
+   * @type {ComboboxOption[]} The list of `option`s that match the user's current filter. Only guaranteed
+   * to exist when the `combobox` is in {@link filter} mode. Otherwise, is irrelevant and may yield `null`.
+   */
+  #matchingOptions = /** @type {ComboboxOption[]} */ (/** @type {unknown} */ (null));
+
+  /**
+   * @type {number} The index of the `option` in `#matchingOptions` that is currently active.
+   * Only relevant for {@link filter filterable} `combobox`es.
+   */
+  #activeIndex = 0;
+
   /** @readonly */ #activeDescendantObserver = new MutationObserver(ComboboxField.#watchActiveDescendant);
+  /** @readonly */ #expansionObserver = new MutationObserver((mutations) => {
+    for (let i = 0; i < mutations.length; i++) {
+      const mutation = mutations[i];
+
+      const combobox = /** @type {ComboboxField} */ (mutation.target);
+      const expanded = combobox.getAttribute(attrs["aria-expanded"]) === String(true);
+      const { listbox } = combobox;
+
+      // Open Combobox
+      if (expanded) {
+        /*
+         * NOTE: If the user opens the `combobox` with search/typeahead, then `aria-activedescendant` will already
+         * exist and this expansion logic will be irrelevant. Remember that `MutationObserver` callbacks are run
+         * asynchronously, so this check would happen AFTER the search/typeahead handler completed.
+         */
+        if (combobox.getAttribute(attrs["aria-activedescendant"]) !== "") return;
+
+        /** @type {ComboboxOption} */
+        const activeOption =
+          listbox.querySelector(":scope [role='option'][aria-selected='true']:not([data-filtered-out])") ??
+          /** @type {ComboboxOption} */ (listbox.querySelector(":scope [role='option']:not([data-filtered-out])"));
+
+        // TODO: DEFINITELY test that `#activeIndex` is correct if there was a previously-selected `option`.
+        //       And really, test for the active `option` in all circumstances here...
+        // NOTE: If our code is written correctly, then `#matchingOptions` should be all `listbox.children` on `expand`
+        // since we won't get here if the user is in the middle of a `#handleSearch`
+        if (combobox.filter) this.#activeIndex = this.#matchingOptions.indexOf(activeOption);
+        combobox.setAttribute(attrs["aria-activedescendant"], activeOption.id);
+      }
+      // Close Combobox
+      else {
+        combobox.setAttribute(attrs["aria-activedescendant"], "");
+
+        // See if logic _exclusive_ to `filter`ed `combobox`es needs to be run
+        if (!combobox.filter || combobox.value == null) return;
+
+        // Reset filtered `option`s. (NOTE: Approach is incompatible with `group`ed `option`s)
+        if (this.#matchingOptions.length !== combobox.listbox.children.length) {
+          this.#matchingOptions = Array.from(combobox.listbox.children, (option) => {
+            option.removeAttribute("data-filtered-out");
+            return option;
+          });
+        }
+
+        // Reset `combobox` display if needed
+        const root = /** @type {Document | ShadowRoot} */ (combobox.getRootNode());
+        const option = /** @type {ComboboxOption} */ (root.getElementById(`${combobox.id}-option-${combobox.value}`));
+        if (combobox.textContent !== option.textContent) combobox.textContent = option.textContent;
+
+        // Reset cursor if `combobox` is still `:focus`ed
+        if (root.activeElement !== combobox) return;
+        const selection = /** @type {Selection} */ (combobox.ownerDocument.getSelection());
+        const textNode = /** @type {Text} */ (combobox.firstChild);
+        selection.setBaseAndExtent(textNode, textNode.length, textNode, textNode.length);
+      }
+    }
+  });
 
   /*
+   * TODO: There are some worthwhile thoughts here... Compile this in some useful way so that the text size is bearable.
+   *
    * NOTE: This observer assumes that the available `option`s don't change while the user types into the searchbox
    * (if the `combobox` is `filter`able). If we want to suppor that use case (e.g., for asynchronously loading `option`s),
    * then we'll need to update this observer accordingly. But even then... is a `combobox` really intended to be
@@ -114,21 +188,21 @@ class ComboboxField extends HTMLElement {
         this.removeAttribute("aria-autocomplete");
         this.removeAttribute("contenteditable");
 
-        // TODO: Do we still need to track `this.#mounted`??? Should we track `isConnected` instead?
-        // Seems less buggy, especially if the component is disconnected, modified, and re-connected?
-        if (this.#mounted) {
-          this.addEventListener("keydown", this.#handleTypeahead, { passive: true });
-          this.addEventListener("click", ComboboxField.#handleClick, { passive: true });
+        if (this.isConnected) {
           this.removeEventListener("focus", ComboboxField.#handleFocus);
+          this.removeEventListener("beforeinput", this.#handleSearch);
+          this.addEventListener("click", ComboboxField.#handleClick, { passive: true });
+          this.addEventListener("keydown", this.#handleTypeahead, { passive: true });
         }
       } else {
         this.setAttribute("aria-autocomplete", "list");
-        this.setAttribute("contenteditable", "plaintext-only");
+        this.setAttribute("contenteditable", "true");
 
         if (this.#mounted) {
-          this.removeEventListener("keydown", this.#handleTypeahead);
           this.removeEventListener("click", ComboboxField.#handleClick);
+          this.removeEventListener("keydown", this.#handleTypeahead);
           this.addEventListener("focus", ComboboxField.#handleFocus, { passive: true });
+          this.addEventListener("beforeinput", this.#handleSearch);
         }
       }
 
@@ -149,6 +223,8 @@ class ComboboxField extends HTMLElement {
       this.setAttribute(attrs["aria-expanded"], String(false));
       this.setAttribute(attrs["aria-activedescendant"], "");
 
+      // NOTE: This initialization of `#matchingOptions` is incompatible with `group`ed `option`s
+      if (this.filter) this.#matchingOptions = Array.from(this.listbox.children);
       this.#mounted = true;
     }
 
@@ -168,11 +244,12 @@ class ComboboxField extends HTMLElement {
 
     // Setup Event Listeners
     this.addEventListener("blur", ComboboxField.#handleBlur, { passive: true });
-    this.addEventListener("input", this.#handleSearch, { passive: true });
-    this.addEventListener("keydown", ComboboxField.#handleKeydown);
+    this.addEventListener("keydown", this.#handleKeydown);
 
-    if (this.filter) this.addEventListener("focus", ComboboxField.#handleFocus, { passive: true });
-    else {
+    if (this.filter) {
+      this.addEventListener("focus", ComboboxField.#handleFocus, { passive: true });
+      this.addEventListener("beforeinput", this.#handleSearch);
+    } else {
       this.addEventListener("click", ComboboxField.#handleClick, { passive: true });
       this.addEventListener("keydown", this.#handleTypeahead, { passive: true });
     }
@@ -185,10 +262,10 @@ class ComboboxField extends HTMLElement {
     this.#activeDescendantObserver.disconnect();
 
     this.removeEventListener("blur", ComboboxField.#handleBlur);
-    this.removeEventListener("input", this.#handleSearch);
-    this.removeEventListener("keydown", ComboboxField.#handleKeydown);
+    this.removeEventListener("keydown", this.#handleKeydown);
 
     this.removeEventListener("focus", ComboboxField.#handleFocus);
+    this.removeEventListener("beforeinput", this.#handleSearch);
     this.removeEventListener("click", ComboboxField.#handleClick);
     this.removeEventListener("keydown", this.#handleTypeahead);
   }
@@ -238,30 +315,121 @@ class ComboboxField extends HTMLElement {
     }
   };
 
-  // TODO: Regarding the `event.stopImmediatePropagation()` hack, watch https://github.com/whatwg/dom/issues/1368
   /**
    * Handles the searching logic for `combobox`es with a {@link filter}
-   * @param {Event} event
+   * @param {InputEvent} event
    * @returns {void}
    */
   #handleSearch = (event) => {
-    // Dismiss events generated by a `combobox` value update
+    /*
+     * Prevent developers from receiving irrelevant `input` events from `ComboboxField`.
+     *
+     * NOTE: This will sadly disable `historyUndo`/`historyRedo`, but that's probably not a big problem.
+     * If it does become a point of contention/need in the future, then we can make a history `Stack` that is opt-in.
+     */
+    event.preventDefault();
     const combobox = /** @type {ComboboxField} */ (event.currentTarget);
-    if (!event.isTrusted || !combobox.filter) return;
 
-    // Let `ComboboxField` manage bubbled `input` events. (We sadly can't control `captured` ones yet.)
-    event.stopImmediatePropagation();
+    /*
+     * Some things to NOTE and to TEST to gain the understanding that we need for this component and verify
+     * that everything works.
+     *
+     * 1) [Note]: Firefox is the only Browser that supports multi-selection. We could skip supporting it, but we'll
+     * choose to support it to avoid breaking user expectations. Note that when Firefox encounters a mult-select for
+     * an `<input>` element, it will place the selection at the very end of the _last_ selection range after text
+     * is inserted into the form control. (You should TEST that you're satisfying this behavior.)
+     *
+     * 2) [Note]: We expect that `ComboboxField` will always have only one child: a Text Node. (Important assumption.)
+     *
+     * 3) [Note]: CHROME BUG. Apparently `[contenteditable="plaintext-only"]` will break `getTargetRanges` in Chrome.
+     * We should probably file a bug for this.
+     *
+     * 4) [Note]: SAFARI / BROWSERS + SELECTION. In Safari, you cannot use `Selection.addRange` to set the `Document`'s
+     * current selection to something WITHIN a `Shadow DOM`. However, you CAN use `Selection.setBaseAndExtent` for this.
+     * Note that Chrome/Firefox support `Selection.addRange` if the `Range` has "legal" access to content in a
+     * `Shadow DOM`. However, since we're trying to create something with cross-browser support, this is irrelevant.
+     * See:
+     * - https://developer.mozilla.org/en-US/docs/Web/API/Selection/setBaseAndExtent
+     * - https://github.com/mfreed7/shadow-dom-selection?tab=readme-ov-file#changes-to-existing-selection-apis
+     *   (May not be the official spec, but seems to be the direction in which things are moving so far.)
+     *
+     * 5) [Note]: `set Element.textContent()` will replace all of the children of the related `Node`. This is bad because
+     * it means you'll lose the reference to the Text Node that your `Range`(s) were originally pointing to. So instead,
+     * get access to the underlying Text Node and modify the node's value.
+     *
+     * 6) [Note]: You probably won't need to distinguish between `insert*` and `delete*` in most cases when updating
+     * the `ComboboxField`'s content. For the delete scenario, you can just "insert" an empty, 0-character string.
+     *
+     * 7) [Note]: Apparently, all (non-static) `Range`s previously associated with a Text Node get emptied once the
+     * referenced node's content is changed. (The `Range`s probably don't know what to point to anymore since the
+     * text has technically "changed".) This makes it imperative that you know when to leverage the a `StaticRange`
+     * and when to work directly with a regular, dynamic `Range` (or a value that it cached before being modified).
+     *
+     * 8) [Test]: We want to verify that our "range shifting" for our `dynamicRange` variable is correct. So far,
+     * the logic seems to be accomplishing what we want.
+     *
+     * 9) [Test]: Pressing `Enter` should select a Combobox Option, and it shouldn't leave the Combobox expanded.
+     * (This should be fixed.)
+     *
+     * 10) [Test]: All regular spaces should appear within the `Combobox` edit/search field and should not be collapsed.
+     * Requires CSS. See `white-space`/`white-space-collapse` CSS Properties. (This should be fixed.)
+     *
+     * 11) [Test]: `deleteContentBackward` should not cause an error if done at the very beginning of the text.
+     * (This should be fixed.)
+     *
+     * 12) [Test]: `deleteContentForward` should not move the cursor backwards if done at the very end of the text.
+     * (This should be fixed.)
+     *
+     * 13) [Test]: The other variants of `delete` (e.g., `deleteWord*`) should work as normal. (I don't think we've
+     * encountered any issues with this yet.)
+     *
+     * 14) [Test]: Entering text when the search is completely empty doesn't break anything. (It seems that when
+     * you're inserting text into an empty element, the `StaticRange` generated during `beforeinput` points to
+     * the element itself instead of the empty text node. So we should just reference the text node within
+     * `ComboboxField`.)
+     */
+
+    const { inputType } = event;
+    let rangeShift = 0;
+    event.getTargetRanges().forEach((staticRange, i, array) => {
+      if (!inputType.startsWith("delete") && !inputType.startsWith("insert")) return;
+
+      const range = new Range();
+      const textNode = /** @type {Text} */ (combobox.firstChild);
+      range.setStart(textNode, staticRange.startOffset + rangeShift);
+      range.setEnd(textNode, staticRange.endOffset + rangeShift);
+      const deletedCharacters = range.toString().length;
+
+      range.deleteContents();
+      let data = event.data ?? event.dataTransfer?.getData("text/plain") ?? "";
+      if (data.includes("\n")) data = data.replaceAll("\n", "");
+
+      /** The `startOffset` of the dynamic `Range` _after_ content deletion */
+      const startOffset = range.startOffset; // eslint-disable-line prefer-destructuring -- Needed to apply JSDocs
+      const originalText = /** @type {string} */ (textNode.nodeValue);
+      textNode.nodeValue = originalText.slice(0, startOffset) + data + originalText.slice(startOffset);
+
+      rangeShift = rangeShift - deletedCharacters + data.length;
+      if (i !== array.length - 1) return;
+
+      // TODO: For the `deletedCharacters` check, is it only checking if we're deleting at the beginning of the word?
+      // Do we need subtraction at all, or is that automatically taken care of by defaulting to the `startOffset`?
+      // In fact, could _everything_ just be condensed by combining the default case and the first `if` check?
+      // (If characters are deleted, then `data.length` _should_ simply be zero.)
+      let cursorLocation = startOffset;
+      if (inputType.startsWith("insert")) cursorLocation += data.length;
+      else if (!deletedCharacters && inputType.endsWith("Backward")) cursorLocation = Math.max(0, cursorLocation - 1);
+
+      const selection = /** @type {Selection} */ (combobox.ownerDocument.getSelection());
+      selection.setBaseAndExtent(textNode, cursorLocation, textNode, cursorLocation);
+    });
+
     const { listbox, textContent: search } = combobox;
     setAttributeFor(combobox, attrs["aria-expanded"], String(true));
 
-    // TODO: Again, `nextElementSibling` might be faster than an `index`-based loop. Need to do more tests...
-    // TODO: There MIGHT also be a possibility to optimize things by `querySelect`ing only those children
-    //       that would actually need their `data-filtered-out` attribute updated. Is that true though? Need tests...
-    //       CAVEAT: If someone `Ctrl + A + Paste/Type`s into the search field, we probably won't be able to determine
-    //       the correct course of action as easily. We'd have to look at `InputEvent.inputType` and that would probably
-    //       get quite convoluted... so maybe just loop over everything as things are today for simplicity. We can
-    //       explore something else if there's a real bottleneck we're running into.
-    let noActiveDescendant = true;
+    // Filter `option`s
+    let matches = 0;
+    this.#activeIndex = 0;
     for (let i = 0; i < listbox.children.length; i++) {
       const option = listbox.children[i];
 
@@ -269,27 +437,28 @@ class ComboboxField extends HTMLElement {
         option.setAttribute("data-filtered-out", String(true));
       else {
         option.removeAttribute("data-filtered-out");
-
-        if (noActiveDescendant) {
-          setAttributeFor(combobox, attrs["aria-activedescendant"], option.id);
-          noActiveDescendant = false;
-        }
+        this.#matchingOptions[matches++] = option;
+        if (matches === 1) setAttributeFor(combobox, attrs["aria-activedescendant"], option.id);
       }
     }
 
-    // TODO: Show "Sorry no options..." (Is that allowed from an a11y standpoint for `listbox`es?)
-    // TODO: We need to make sure the `combobox` doesn't try to `activate` the `No-Options` message during keystrokes
-    // TODO: Do we care if someone _DOESN'T_ want to display a "No Options" message?
-    if (noActiveDescendant) {
+    // Remove any `option`s that still exist from the previous filter
+    this.#matchingOptions.splice(matches);
+
+    // TODO: We need to make sure the `combobox` doesn't try to `activate` the `No-Options` message during keystrokes.
+    //       NOTE: I think this is resolved, but we should definitely test this.
+    if (matches === 0) {
       if (!this.#emptyOption) {
-        this.#emptyOption = document.createElement("span");
+        this.#emptyOption = document.createElement("div");
         this.#emptyOption.textContent = this.emptyMessage;
         this.#emptyOption.setAttribute("role", "option");
         this.#emptyOption.setAttribute("aria-selected", String(false));
-        this.#emptyOption.inert = true; // TODO: Will Screen Reader properly announce that the `listbox` is empty?
+        this.#emptyOption.inert = true;
       }
 
+      // TODO: Should we test that `#emptyOption` remains visible even after it is encountered for the `N > 1`-th time?
       listbox.appendChild(this.#emptyOption);
+      this.#emptyOption.removeAttribute("data-filtered-out");
       setAttributeFor(combobox, attrs["aria-activedescendant"], "");
     } else this.#emptyOption?.remove();
   };
@@ -480,18 +649,13 @@ class ComboboxField extends HTMLElement {
   static #handleBlur(event) {
     const combobox = /** @type {ComboboxField} */ (event.currentTarget);
     setAttributeFor(combobox, attrs["aria-expanded"], String(false));
-
-    if (!combobox.filter || combobox.value == null) return;
-    const root = /** @type {Document | ShadowRoot} */ (combobox.getRootNode());
-    const option = /** @type {ComboboxOption} */ (root.getElementById(`${combobox.id}-option-${combobox.value}`));
-    combobox.textContent = option.textContent;
   }
 
   /**
    * @param {KeyboardEvent} event
    * @returns {void}
    */
-  static #handleKeydown(event) {
+  #handleKeydown = (event) => {
     const combobox = /** @type {ComboboxField} */ (event.currentTarget);
     const { listbox } = combobox;
     const activeOption = /** @type {ComboboxOption | null} */ (
@@ -509,21 +673,19 @@ class ComboboxField extends HTMLElement {
         return combobox.setAttribute(attrs["aria-expanded"], String(true));
       }
 
-      /** @type {Element | null | undefined} */
-      let nextActiveOption = activeOption;
-      do nextActiveOption = nextActiveOption?.nextElementSibling;
-      while (combobox.filter ? nextActiveOption?.hasAttribute("data-filtered-out") : false);
+      const nextActiveOption = combobox.filter
+        ? this.#matchingOptions[(this.#activeIndex = Math.min(this.#activeIndex + 1, this.#matchingOptions.length - 1))]
+        : activeOption?.nextElementSibling;
 
-      if (nextActiveOption) combobox.setAttribute(attrs["aria-activedescendant"], nextActiveOption.id);
+      if (nextActiveOption) setAttributeFor(combobox, attrs["aria-activedescendant"], nextActiveOption.id);
       return;
     }
 
     if (event.key === "End") {
       event.preventDefault(); // Don't scroll
 
-      // NOTE: This query selector will likely not be safe if we use `group`ed `option`s. In that case, use a loop.
       const lastOption = combobox.filter
-        ? listbox.querySelector(":scope [role='option']:nth-last-child(1 of :not([data-filtered-out]))")
+        ? this.#matchingOptions[(this.#activeIndex = this.#matchingOptions.length - 1)]
         : listbox.lastElementChild;
 
       setAttributeFor(combobox, attrs["aria-expanded"], String(true));
@@ -549,43 +711,41 @@ class ComboboxField extends HTMLElement {
         return combobox.setAttribute(attrs["aria-expanded"], String(true));
       }
 
-      /** @type {Element | null | undefined} */
-      let nextActiveOption = activeOption;
-      do nextActiveOption = nextActiveOption?.previousElementSibling;
-      while (combobox.filter ? nextActiveOption?.hasAttribute("data-filtered-out") : false);
+      const nextActiveOption = combobox.filter
+        ? this.#matchingOptions[(this.#activeIndex = Math.max(this.#activeIndex - 1, 0))]
+        : activeOption?.previousElementSibling;
 
-      if (nextActiveOption) combobox.setAttribute(attrs["aria-activedescendant"], nextActiveOption.id);
+      if (nextActiveOption) setAttributeFor(combobox, attrs["aria-activedescendant"], nextActiveOption.id);
       return;
     }
 
     if (event.key === "Home") {
       event.preventDefault(); // Don't scroll
 
-      const firstOption = combobox.filter
-        ? listbox.querySelector(":scope [role='option']:not([data-filtered-out])")
-        : listbox.firstElementChild;
-
+      const firstOption = combobox.filter ? this.#matchingOptions[(this.#activeIndex = 0)] : listbox.firstElementChild;
       setAttributeFor(combobox, attrs["aria-expanded"], String(true));
       setAttributeFor(combobox, attrs["aria-activedescendant"], firstOption?.id ?? "");
       return;
     }
 
     if (event.key === " ") {
+      if (combobox.filter) return; // Defer to `#handleSearch` instead
       event.preventDefault(); // Don't scroll
-      if (combobox.filter) return;
 
       if (combobox.getAttribute(attrs["aria-expanded"]) === String(true)) return activeOption?.click();
       return combobox.setAttribute(attrs["aria-expanded"], String(true));
     }
 
     if (event.key === "Tab") {
-      if (combobox.getAttribute(attrs["aria-expanded"]) === String(true)) return activeOption?.click();
-      return;
+      return combobox.getAttribute(attrs["aria-expanded"]) === String(true) ? activeOption?.click() : undefined;
     }
 
     if (event.key === "Enter") {
       // Select a Value (if the element is expanded)
-      if (combobox.getAttribute(attrs["aria-expanded"]) === String(true)) return activeOption?.click();
+      if (combobox.getAttribute(attrs["aria-expanded"]) === String(true)) {
+        if (combobox.filter) event.preventDefault(); // Prevent `#handleSearch` from triggering
+        return activeOption?.click();
+      }
 
       // Submit the Form (if the element is collapsed)
       const { form } = combobox;
@@ -601,37 +761,9 @@ class ComboboxField extends HTMLElement {
       if (submitter) return submitter.disabled ? undefined : submitter.click();
       return form.requestSubmit();
     }
-  }
+  };
 
   /* ------------------------------ Combobox Mutation Observer Details ------------------------------ */
-  /**
-   * @param {MutationRecord[]} mutations
-   * @returns {void}
-   */
-  static #watchExpansion(mutations) {
-    for (let i = 0; i < mutations.length; i++) {
-      const mutation = mutations[i];
-
-      const combobox = /** @type {ComboboxField} */ (mutation.target);
-      const { listbox } = combobox;
-      const expanded = combobox.getAttribute(attrs["aria-expanded"]) === String(true);
-
-      // Open Combobox
-      if (expanded) {
-        if (combobox.getAttribute(attrs["aria-activedescendant"]) !== "") return;
-
-        /** @type {ComboboxOption} */
-        const activeOption =
-          listbox.querySelector(":scope [role='option'][aria-selected='true']:not([data-filtered-out])") ??
-          /** @type {ComboboxOption} */ (listbox.querySelector(":scope [role='option']:not([data-filtered-out])"));
-
-        if (!activeOption.inert) combobox.setAttribute(attrs["aria-activedescendant"], activeOption.id);
-      }
-      // Close Combobox
-      else combobox.setAttribute(attrs["aria-activedescendant"], "");
-    }
-  }
-
   /**
    * @param {MutationRecord[]} mutations
    * @returns {void}

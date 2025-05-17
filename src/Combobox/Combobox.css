@@ -24,6 +24,7 @@ select-enhancer {
     outline: none;
 
     cursor: pointer;
+    white-space: pre;
     text-align: center;
     font-size: inherit;
     font-family: inherit;
