@@ -114,6 +114,8 @@ class ComboboxField extends HTMLElement {
         this.removeAttribute("aria-autocomplete");
         this.removeAttribute("contenteditable");
 
+        // TODO: Do we still need to track `this.#mounted`??? Should we track `isConnected` instead?
+        // Seems less buggy, especially if the component is disconnected, modified, and re-connected?
         if (this.#mounted) {
           this.addEventListener("keydown", this.#handleTypeahead, { passive: true });
           this.addEventListener("click", ComboboxField.#handleComboboxClick, { passive: true });
