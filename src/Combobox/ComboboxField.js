@@ -137,7 +137,7 @@ class ComboboxField extends HTMLElement {
     }
   }
 
-  // "On Mount" for Custom Elements
+  /** "On Mount" for Custom Elements @returns {void} */
   connectedCallback() {
     if (!this.isConnected) return;
 
@@ -178,7 +178,7 @@ class ComboboxField extends HTMLElement {
     }
   }
 
-  // "On Unmount" for Custom Elements
+  /** "On Unmount" for Custom Elements @returns {void} */
   disconnectedCallback() {
     this.#optionNodesObserver.disconnect();
     this.#expansionObserver.disconnect();
@@ -421,6 +421,7 @@ class ComboboxField extends HTMLElement {
   }
 
   /* ------------------------------ Form Control Callbacks ------------------------------ */
+  /** @returns {void} */
   formResetCallback() {
     const { listbox } = this;
 
@@ -436,12 +437,16 @@ class ComboboxField extends HTMLElement {
   /**
    * @param {string} state
    * @param {"restore" | "autocomplete"} _mode
+   * @returns {void}
    */
   formStateRestoreCallback(state, _mode) {
     this.value = state;
   }
 
-  /** @param {boolean} disabled */
+  /**
+   * @param {boolean} disabled
+   * @returns {void}
+   */
   formDisabledCallback(disabled) {
     if (disabled) setAttributeFor(this, attrs["aria-expanded"], String(false));
   }

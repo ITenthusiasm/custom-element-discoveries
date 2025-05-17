@@ -10,7 +10,7 @@ class SelectEnhancer extends HTMLElement {
   /** @readonly */ #combobox = document.createElement("combobox-field");
   /** @readonly */ #listbox = document.createElement("div");
 
-  // "On Mount" for Custom Elements
+  /** "On Mount" for Custom Elements @returns {void} */
   connectedCallback() {
     if (!this.isConnected) return;
 
@@ -67,7 +67,7 @@ class SelectEnhancer extends HTMLElement {
     this.addEventListener("mousedown", SelectEnhancer.#handleDelegatedMousedown);
   }
 
-  // "On Unmount" for Custom Elements
+  /** "On Unmount" for Custom Elements @returns {void} */
   disconnectedCallback() {
     this.#listbox.removeEventListener("mouseover", SelectEnhancer.#handleDelegatedOptionHover);
     this.#listbox.removeEventListener("click", SelectEnhancer.#handleDelegatedOptionClick);

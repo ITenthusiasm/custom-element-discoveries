@@ -13,17 +13,23 @@ class ComboboxOption extends HTMLElement {
    * @param {typeof ComboboxOption.observedAttributes[number]} name
    * @param {string | null} oldValue
    * @param {string | null} newValue
+   * @returns {void}
    */
   attributeChangedCallback(name, oldValue, newValue) {
     if (!this.#mounted) return;
-    if (name === "selected" && (newValue === null) !== (oldValue === null)) return (this.selected = newValue !== null);
+
+    if (name === "selected" && (newValue === null) !== (oldValue === null)) {
+      this.selected = newValue !== null;
+      return;
+    }
+
     if (name === "value" && newValue !== oldValue) {
       this.id = `${this.#combobox.id}-option-${newValue ?? this.textContent}`;
       return this.#syncWithCombobox();
     }
   }
 
-  // "On Mount" for Custom Elements
+  /** "On Mount" for Custom Elements @returns {void} */
   connectedCallback() {
     if (!this.isConnected) return;
 
@@ -104,6 +110,7 @@ class ComboboxOption extends HTMLElement {
     return /** @type {ComboboxField} */ (this.#listbox.previousElementSibling);
   }
 
+  /** @returns {void} */
   #syncWithCombobox() {
     const combobox = this.#combobox;
 
