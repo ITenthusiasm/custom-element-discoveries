@@ -417,10 +417,12 @@ class ComboboxField extends HTMLElement {
       const cursorLocation = startOffset + data.length;
       const selection = /** @type {Selection} */ (combobox.ownerDocument.getSelection());
       selection.setBaseAndExtent(textNode, cursorLocation, textNode, cursorLocation);
+
+      if (deletedCharacters === 0 && data.length === 0) return; // User attempted to "delete" nothing
     }
 
-    // TODO: Should we skip filtering when the filter hasn't changed? (Only relevant if
-    // the user attempts to press `Backspace` at the beginning of the text content, for example.)
+    // TODO: Test that the filtered `option`s don't update if the user attempts to "delete" nothing.
+    // (This can be tested by pressing `Delete` at the very end of the searchbox right after `expand`ing it.)
     const { listbox, textContent: search } = combobox;
     setAttributeFor(combobox, attrs["aria-expanded"], String(true));
 
