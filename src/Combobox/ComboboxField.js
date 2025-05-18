@@ -11,8 +11,9 @@ import attrs from "./attrs.js";
 
 // TODO: It might be helpful to have `(add|remove)Option` methods, especially for frameworks like `React`...
 // TODO: Do we want to force a default option to exist when the `combobox` is in `filter` mode? Maybe not?
-// TODO: If a user `Tab`s to a `filter`ed `combobox`, we want cursor to move to the end. But if the user
-//       `click`s the `combobox`, then the cursor should go where they clicked it... How to accomplish this?
+// TODO: Test that when a user TABs to a `filter`able `combobox`, the full text content is highlighted
+//       (similar to `<input>`s). But when a user focuses the `combobox` by `click`ing it, the cursor
+//       naturally goes where the `MouseEvent` would place it.
 /** @implements {Pick<ElementInternals, ExposedInternals>} */
 class ComboboxField extends HTMLElement {
   /* ------------------------------ Custom Element Settings ------------------------------ */
@@ -189,6 +190,7 @@ class ComboboxField extends HTMLElement {
         this.removeAttribute("contenteditable");
 
         if (this.isConnected) {
+          this.removeEventListener("mousedown", ComboboxField.#handleMousedown);
           this.removeEventListener("focus", ComboboxField.#handleFocus);
           this.removeEventListener("beforeinput", this.#handleSearch);
           this.addEventListener("click", ComboboxField.#handleClick, { passive: true });
@@ -201,6 +203,7 @@ class ComboboxField extends HTMLElement {
         if (this.#mounted) {
           this.removeEventListener("click", ComboboxField.#handleClick);
           this.removeEventListener("keydown", this.#handleTypeahead);
+          this.addEventListener("mousedown", ComboboxField.#handleMousedown, { passive: true });
           this.addEventListener("focus", ComboboxField.#handleFocus, { passive: true });
           this.addEventListener("beforeinput", this.#handleSearch);
         }
@@ -247,6 +250,7 @@ class ComboboxField extends HTMLElement {
     this.addEventListener("keydown", this.#handleKeydown);
 
     if (this.filter) {
+      this.addEventListener("mousedown", ComboboxField.#handleMousedown, { passive: true });
       this.addEventListener("focus", ComboboxField.#handleFocus, { passive: true });
       this.addEventListener("beforeinput", this.#handleSearch);
     } else {
@@ -264,6 +268,7 @@ class ComboboxField extends HTMLElement {
     this.removeEventListener("blur", ComboboxField.#handleBlur);
     this.removeEventListener("keydown", this.#handleKeydown);
 
+    this.removeEventListener("mousedown", ComboboxField.#handleMousedown);
     this.removeEventListener("focus", ComboboxField.#handleFocus);
     this.removeEventListener("beforeinput", this.#handleSearch);
     this.removeEventListener("click", ComboboxField.#handleClick);
@@ -634,6 +639,20 @@ class ComboboxField extends HTMLElement {
   }
 
   /**
+   * Used to determine if a {@link filter filterable} `combobox` was `:focus`ed by a `click` event.
+   * @param {MouseEvent} event
+   * @returns {void}
+   */
+  static #handleMousedown(event) {
+    const combobox = /** @type {ComboboxField} */ (event.currentTarget);
+    const root = /** @type {Document | ShadowRoot} */ (combobox.getRootNode());
+    if (root.activeElement === combobox) return;
+
+    combobox.setAttribute("data-mousedown", "");
+    combobox.addEventListener("mouseup", () => combobox.removeAttribute("data-mousedown"), { once: true });
+  }
+
+  /**
    * (For {@link filter filtered} `combobox`es only)
    * @param {FocusEvent} event
    * @returns {void}
@@ -641,6 +660,10 @@ class ComboboxField extends HTMLElement {
   static #handleFocus(event) {
     const combobox = /** @type {ComboboxField} */ (event.currentTarget);
     combobox.setAttribute(attrs["aria-expanded"], String(true));
+
+    if (combobox.hasAttribute("data-mousedown")) return;
+    const textNode = /** @type {Text} */ (combobox.firstChild);
+    document.getSelection()?.setBaseAndExtent(textNode, 0, textNode, textNode.length);
   }
 
   /**
