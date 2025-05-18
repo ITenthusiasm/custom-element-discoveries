@@ -658,6 +658,9 @@ class ComboboxField extends HTMLElement {
    * @returns {void}
    */
   static #handleFocus(event) {
+    // TODO: Is it worth considering not expanding the `combobox` on `focus`? (We can maintain highlighting.)
+    // This is what Material UI does, and it probably makes it more clear that the user is on a `combobox`
+    // (and what the original/previous values was). Just a consideration. Note sure yet.
     const combobox = /** @type {ComboboxField} */ (event.currentTarget);
     combobox.setAttribute(attrs["aria-expanded"], String(true));
 
