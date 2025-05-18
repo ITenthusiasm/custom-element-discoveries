@@ -200,7 +200,7 @@ class ComboboxField extends HTMLElement {
         this.setAttribute("aria-autocomplete", "list");
         this.setAttribute("contenteditable", "true");
 
-        if (this.#mounted) {
+        if (this.isConnected) {
           this.removeEventListener("click", ComboboxField.#handleClick);
           this.removeEventListener("keydown", this.#handleTypeahead);
           this.addEventListener("mousedown", ComboboxField.#handleMousedown, { passive: true });
