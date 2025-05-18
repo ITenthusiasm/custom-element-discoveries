@@ -86,8 +86,10 @@ class ComboboxField extends HTMLElement {
         if (!combobox.filter || combobox.value == null) return;
 
         // Reset filtered `option`s. (NOTE: Approach is incompatible with `group`ed `option`s)
-        if (this.#matchingOptions.length !== combobox.listbox.children.length) {
-          this.#matchingOptions = Array.from(combobox.listbox.children, (option) => {
+        // TODO: Test that `#emptyOption` is excluded from the Filter Reset if no results were found before `collapse`
+        if (this.#matchingOptions.length !== listbox.children.length) {
+          this.#emptyOption?.remove();
+          this.#matchingOptions = Array.from(listbox.children, (option) => {
             option.removeAttribute("data-filtered-out");
             return option;
           });
@@ -283,9 +285,7 @@ class ComboboxField extends HTMLElement {
   #handleTypeahead = (event) => {
     const combobox = /** @type {ComboboxField} */ (event.currentTarget);
     const { listbox } = combobox;
-    const activeOption = /** @type {ComboboxOption | null} */ (
-      listbox.querySelector(":scope [role='option'][data-active='true']")
-    );
+    const activeOption = listbox.querySelector(":scope [role='option'][data-active='true']");
 
     // TODO: Should we allow matching multi-word `option`s by removing empty spaces during a search comparison?
     //       (NOTE: The native `<select>` element does not support such functionality.)
@@ -294,18 +294,14 @@ class ComboboxField extends HTMLElement {
       this.#searchString += event.key;
 
       /* -------------------- Determine Next Active `option` -------------------- */
-      /** @type {ComboboxOption | undefined} */
-      let nextActiveOption;
-      const start = (activeOption?.index ?? -1) + 1;
+      // NOTE: This approach won't work with `group`ed `option`s, but it can be fairly easily modified to do so
+      const lastOption = activeOption ?? listbox.lastElementChild;
+      let nextActiveOption = lastOption;
 
-      // TODO: `nextElementSibling` might be faster than an `index`-based loop. Need to do more tests...
-      for (let i = start; i < listbox.children.length + start; i++) {
-        const index = i % listbox.children.length;
-
-        if (listbox.children[index].textContent?.toLowerCase().startsWith(this.#searchString.toLowerCase())) {
-          nextActiveOption = listbox.children[index];
-          break;
-        }
+      while (nextActiveOption !== null) {
+        nextActiveOption = nextActiveOption.nextElementSibling ?? listbox.firstElementChild;
+        if (nextActiveOption?.textContent?.toLowerCase().startsWith(this.#searchString.toLowerCase())) break;
+        if (nextActiveOption === lastOption) nextActiveOption = null;
       }
 
       /* -------------------- Update `search` and Active `option` -------------------- */
@@ -435,10 +431,10 @@ class ComboboxField extends HTMLElement {
     let matches = 0;
     this.#activeIndex = 0;
 
-    // TODO: Should be faster to loop with `element.nextElementSibling` instead, based on our (small) perf tests
-    for (let i = 0; i < listbox.children.length; i++) {
-      const option = listbox.children[i];
-
+    // NOTE: This approach won't work with `group`ed `option`s, but it can be fairly easily modified to do so
+    // TODO: Test that `#emptyOption` is excluded from the Results if the `search` matches the No Options Message
+    for (let option = listbox.firstElementChild; option; option = /** @type {any} */ (option.nextElementSibling)) {
+      if (option === this.#emptyOption) continue;
       if (search && !option.textContent?.toLowerCase().includes(search.toLowerCase()))
         option.setAttribute("data-filtered-out", String(true));
       else {
