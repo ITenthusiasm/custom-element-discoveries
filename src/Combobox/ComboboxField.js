@@ -405,7 +405,7 @@ class ComboboxField extends HTMLElement {
 
       range.deleteContents();
       let data = event.data ?? event.dataTransfer?.getData("text/plain") ?? "";
-      if (data.includes("\n")) data = data.replaceAll("\n", "");
+      data = data.replaceAll("\n", "");
 
       /** The `startOffset` of the dynamic `Range` _after_ content deletion */
       const startOffset = range.startOffset; // eslint-disable-line prefer-destructuring -- Needed to apply JSDocs
