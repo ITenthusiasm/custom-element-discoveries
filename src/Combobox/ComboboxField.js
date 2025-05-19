@@ -409,8 +409,7 @@ class ComboboxField extends HTMLElement {
 
       /** The `startOffset` of the dynamic `Range` _after_ content deletion */
       const startOffset = range.startOffset; // eslint-disable-line prefer-destructuring -- Needed to apply JSDocs
-      const originalText = /** @type {string} */ (textNode.nodeValue);
-      textNode.nodeValue = originalText.slice(0, startOffset) + data + originalText.slice(startOffset);
+      textNode.insertData(startOffset, data);
 
       rangeShift = rangeShift - deletedCharacters + data.length;
       if (i !== staticRanges.length - 1) continue;
