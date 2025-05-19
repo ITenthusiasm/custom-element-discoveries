@@ -3,6 +3,15 @@ import { setAttributeFor } from "../utils/dom.js";
 import ComboboxOption from "./ComboboxOption.js";
 import attrs from "./attrs.js";
 
+/*
+ * "TypeScript Lies" to Be Aware of:
+ * (Probably should move this comment to a markdown file)
+ *
+ * 1) `#matchingOptions` could technically be `null` but is `ComboboxOption[]` (never a practical problem)
+ * 2) `listbox` could technically have `#emptyOption` if mis-handled, but typed as only having `ComboboxOption`s
+ *    (and should never be a practical problem).
+ */
+
 /** 
  * @typedef {keyof Pick<ElementInternals,
      "labels" | "form" | "validity" | "validationMessage" | "willValidate" | "checkValidity" | "reportValidity"
@@ -12,7 +21,7 @@ import attrs from "./attrs.js";
 // TODO: It might be helpful to have `(add|remove)Option` methods, especially for frameworks like `React`...
 // TODO: Do we want to force a default option to exist when the `combobox` is in `filter` mode? Maybe not?
 // TODO: Test that when a user TABs to a `filter`able `combobox`, the full text content is highlighted
-//       (similar to `<input>`s). But when a user focuses the `combobox` by `click`ing it, the cursor
+//       (similar to `<input>`s). But when a user focuses the `combobox` by CLICKing it, the cursor
 //       naturally goes where the `MouseEvent` would place it.
 /** @implements {Pick<ElementInternals, ExposedInternals>} */
 class ComboboxField extends HTMLElement {
@@ -52,7 +61,6 @@ class ComboboxField extends HTMLElement {
   /** @readonly */ #expansionObserver = new MutationObserver((mutations) => {
     for (let i = 0; i < mutations.length; i++) {
       const mutation = mutations[i];
-
       const combobox = /** @type {ComboboxField} */ (mutation.target);
       const expanded = combobox.getAttribute(attrs["aria-expanded"]) === String(true);
       const { listbox } = combobox;
@@ -211,8 +219,7 @@ class ComboboxField extends HTMLElement {
         }
       }
 
-      // eslint-disable-next-line no-useless-return -- I want code here to be easily moved around
-      return;
+      return; // eslint-disable-line no-useless-return -- I want code in this callback to be easily moved around
     }
   }
 
@@ -356,24 +363,24 @@ class ComboboxField extends HTMLElement {
      *
      * 5) [Note]: `set Element.textContent()` will replace all of the children of the related `Node`. This is bad because
      * it means you'll lose the reference to the Text Node that your `Range`(s) were originally pointing to. So instead,
-     * get access to the underlying Text Node and modify the node's value.
+     * get access to the underlying Text Node and modify the node's value (through `nodeValue`, `insertData`, etc.).
      *
      * 6) [Note]: You probably won't need to distinguish between `insert*` and `delete*` in most cases when updating
      * the `ComboboxField`'s content. For the delete scenario, you can just "insert" an empty, 0-character string.
      *
      * 7) [Note]: Apparently, all (non-static) `Range`s previously associated with a Text Node get emptied once the
-     * referenced node's content is changed. (The `Range`s probably don't know what to point to anymore since the
-     * text has technically "changed".) This makes it imperative that you know when to leverage the a `StaticRange`
+     * referenced node's `nodeValue` is re-set. (The `Range`s probably don't know what to point to anymore since the
+     * `nodeValue` has technically "changed".) This makes it imperative that you know when to leverage the a `StaticRange`
      * and when to work directly with a regular, dynamic `Range` (or a value that it cached before being modified).
      *
      * 8) [Test]: We want to verify that our "range shifting" for our `dynamicRange` variable is correct. So far,
      * the logic seems to be accomplishing what we want.
      *
      * 9) [Test]: Pressing `Enter` should select a Combobox Option, and it shouldn't leave the Combobox expanded.
-     * (This should be fixed.)
+     * (This should be fixed.) It also shouldn't expand the Combobox if it was previously collapsed.
      *
      * 10) [Test]: All regular spaces should appear within the `Combobox` edit/search field and should not be collapsed.
-     * Requires CSS. See `white-space`/`white-space-collapse` CSS Properties. (This should be fixed.)
+     * Requires CSS. See the `white-space`/`white-space-collapse` CSS Properties. (This should be fixed.)
      *
      * 11) [Test]: `deleteContentBackward` should not cause an error if done at the very beginning of the text.
      * (This should be fixed.)
@@ -410,10 +417,9 @@ class ComboboxField extends HTMLElement {
       /** The `startOffset` of the dynamic `Range` _after_ content deletion */
       const startOffset = range.startOffset; // eslint-disable-line prefer-destructuring -- Needed to apply JSDocs
       textNode.insertData(startOffset, data);
-
       rangeShift = rangeShift - deletedCharacters + data.length;
-      if (i !== staticRanges.length - 1) continue;
 
+      if (i !== staticRanges.length - 1) continue;
       const cursorLocation = startOffset + data.length;
       const selection = /** @type {Selection} */ (combobox.ownerDocument.getSelection());
       selection.setBaseAndExtent(textNode, cursorLocation, textNode, cursorLocation);
@@ -450,7 +456,7 @@ class ComboboxField extends HTMLElement {
     //       NOTE: I think this is resolved, but we should definitely test this.
     if (matches === 0) {
       if (!this.#emptyOption) {
-        this.#emptyOption = document.createElement("div");
+        this.#emptyOption = document.createElement("span");
         this.#emptyOption.textContent = this.emptyMessage;
         this.#emptyOption.setAttribute("role", "option");
         this.#emptyOption.setAttribute("aria-selected", String(false));
@@ -459,7 +465,7 @@ class ComboboxField extends HTMLElement {
 
       // TODO: Should we test that `#emptyOption` remains visible even after it is encountered for the `N > 1`-th time?
       listbox.appendChild(this.#emptyOption);
-      this.#emptyOption.removeAttribute("data-filtered-out");
+      this.#emptyOption.removeAttribute("data-filtered-out"); // TODO: Is this still needed?
       setAttributeFor(combobox, attrs["aria-activedescendant"], "");
     } else this.#emptyOption?.remove();
   };
@@ -655,7 +661,7 @@ class ComboboxField extends HTMLElement {
   static #handleFocus(event) {
     // TODO: Is it worth considering not expanding the `combobox` on `focus`? (We can maintain highlighting.)
     // This is what Material UI does, and it probably makes it more clear that the user is on a `combobox`
-    // (and what the original/previous values was). Just a consideration. Note sure yet.
+    // (and what the original/previous values was). Just a consideration. Note sure yet. Screen Readers... :\
     const combobox = /** @type {ComboboxField} */ (event.currentTarget);
     combobox.setAttribute(attrs["aria-expanded"], String(true));
 
@@ -762,7 +768,6 @@ class ComboboxField extends HTMLElement {
       return combobox.getAttribute(attrs["aria-expanded"]) === String(true) ? activeOption?.click() : undefined;
     }
 
-    // TODO: Test that the `combobox` doesn't expand when `Enter` is pressed in filter mode (when expanded OR collapsed)
     if (event.key === "Enter") {
       // Prevent `#handleSearch` from triggering
       if (combobox.filter) event.preventDefault();
