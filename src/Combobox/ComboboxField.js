@@ -18,7 +18,6 @@ import attrs from "./attrs.js";
    >} ExposedInternals
  */
 
-// TODO: It might be helpful to have `(add|remove)Option` methods, especially for frameworks like `React`...
 // TODO: Do we want to force a default option to exist when the `combobox` is in `filter` mode? Maybe not?
 /** @implements {Pick<ElementInternals, ExposedInternals>} */
 class ComboboxField extends HTMLElement {
