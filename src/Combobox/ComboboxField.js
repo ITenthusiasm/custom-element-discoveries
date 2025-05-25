@@ -28,7 +28,7 @@ class ComboboxField extends HTMLElement {
   }
 
   static get observedAttributes() {
-    return /** @type {const} */ (["required", "filter", "empty-message"]);
+    return /** @type {const} */ (["required", "filter", "emptymessage"]);
   }
 
   /* ------------------------------ Internals ------------------------------ */
@@ -184,7 +184,7 @@ class ComboboxField extends HTMLElement {
    */
   attributeChangedCallback(name, oldValue, newValue) {
     if (name === "required") return this.#validateRequiredConstraint();
-    if (name === "empty-message" && this.#emptyOption && newValue !== oldValue) {
+    if (name === "emptymessage" && this.#emptyOption && newValue !== oldValue) {
       this.#emptyOption.textContent = this.emptyMessage;
       return;
     }
@@ -539,11 +539,11 @@ class ComboboxField extends HTMLElement {
 
   /** The message displayed to users when none of the `combobox`'s `option`s match their filter. @returns {string} */
   get emptyMessage() {
-    return this.getAttribute("empty-message") ?? "No options found";
+    return this.getAttribute("emptymessage") ?? "No options found";
   }
 
   set emptyMessage(value) {
-    this.setAttribute("empty-message", value);
+    this.setAttribute("emptymessage", value);
   }
 
   /* ------------------------------ Exposed `ElementInternals` ------------------------------ */
