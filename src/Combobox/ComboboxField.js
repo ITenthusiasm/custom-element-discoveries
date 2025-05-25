@@ -20,9 +20,6 @@ import attrs from "./attrs.js";
 
 // TODO: It might be helpful to have `(add|remove)Option` methods, especially for frameworks like `React`...
 // TODO: Do we want to force a default option to exist when the `combobox` is in `filter` mode? Maybe not?
-// TODO: Test that when a user TABs to a `filter`able `combobox`, the full text content is highlighted
-//       (similar to `<input>`s). But when a user focuses the `combobox` by CLICKing it, the cursor
-//       naturally goes where the `MouseEvent` would place it.
 /** @implements {Pick<ElementInternals, ExposedInternals>} */
 class ComboboxField extends HTMLElement {
   /* ------------------------------ Custom Element Settings ------------------------------ */
@@ -79,8 +76,6 @@ class ComboboxField extends HTMLElement {
           listbox.querySelector(":scope [role='option'][aria-selected='true']:not([data-filtered-out])") ??
           /** @type {ComboboxOption} */ (listbox.querySelector(":scope [role='option']:not([data-filtered-out])"));
 
-        // TODO: DEFINITELY test that `#activeIndex` is correct if there was a previously-selected `option`.
-        //       And really, test for the active `option` in all circumstances here...
         // NOTE: If our code is written correctly, then `#matchingOptions` should be all `listbox.children` on `expand`
         // since we won't get here if the user is in the middle of a `#handleSearch`
         if (combobox.filter) this.#activeIndex = this.#matchingOptions.indexOf(activeOption);
@@ -94,7 +89,6 @@ class ComboboxField extends HTMLElement {
         if (!combobox.filter || combobox.value == null) return;
 
         // Reset filtered `option`s. (NOTE: Approach is incompatible with `group`ed `option`s)
-        // TODO: Test that `#emptyOption` is excluded from the Filter Reset if no results were found before `collapse`
         if (this.#matchingOptions.length !== listbox.children.length) {
           this.#emptyOption?.remove();
           this.#matchingOptions = Array.from(listbox.children, (option) => {
@@ -427,8 +421,6 @@ class ComboboxField extends HTMLElement {
       if (deletedCharacters === 0 && data.length === 0) return; // User attempted to "delete" nothing
     }
 
-    // TODO: Test that the filtered `option`s don't update if the user attempts to "delete" nothing.
-    // (This can be tested by pressing `Delete` at the very end of the searchbox right after `expand`ing it.)
     const { listbox, textContent: search } = combobox;
     setAttributeFor(combobox, attrs["aria-expanded"], String(true));
 
@@ -437,7 +429,6 @@ class ComboboxField extends HTMLElement {
     this.#activeIndex = 0;
 
     // NOTE: This approach won't work with `group`ed `option`s, but it can be fairly easily modified to do so
-    // TODO: Test that `#emptyOption` is excluded from the Results if the `search` matches the No Options Message
     for (let option = listbox.firstElementChild; option; option = /** @type {any} */ (option.nextElementSibling)) {
       if (option === this.#emptyOption) continue;
       if (search && !option.textContent?.toLowerCase().includes(search.toLowerCase()))
@@ -452,8 +443,6 @@ class ComboboxField extends HTMLElement {
     // Remove any `option`s that still exist from the previous filter
     this.#matchingOptions.splice(matches);
 
-    // TODO: We need to make sure the `combobox` doesn't try to `activate` the `No-Options` message during keystrokes.
-    //       NOTE: I think this is resolved, but we should definitely test this.
     if (matches === 0) {
       if (!this.#emptyOption) {
         this.#emptyOption = document.createElement("span");
@@ -463,9 +452,7 @@ class ComboboxField extends HTMLElement {
         this.#emptyOption.inert = true;
       }
 
-      // TODO: Should we test that `#emptyOption` remains visible even after it is encountered for the `N > 1`-th time?
       listbox.appendChild(this.#emptyOption);
-      this.#emptyOption.removeAttribute("data-filtered-out"); // TODO: Is this still needed?
       setAttributeFor(combobox, attrs["aria-activedescendant"], "");
     } else this.#emptyOption?.remove();
   };
