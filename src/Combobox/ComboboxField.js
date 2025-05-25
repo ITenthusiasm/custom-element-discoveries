@@ -66,7 +66,9 @@ class ComboboxField extends HTMLElement {
         /*
          * NOTE: If the user opens the `combobox` with search/typeahead, then `aria-activedescendant` will already
          * exist and this expansion logic will be irrelevant. Remember that `MutationObserver` callbacks are run
-         * asynchronously, so this check would happen AFTER the search/typeahead handler completed.
+         * asynchronously, so this check would happen AFTER the search/typeahead handler completed. It's also
+         * possible for this condition to be met if we redundantly set `aria-expanded`. Although we should be
+         * be able to avoid this, we can't prevent Developers from accidentally doing this themselves.
          */
         if (combobox.getAttribute(attrs["aria-activedescendant"]) !== "") return;
 
@@ -196,7 +198,6 @@ class ComboboxField extends HTMLElement {
           this.removeEventListener("mousedown", ComboboxField.#handleMousedown);
           this.removeEventListener("focus", ComboboxField.#handleFocus);
           this.removeEventListener("beforeinput", this.#handleSearch);
-          this.addEventListener("click", ComboboxField.#handleClick, { passive: true });
           this.addEventListener("keydown", this.#handleTypeahead, { passive: true });
         }
       } else {
@@ -204,7 +205,6 @@ class ComboboxField extends HTMLElement {
         this.setAttribute("contenteditable", "true");
 
         if (this.isConnected) {
-          this.removeEventListener("click", ComboboxField.#handleClick);
           this.removeEventListener("keydown", this.#handleTypeahead);
           this.addEventListener("mousedown", ComboboxField.#handleMousedown, { passive: true });
           this.addEventListener("focus", ComboboxField.#handleFocus, { passive: true });
@@ -248,6 +248,7 @@ class ComboboxField extends HTMLElement {
     });
 
     // Setup Event Listeners
+    this.addEventListener("click", ComboboxField.#handleClick, { passive: true });
     this.addEventListener("blur", ComboboxField.#handleBlur, { passive: true });
     this.addEventListener("keydown", this.#handleKeydown);
 
@@ -256,7 +257,6 @@ class ComboboxField extends HTMLElement {
       this.addEventListener("focus", ComboboxField.#handleFocus, { passive: true });
       this.addEventListener("beforeinput", this.#handleSearch);
     } else {
-      this.addEventListener("click", ComboboxField.#handleClick, { passive: true });
       this.addEventListener("keydown", this.#handleTypeahead, { passive: true });
     }
   }
@@ -267,13 +267,13 @@ class ComboboxField extends HTMLElement {
     this.#expansionObserver.disconnect();
     this.#activeDescendantObserver.disconnect();
 
+    this.removeEventListener("click", ComboboxField.#handleClick);
     this.removeEventListener("blur", ComboboxField.#handleBlur);
     this.removeEventListener("keydown", this.#handleKeydown);
 
     this.removeEventListener("mousedown", ComboboxField.#handleMousedown);
     this.removeEventListener("focus", ComboboxField.#handleFocus);
     this.removeEventListener("beforeinput", this.#handleSearch);
-    this.removeEventListener("click", ComboboxField.#handleClick);
     this.removeEventListener("keydown", this.#handleTypeahead);
   }
 
@@ -615,13 +615,14 @@ class ComboboxField extends HTMLElement {
 
   /* ------------------------------ Combobox Event Handlers ------------------------------ */
   /**
-   * (For {@link filter unfiltered} `combobox`es only)
    * @param {MouseEvent} event
    * @returns {void}
    */
   static #handleClick(event) {
     const combobox = /** @type {ComboboxField} */ (event.currentTarget);
     const expanded = combobox.getAttribute(attrs["aria-expanded"]) === String(true);
+
+    if (combobox.filter && expanded) return;
     combobox.setAttribute(attrs["aria-expanded"], String(!expanded));
   }
 
@@ -645,13 +646,9 @@ class ComboboxField extends HTMLElement {
    * @returns {void}
    */
   static #handleFocus(event) {
-    // TODO: Is it worth considering not expanding the `combobox` on `focus`? (We can maintain highlighting.)
-    // This is what Material UI does, and it probably makes it more clear that the user is on a `combobox`
-    // (and what the original/previous values was). Just a consideration. Note sure yet. Screen Readers... :\
     const combobox = /** @type {ComboboxField} */ (event.currentTarget);
-    combobox.setAttribute(attrs["aria-expanded"], String(true));
-
     if (combobox.hasAttribute("data-mousedown")) return;
+
     const textNode = /** @type {Text} */ (combobox.firstChild);
     document.getSelection()?.setBaseAndExtent(textNode, 0, textNode, textNode.length);
   }

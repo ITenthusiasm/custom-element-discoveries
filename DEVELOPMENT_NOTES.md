@@ -2,6 +2,31 @@
 
 My more-detailed notes on certain design decisions that I made for the components in this codebase.
 
+## Why Doesn't the `ComboboxField` Expand When `focus`ed? (2025-05-23)
+
+In all of our previous iterations of _filterable_ `combobox` components, we designed the `combobox` to reveal its `listbox` immediately after being focused. (This design decision was likely influenced by libraries like `React Select` and `Vue Select`, which exhibit this behavior. **EDIT**: React Select no longer exhibits this behavior. Was it changed?) This approach mainly benefits Visual Users: When someone `Tab`s to a `combobox` field, they'll be met _immediately_ with a list of `option`s (in the `listbox` popup) and a blinking `cursor` (in the `combobox` element). This makes it clear-as-day that the user can click one of the available `option`s _or_ use the keyboard to filter down into the list. Given the UI, the user will likely know that they can hit `Enter` to select an `option` as well.
+
+Although this experience is great for Visual Users, it's bad (and irreparably so) for Screen Reader Users. If a Screen Reader User focuses the `combobox` component that we described earlier, then they'll be met with a `listbox` popup before they're told that they're on a `combobox`. (This is because the appearance of the `listbox` interrupts/overrides the announcement of the `combobox` that was just focused.) Such users likely won't know what triggered the `listbox` _popup_ to appear (remember, we're using `aria-haspopup`), and they probably won't know that they can filter the available list of `option`s either. In fact, they may not know what _any_ of the consequences would be for pressing a given key on their keyboard. Basically, the user will be at a loss upon encountering our `combobox` -- at least initially. Thankfully, in some cases, the Screen Reader _might_ announce that the user is on a `combobox` after the `listbox` is announced, but this behavior is inconsistent across browsers on MacOS with VoiceOver. And who knows what inconistencies or ambiguities could arise with other tools?
+
+Naturally, the alternative here is to _avoid_ expanding the `combobox` when it is focused. That way, Screen Reader Users would understand that they're on a `combobox` when they visit the form field, and they could set their expectations accordingly. Unfortunately, this would mean that Visual Users might not know that the `combobox` is a "Filterable Dropdown Form Control" when they focus it ... or would it?
+
+You see, advantage of being a Visual User is that it's possible to gain full context by looking at a page. If the `combobox` field shows a Caret Icon which rotates based on whether the `combobox` is expanded or not, this could be a clear indication that the `combobox` is a "Dropdown" with a list of `option`s. And if the `combobox` shows a cursor to the User when they focus the form control, that will likely indicate that this "Dropdown" is searchable. Keyboard Users should be able to deduce that they can open the `combobox` by pressing an Arrow Key or typing into the searchbox. As for Mouse Users, we can simply expand the `combobox` when it's clicked (just like we do when the element is unfilterable).
+
+The only perceivable drawback of this approach for Visual _Keyboard_ Users is that there's a possibility they won't see _all_ of the `option`s the first time that they expand the `combobox`. If they expand the `combobox` by pressing an Arrow Key, then they'll see all of the `option`s immediately and should be able to conclude from there that they're working with a "Filterable Dropdown". If they expand the `combobox` by providing a filter, then they may not know/see all of the available `option`s initially. However, it should be (sufficiently) obvious that deleting the filter will expose all of the `option`s. After that first encounter, the Visual Keyboard User's expectations will be properly set.
+
+Is this a safe bet? Other libraries seem to think so. [Reach UI](https://reach.tech/combobox/), [WAI-ARIA](https://www.w3.org/WAI/ARIA/apg/patterns/combobox/examples/combobox-autocomplete-list), and [Material UI](https://mui.com/material-ui/react-autocomplete/) (all of which seem to take Accessibility more seriously than React Select and Vue Select) are libraries that _don't_ expand their `combobox`es on `focus`. [Shadcn UI](https://ui.shadcn.com/docs/components/combobox) is the same way, but its approach to handling `combobox` expansion seems a little unorthodox (and potentially confusing). Many of the components from these tools are (or have been) widely used (or used as frames of reference for building other components), so the Visual User Experience should be just fine for Mouse Users and Keyboard Users alike.
+
+Finally, if developers _really_ want their `combobox`es to expand on `focus`, then they can easily provide that logic themselves with a simple `focus` handler:
+
+```js
+function handleFocus(event) {
+  const combobox = event.currentTarget;
+  combobox.setAttribute("aria-expanded", String(true));
+}
+```
+
+With these considerations, we think it best to deviate from React/Vue Select to provide a better experience for users overall. This means we'll no longer be expanding the `ComboboxField` on `focus`.
+
 ## What's the Motivation behind Using `static` Methods as Event Handlers? (2025-05-12)
 
 As as rule, we prefer using `static` event handlers in our Web Components whenever possible. The reason for this is quite simple: If you have a single function that _every_ instance of your component uses, then you'll save _significantly_ on memory usage. For example: If 100 `SelectEnhancer` components are rendered to the DOM, only _one_ `#handleDelegatedOptionClick` "function" (`static` method) will be created. This function will be referenced by all of the corresponding event listeners registered for the `SelectEnhancer`.

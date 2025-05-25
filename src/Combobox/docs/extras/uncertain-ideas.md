@@ -2,7 +2,7 @@
 
 Unlike `Future Ideas`, which represent planned future work and [potentially] have their implementations known, this file documents a set of "Uncertain Ideas": Ideas that _might_ be good to implement, but might also yield a less-than-ideal UX/DX. An idea can also be "Uncertain" if the resulting UX/DX is good, but the maintenance cost for implementing the idea seems too high. We're documenting these ideas here in case they become true `Future Ideas`. If an idea is rejected, then it will be moved to a `Development Note` or `Design Decision`, where the reason for the rejection will be clearly expressed.
 
-## Supporting `(add|remove)Option` Methods on `ComboboxField`
+## Supporting `(add|remove)Option` Methods on `ComboboxField` (2025-05-22)
 
 The native `<select>` element has [`add()`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLSelectElement/add) and [`remove()`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLSelectElement/remove) methods for adding new `<option>`s to the form control. We thought it might make sense to support similar methods on the `ComboboxField` element, as it would improve `<select>` compatibility. Additionally, we thought that it might be helpful for JS Frameworks like `React`; but after thinking things through a little more, we no longer think that's true.
 
