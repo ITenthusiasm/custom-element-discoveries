@@ -737,7 +737,7 @@ it.describe("Combobox Web Component", () => {
           await expect(page.locator(":has(+ select-enhancer)")).toBeFocused();
         });
 
-        it("Selects the `active` `option`, hides the `option`s, and performs the default action", async ({ page }) => {
+        it("Hides the `option`s, and performs the default action without selecting an `option`", async ({ page }) => {
           /* ---------- Setup ---------- */
           const initialValue = testOptions[0];
           await renderComponent(page);
@@ -757,31 +757,33 @@ it.describe("Combobox Web Component", () => {
 
           /* ---------- Assertions ---------- */
           // Forward Tabbing Works
-          const newValue = testOptions[1];
+          const activeOption = testOptions[1];
           for (let i = 0; i < 2; i++) await page.keyboard.press("ArrowDown");
+          await expectOptionToBeActive(page, { label: activeOption });
 
           await page.keyboard.press("Tab");
           await expect(combobox).not.toBeFocused();
           await expect(page.locator("select-enhancer + *")).toBeFocused();
 
           await expectComboboxToBeClosed(page);
-          await expectOptionToBeSelected(page, { label: newValue });
-          await expectOptionToBeSelected(page, { label: initialValue }, false);
+          await expectOptionToBeSelected(page, { label: initialValue });
+          await expectOptionToBeSelected(page, { label: activeOption }, false);
 
           // Backwards Tabbing Works
-          const secondNewValue = testOptions[2];
+          const newActiveOption = testOptions[2];
           await page.keyboard.press("Shift+Tab");
           await expect(combobox).toBeFocused();
-          for (let i = 0; i < 2; i++) await page.keyboard.press("ArrowDown");
+          for (let i = 0; i < 3; i++) await page.keyboard.press("ArrowDown");
+          await expectOptionToBeActive(page, { label: newActiveOption });
 
           await page.keyboard.press("Shift+Tab");
           await expect(combobox).not.toBeFocused();
           await expect(page.locator(":has(+ select-enhancer)")).toBeFocused();
 
           await expectComboboxToBeClosed(page);
-          await expectOptionToBeSelected(page, { label: secondNewValue });
-          await expectOptionToBeSelected(page, { label: newValue }, false);
-          await expectOptionToBeSelected(page, { label: initialValue }, false);
+          await expectOptionToBeSelected(page, { label: initialValue });
+          await expectOptionToBeSelected(page, { label: activeOption }, false);
+          await expectOptionToBeSelected(page, { label: newActiveOption }, false);
         });
       });
 

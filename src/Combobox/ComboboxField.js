@@ -747,10 +747,6 @@ class ComboboxField extends HTMLElement {
       return combobox.setAttribute(attrs["aria-expanded"], String(true));
     }
 
-    if (event.key === "Tab") {
-      return combobox.getAttribute(attrs["aria-expanded"]) === String(true) ? activeOption?.click() : undefined;
-    }
-
     if (event.key === "Enter") {
       // Prevent `#handleSearch` from triggering
       if (combobox.filter) event.preventDefault();
