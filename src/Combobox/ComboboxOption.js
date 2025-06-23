@@ -47,6 +47,7 @@ class ComboboxOption extends HTMLElement {
     }
   }
 
+  /** The `option`'s label */
   get label() {
     return /** @type {string} */ (this.textContent);
   }
@@ -116,7 +117,9 @@ class ComboboxOption extends HTMLElement {
 
     if (this.selected && combobox.value !== this.value) combobox.value = this.value;
     else if (!this.selected && combobox.value === this.value) {
-      combobox.value = /** @type {this} */ (this.#listbox.firstElementChild).value;
+      if (combobox.textContent && combobox.acceptsFilter(combobox.textContent)) return;
+      if (combobox.acceptsFilter("")) return combobox.forceEmptyValue();
+      combobox.formResetCallback(); // TODO: This is a BREAKING change! Need to update tests BEFORE `commit`TING!
     }
   }
 }

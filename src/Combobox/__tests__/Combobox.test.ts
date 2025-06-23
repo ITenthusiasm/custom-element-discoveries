@@ -1,3 +1,4 @@
+/* eslint-disable func-names */
 import { test as it, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import type SelectEnhancer from "../SelectEnhancer.js";
@@ -2113,7 +2114,7 @@ it.describe("Combobox Web Component", () => {
           expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("4");
         });
 
-        it("Resets its value to the first `option` if the selected one is removed", async ({ page }) => {
+        it("Resets its value if the selected `option` is removed", async ({ page }) => {
           /* ---------- Setup ---------- */
           const name = "my-combobox";
           await page.goto(url);
@@ -2133,9 +2134,20 @@ it.describe("Combobox Web Component", () => {
             `;
           }, name);
 
+          // Enable Observability of `ComboboxField.formResetCallback()`
+          const combobox = page.getByRole("combobox");
+          const resetCountAttribute = "data-reset-count";
+          await combobox.evaluate((node: ComboboxField, attr) => {
+            const { formResetCallback } = node;
+            node.formResetCallback = function () {
+              formResetCallback.call(this);
+              const count = Number(this.getAttribute(attr) ?? 0);
+              this.setAttribute(attr, String(count + 1));
+            };
+          }, resetCountAttribute);
+
           /* ---------- Assertions ---------- */
           // Display Options (Not necessary, but makes this test easier to write)
-          const combobox = page.getByRole("combobox");
           await combobox.click();
 
           // Intial value should match the `defaultSelected` `option`
@@ -2147,8 +2159,9 @@ it.describe("Combobox Web Component", () => {
           expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("4");
           await expect(firstOption.and(selectedOption)).not.toBeAttached();
 
-          // `combobox` value changes to first `option` when the selected `option` is removed
+          // `combobox` resets itself when the selected `option` is removed
           await selectedOption.evaluate((node) => node.remove());
+          await expect(combobox).toHaveAttribute(resetCountAttribute, String(1));
           await expect(firstOption.and(selectedOption)).toBeAttached();
 
           await expect(firstOption).toHaveAttribute("value", "1");
@@ -2157,8 +2170,9 @@ it.describe("Combobox Web Component", () => {
             await firstOption.getAttribute("value"),
           );
 
-          // This behavior still works even if the first `option` is removed after being selected
+          // This behavior still works even if the first `option` is removed after becoming selected
           await selectedOption.evaluate((node) => node.remove());
+          await expect(combobox).toHaveAttribute(resetCountAttribute, String(2));
           await expect(firstOption.and(selectedOption)).toBeVisible();
 
           await expect(firstOption).toHaveAttribute("value", "2");
@@ -2168,7 +2182,7 @@ it.describe("Combobox Web Component", () => {
           );
         });
 
-        it("Resets its value to `null` if all `option`s are removed", async ({ page }) => {
+        it("Forcefully resets its value to `null` if all `option`s are removed", async ({ page }) => {
           /* ---------- Setup ---------- */
           await renderComponent(page);
           await expectOptionToBeSelected(page, { label: testOptions[0] });
@@ -2701,17 +2715,30 @@ it.describe("Combobox Web Component", () => {
             expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).not.toBe(firstOption);
           });
 
-          // Note: This is the behavior of the native <select> element, even when trying to unselect the 1st option.
-          it("Reverts the `combobox` value to the 1st option when changed from `true` to `false`", async ({ page }) => {
+          it("Resets the value of the `combobox` when changed from `true` to `false`", async ({ page }) => {
             // Setup
             const firstOption = testOptions[0];
             const lastOption = testOptions.at(-1) as string;
-            await renderComponent(page, getRandomOption(testOptions.slice(1, -1)));
+            const defaultOption = getRandomOption(testOptions.slice(1, -1));
+            await renderComponent(page, defaultOption);
 
             const name = "my-combobox";
             const combobox = page.getByRole("combobox");
             await associateComboboxWithForm(combobox, name);
             const form = page.getByRole("form");
+
+            // Enable Observability of `ComboboxField.formResetCallback()`
+            const resetCountAttribute = "data-reset-count";
+            await combobox.evaluate((node: ComboboxField, attr) => {
+              const { formResetCallback } = node;
+              node.formResetCallback = function () {
+                formResetCallback.call(this);
+                const count = Number(this.getAttribute(attr) ?? 0);
+                this.setAttribute(attr, String(count + 1));
+              };
+            }, resetCountAttribute);
+
+            await expect(combobox).not.toHaveAttribute(resetCountAttribute);
 
             // Display Options
             await combobox.click();
@@ -2726,22 +2753,25 @@ it.describe("Combobox Web Component", () => {
             await lastOptionElement.evaluate((node: ComboboxOption) => (node.selected = true));
             await lastOptionElement.evaluate((node: ComboboxOption) => (node.selected = false));
 
-            // First `option` should now be selected
-            await expectOptionToBeSelected(page, { label: firstOption });
-            await expect(page.getByRole("option").first()).toHaveJSProperty("selected", true);
-            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(firstOption);
+            // `combobox` value should have been reset
+            await expect(combobox).toHaveAttribute(resetCountAttribute, String(1));
+
+            const defaultOptionElement = page.getByRole("option", { name: defaultOption });
+            await expectOptionToBeSelected(page, { label: defaultOption }, true);
+            await expect(defaultOptionElement).toHaveJSProperty("selected", true);
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(defaultOption);
 
             await expectOptionToBeSelected(page, { label: lastOption }, false);
             await expect(lastOptionElement).toHaveJSProperty("selected", false);
             expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).not.toBe(lastOption);
 
-            // First `option` will still be the default even if someone unselects it
-            const firstOptionElement = page.getByRole("option", { name: firstOption });
-            await firstOptionElement.evaluate((node: ComboboxOption) => (node.selected = false));
+            // Resets still function properly if the `defaultOption` is de-selected
+            await defaultOptionElement.evaluate((node: ComboboxOption) => (node.selected = false));
+            await expect(combobox).toHaveAttribute(resetCountAttribute, String(2));
 
-            await expectOptionToBeSelected(page, { label: firstOption }, true);
-            await expect(firstOptionElement).toHaveJSProperty("selected", true);
-            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(firstOption);
+            await expectOptionToBeSelected(page, { label: defaultOption }, true);
+            await expect(defaultOptionElement).toHaveJSProperty("selected", true);
+            expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(defaultOption);
           });
         });
 
@@ -3149,29 +3179,35 @@ it.describe("Combobox Web Component", () => {
         );
       });
 
-      it("Removes unsupported nodes/elements during initialization", async ({ page }) => {
+      // NOTE: This is important for developers to be able to add "Cancel Buttons" or "Caret Icons" seamlessly
+      it("Replaces only the provided <select> element and ignores everything else", async ({ page }) => {
         // Setup
-        const className = "invalid";
+        const className = "ignored";
         await page.goto(url);
         await page.evaluate((c) => {
           const app = document.getElementById("app") as HTMLDivElement;
 
           app.innerHTML = `
             <select-enhancer>
-              <div class="${c}">I am ignored</div>
+              <span class="${c}" role="option">I am ignored even though I have a "recognized" role</span>
               <select>
                 <option>Choose Me!!!</option>
               </select>
-              <span class="${c}" role="option">I am ignored even though I have a proper role</span>
-              <div class="${c}" role="listbox">I am ignored even though a \`listbox\` will be put here</div>
+              <div class="${c}" role="listbox">I am ignored even though a \`listbox\` will be generated</div>
+              <button class="${c}">I am ignored</button>
             </select-enhancer>
           `;
         }, className);
 
-        // Unsupported elements (e.g., the `div`s and `span`s) should have been removed
+        // The <select> field is replaced
         const container = page.locator("select-enhancer");
-        expect(await container.locator(".invalid").count()).toBe(0);
-        expect(await container.locator("combobox-option").count()).toBe(1);
+        await expect(container.locator("select, option")).toHaveCount(0);
+        await expect(container.locator("combobox-field")).toHaveCount(1);
+        await expect(container.getByRole("listbox", { includeHidden: true }).locator("combobox-option")).toHaveCount(1);
+
+        // But the other elements are left alone
+        await expect(container.locator(`.${className}`)).toHaveCount(3);
+        await expect(container.getByRole("listbox", { includeHidden: true })).toHaveCount(2);
       });
 
       it("Has no accessible `role`", async ({ page }) => {

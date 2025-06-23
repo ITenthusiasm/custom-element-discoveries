@@ -2,6 +2,16 @@
 
 My more-detailed notes on certain design decisions that I made for the components in this codebase.
 
+## Why Is `this.#value` Used in the `ComboboxField.#handleSearch` `beforeinput` Method?
+
+One very important comment that we made in the `ComboboxField` code was that if the component's value was being set internally, it should use `set ComboboxField.value()`, **_not_** `ComboboxField.#value`. The only exception to this rule is when the `combobox`'s value needs to be set to `null`, as we don't want the `setter` to support `null`. Setting the `combobox` value to `null` is only for edge cases where the `combobox` needs to declare itself as unitialized (e.g., because it currently has no `option`s). Besides that, the `setter` should always be used.
+
+Despite what the "rule" for `ComboboxField.#value` is, the private field &mdash; which represents the component's internal value &mdash; is directly being used intentionally in the `ComboboxField.#handleSearch` method (used for `beforeinput` events). This is another rare exception for using the private field directly.
+
+The reason for this additional exception is simple: Using `set ComboboxField.value()` could lead to unexpected behavior in the event handler when the `combobox`'s filter mode is `clearable` or `anyvalue`. Imagine if the `combobox` had a `<combobox-option value="">Choose</combobox-option>`. In this scenario, if `set ComboboxField.value()` was used, the code would end up trying to select the "Empty String Option" whenever the user tries to clear their filter &mdash; causing the filter to get reset to `Choose`. This means that users would never be able to clear a `clearable` (or `anyvalue`) `combobox`. That's a poor and unacceptable UX.
+
+There are perhaps other edge cases to be concerned about as well when it comes to the `beforeinput` event handler. But we don't have to think about _any_ of those concerns if we make all such concerns _impossible_ by always A&rpar; setting the internal `ComboboxField.#value` directly and B&rpar; deselecting the previously-selected `option`.
+
 ## Why Doesn't `Tab`bing Select the Active `option` in the `combobox`? (2025-05-25)
 
 Some of you may be wondering why I'm even addressing this question, as the idea of selecting an `option` when the user `Tab`s _away_ from the `combobox` might sound preposterous. Indeed, it is preposterous. But WAI-ARIA's examples for `combobox`es, such as their [Select-Only Combobox Example](https://www.w3.org/WAI/ARIA/apg/patterns/combobox/examples/combobox-select-only/), uses `Tab` as a means to choose `option`s. Since WAI-ARIA is an excellent frame of reference for all things related to accessibility, we initially decided to adopt their behavior. However, we've since decided to reject said behavior instead.
