@@ -454,7 +454,7 @@ class ComboboxField extends HTMLElement {
 
       // NOTE: The "Empty String Option" cannot be `autoselectable` with this approach, and that's intentional
       if (search && !option.value) option.setAttribute("data-filtered-out", String(true));
-      else if (search && !option.textContent?.toLowerCase().includes(search.toLowerCase()))
+      else if (search && !option.textContent?.toLowerCase().startsWith(search.toLowerCase()))
         option.setAttribute("data-filtered-out", String(true));
       else {
         // TODO: We can support case-insensitivity in the future here if we want.
