@@ -415,28 +415,21 @@ class ComboboxField extends HTMLElement {
 
     /** The `data` input by the user, modified to be valid for the `combobox` */
     let data = event.data ?? event.dataTransfer?.getData("text/plain") ?? "";
-    data = data.replace(/[\r\n]/g, "");
+    data = data.replace(/[\r\n]/g, ""); // NOTE: This deletion seems to be safe for our range looping logic.
 
-    let rangeShift = 0;
     const staticRanges = event.getTargetRanges();
-    for (let i = 0; i < staticRanges.length; i++) {
+    for (let i = 0, rangeShift = 0; i < staticRanges.length; i++) {
       const staticRange = staticRanges[i];
+      const deletedCharacters = staticRange.endOffset - staticRange.startOffset;
 
-      const range = new Range();
-      range.setStart(text, staticRange.startOffset + rangeShift);
-      range.setEnd(text, staticRange.endOffset + rangeShift);
-
-      const deletedCharacters = range.toString().length;
-      range.deleteContents();
-
-      /** The `startOffset` of the dynamic `Range` _after_ content deletion */
-      const startOffset = range.startOffset; // eslint-disable-line prefer-destructuring -- Needed to apply JSDocs
-      text.insertData(startOffset, data);
+      const correctedStartOffset = staticRange.startOffset + rangeShift;
+      text.deleteData(correctedStartOffset, deletedCharacters);
+      text.insertData(correctedStartOffset, data);
       rangeShift = rangeShift - deletedCharacters + data.length;
 
       if (i !== staticRanges.length - 1) continue;
-      const cursorLocation = startOffset + data.length;
-      const selection = /** @type {Selection} */ (combobox.ownerDocument.getSelection());
+      const cursorLocation = correctedStartOffset + data.length;
+      const selection = /** @type {Selection} */ (text.ownerDocument.getSelection());
       selection.setBaseAndExtent(text, cursorLocation, text, cursorLocation);
 
       if (deletedCharacters === 0 && data.length === 0) return; // User attempted to "delete" nothing
