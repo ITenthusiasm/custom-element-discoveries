@@ -62,6 +62,12 @@ select-enhancer {
         display: none;
       }
 
+      /* TODO: Should this be a custom `ElementInternals` state? */
+      &:is([role="combobox"][filteris="anyvalue"] + [role="listbox"]:not(:has(:not([data-filtered-out])))) {
+        /* Hide `listbox` without making it inaccessible */
+        clip-path: inset(50%);
+      }
+
       & > [role="option"] {
         display: block;
         box-sizing: border-box;

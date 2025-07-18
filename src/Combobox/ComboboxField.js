@@ -20,6 +20,10 @@ import attrs from "./attrs.js";
    >} ExposedInternals
  */
 
+/*
+ * TODO: Some of our functionality requires (or recommends) CSS to be properly implemented (e.g., hiding `listbox`,
+ * properly showing white spaces, etc.). We should probably explain all such things to developers.
+ */
 // NOTE: We expect that `ComboboxField`s will always have only one child: a single Text Node. (IMPORTANT ASSUMPTION!)
 /** @implements {Pick<ElementInternals, ExposedInternals>} */
 class ComboboxField extends HTMLElement {
@@ -30,6 +34,7 @@ class ComboboxField extends HTMLElement {
   }
 
   static get observedAttributes() {
+    // TODO: Consider `emptymessage` --> `nomatchessage`. Wondering if `emptymessage` is too ambiguous/confusing...
     return /** @type {const} */ (["required", "filter", "filteris", "emptymessage"]);
   }
 
@@ -272,7 +277,7 @@ class ComboboxField extends HTMLElement {
         }
       } else {
         this.setAttribute("aria-autocomplete", "list");
-        this.setAttribute("contenteditable", "true");
+        this.setAttribute("contenteditable", String(!this.disabled));
 
         if (this.isConnected) {
           this.removeEventListener("keydown", this.#handleTypeahead);
@@ -452,9 +457,9 @@ class ComboboxField extends HTMLElement {
     for (let option = listbox.firstElementChild; option; option = /** @type {any} */ (option.nextElementSibling)) {
       if (option === this.#emptyOption) continue;
 
-      // NOTE: The "Empty String Option" cannot be `autoselectable` with this approach, and that's intentional
+      // NOTE: An "Empty String Option" cannot be `autoselectable` with this approach, and that's intentional
       if (search && !option.value) option.setAttribute("data-filtered-out", String(true));
-      else if (search && !option.textContent?.toLowerCase().includes(search.toLowerCase()))
+      else if (search && !option.textContent?.toLowerCase().startsWith(search.toLowerCase()))
         option.setAttribute("data-filtered-out", String(true));
       else {
         // TODO: We can support case-insensitivity in the future here if we want.
@@ -491,13 +496,16 @@ class ComboboxField extends HTMLElement {
 
     if (matches === 0) {
       if (!this.#emptyOption) {
+        // TODO: Should we set a `data-nomatchesmessage` attribute for easy styling?
         // TODO: Do we really need to set fake `role`s for something that's totally hidden from the A11y Tree?
         //       If we're unwilling to use `aria-disabled` (which would add more clarity), and we don't _need_
         //       `aria-disabled`, then we should probalby just remove the A11y Data that's just going to be suppressed.
+        //       If we really need CSS, maybe we can target `inert` in addition to `option`?
         this.#emptyOption = document.createElement("span");
         this.#emptyOption.textContent = this.emptyMessage;
         this.#emptyOption.setAttribute("role", "option");
         this.#emptyOption.setAttribute("aria-selected", String(false));
+        this.#emptyOption.setAttribute("aria-hidden", String(true));
         this.#emptyOption.inert = true;
       }
 
@@ -760,6 +768,7 @@ class ComboboxField extends HTMLElement {
    */
   formDisabledCallback(disabled) {
     if (disabled) setAttributeFor(this, attrs["aria-expanded"], String(false));
+    if (this.filter) this.setAttribute("contenteditable", String(!disabled));
   }
 
   /* ------------------------------ Combobox Event Handlers ------------------------------ */
