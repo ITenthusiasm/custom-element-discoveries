@@ -1,3 +1,4 @@
+/* eslint-disable no-void */
 /* eslint-disable prefer-template */
 /* eslint-disable func-names */
 import { test as it, expect as baseExpect } from "@playwright/test";
@@ -84,15 +85,19 @@ for (const { mode } of testConfigs) {
 
     /**
      * Renders the provided HTML template string to the provided `page`, replacing all of the contents
-     * of the `body > div#app` on that page.
+     * of the `body` on that page.
      *
-     * Function will fail if the expected `div#app` does not exist on the page.
+     * @example
+     * renderHTMLToPage(page)`
+     *   <div>Hello</div>
+     *   <div>World</div>
+     * `;
      */
-    function renderHTMLToPage(page: Page, html: string): Promise<void> {
-      return page.evaluate((template) => {
-        const app = document.getElementById("app") as HTMLDivElement;
-        app.innerHTML = template;
-      }, html);
+    function renderHTMLToPage(page: Page) {
+      return function html(strings: TemplateStringsArray, ...values: string[]): Promise<void> {
+        const markup = String.raw({ raw: strings }, ...values);
+        return page.evaluate((template) => void (document.body.innerHTML = template), markup);
+      };
     }
 
     function getRandomOption<T extends ReadonlyArray<string>>(options: T = testOptions as unknown as T): T[number] {
@@ -1811,17 +1816,14 @@ for (const { mode } of testConfigs) {
             it("Supports all `delete*` `inputType`s", async ({ page }) => {
               /* ---------- Setup ---------- */
               await page.goto(url);
-              await renderHTMLToPage(
-                page,
-                `
-                  <select-enhancer>
-                    <select filter filteris="unclearable">
-                      <option>Words of Great Variety</option>
-                      <option>Much Excitement</option>
-                    </select>
-                  </select-enhancer>
-                `,
-              );
+              await renderHTMLToPage(page)`
+                <select-enhancer>
+                  <select filter filteris="unclearable">
+                    <option>Words of Great Variety</option>
+                    <option>Much Excitement</option>
+                  </select>
+                </select-enhancer>
+              `;
 
               const combobox = page.getByRole("combobox");
               await expect(combobox).toHaveText("Words of Great Variety");
@@ -2032,21 +2034,18 @@ for (const { mode } of testConfigs) {
                 const emptyOptionLabel = "Choose a Value";
 
                 await page.goto(url);
-                await renderHTMLToPage(
-                  page,
-                  `
-                    <select-enhancer>
-                      <select filter filteris="${"anyvalue" satisfies FilterMode}">
-                        <option value="">${emptyOptionLabel}</option>
-                        <option selected>${letters.slice(0, -4)}</option>
-                        <option>${letters.slice(0, -3)}</option>
-                        <option>${letters.slice(0, -2)}</option>
-                        <option>${letters.slice(0, -1)}</option>
-                        <option>${letters}</option>
-                      </select>
-                    </select-enhancer>
-                  `,
-                );
+                await renderHTMLToPage(page)`
+                  <select-enhancer>
+                    <select filter filteris="${"anyvalue" satisfies FilterMode}">
+                      <option value="">${emptyOptionLabel}</option>
+                      <option selected>${letters.slice(0, -4)}</option>
+                      <option>${letters.slice(0, -3)}</option>
+                      <option>${letters.slice(0, -2)}</option>
+                      <option>${letters.slice(0, -1)}</option>
+                      <option>${letters}</option>
+                    </select>
+                  </select-enhancer>
+                `;
 
                 const form = page.getByRole("form");
                 const combobox = page.getByRole("combobox");
@@ -2090,17 +2089,14 @@ for (const { mode } of testConfigs) {
                 const Cars = "Cars";
 
                 await page.goto(url);
-                await renderHTMLToPage(
-                  page,
-                  `
-                    <select-enhancer>
-                      <select filter filteris="${"clearable" satisfies FilterMode}">
-                        <option value="" selected>${emptyOptionLabel}</option>
-                        <option>${Cars}</option>
-                      </select>
-                    </select-enhancer>
-                  `,
-                );
+                await renderHTMLToPage(page)`
+                  <select-enhancer>
+                    <select filter filteris="${"clearable" satisfies FilterMode}">
+                      <option value="" selected>${emptyOptionLabel}</option>
+                      <option>${Cars}</option>
+                    </select>
+                  </select-enhancer>
+                `;
 
                 const form = page.getByRole("form");
                 const combobox = page.getByRole("combobox");
@@ -2160,21 +2156,18 @@ for (const { mode } of testConfigs) {
                 const emptyOptionLabel = "Choose a Value";
 
                 await page.goto(url);
-                await renderHTMLToPage(
-                  page,
-                  `
-                    <select-enhancer>
-                      <select filter filteris="${"unclearable" satisfies FilterMode}">
-                        <option value="">${emptyOptionLabel}</option>
-                        <option>${letters.slice(0, -4)}</option>
-                        <option>${letters.slice(0, -3)}</option>
-                        <option>${letters.slice(0, -2)}</option>
-                        <option>${letters.slice(0, -1)}</option>
-                        <option>${letters}</option>
-                      </select>
-                    </select-enhancer>
-                  `,
-                );
+                await renderHTMLToPage(page)`
+                  <select-enhancer>
+                    <select filter filteris="${"unclearable" satisfies FilterMode}">
+                      <option value="">${emptyOptionLabel}</option>
+                      <option>${letters.slice(0, -4)}</option>
+                      <option>${letters.slice(0, -3)}</option>
+                      <option>${letters.slice(0, -2)}</option>
+                      <option>${letters.slice(0, -1)}</option>
+                      <option>${letters}</option>
+                    </select>
+                  </select-enhancer>
+                `;
 
                 const form = page.getByRole("form");
                 const combobox = page.getByRole("combobox");
@@ -2217,20 +2210,17 @@ for (const { mode } of testConfigs) {
                   /* -------------------- Setup -------------------- */
                   const emptyOptionLabel = "Choose a Word";
                   await page.goto(url);
-                  await renderHTMLToPage(
-                    page,
-                    `
-                      <select-enhancer>
-                        <select filter filteris="${filtertype}">
-                          <option value="">${emptyOptionLabel}</option>
-                          <option value="1">App</option>
-                          <option value="2">Apparent</option>
-                          <option value="3">Apparently</option>
-                        </select>
-                      </select-enhancer>
-                      <button type="button">Focus Me</button>
-                    `,
-                  );
+                  await renderHTMLToPage(page)`
+                    <select-enhancer>
+                      <select filter filteris="${filtertype}">
+                        <option value="">${emptyOptionLabel}</option>
+                        <option value="1">App</option>
+                        <option value="2">Apparent</option>
+                        <option value="3">Apparently</option>
+                      </select>
+                    </select-enhancer>
+                    <button type="button">Focus Me</button>
+                  `;
 
                   const combobox = page.getByRole("combobox");
                   await expect(combobox).toHaveText(filtertype === "unclearable" ? emptyOptionLabel : "");
@@ -2454,21 +2444,18 @@ for (const { mode } of testConfigs) {
                       const second = "Second";
 
                       await page.goto(url);
-                      await renderHTMLToPage(
-                        page,
-                        `
-                          <form aria-label="Test Form">
-                            <select-enhancer>
-                              <select name="${name}" filter filteris="${filtertype}">
-                                <option value="">Choose a Number</option>
-                                <option value="1">${first}</option>
-                                <option value="2" selected>${second}</option>
-                                <option value="3">Third</option>
-                              </select>
-                            </select-enhancer>
-                          </form>
-                        `,
-                      );
+                      await renderHTMLToPage(page)`
+                        <form aria-label="Test Form">
+                          <select-enhancer>
+                            <select name="${name}" filter filteris="${filtertype}">
+                              <option value="">Choose a Number</option>
+                              <option value="1">${first}</option>
+                              <option value="2" selected>${second}</option>
+                              <option value="3">Third</option>
+                            </select>
+                          </select-enhancer>
+                        </form>
+                      `;
 
                       const form = page.getByRole("form");
                       const combobox = page.getByRole("combobox");
@@ -3025,18 +3012,15 @@ for (const { mode } of testConfigs) {
                   const filterAttrs = mode === "Regular" ? "" : (` filter filteris="${filtertype}"` as const);
                   const comboboxAttrsOnMount = `${disabledAttr}${filterAttrs}` as const;
 
-                  await renderHTMLToPage(
-                    page,
-                    `
-                      <button type="button">First Focusable</button>
-                      <select-enhancer>
-                        <select${comboboxAttrsOnMount}>
-                          ${testOptions.map((o, i) => `<option${i === 1 ? " selected" : ""}>${o}</option>`).join("")}
-                        </select>
-                      </select-enhancer>
-                      <button type="button">Last Focusable</button>
-                    `,
-                  );
+                  await renderHTMLToPage(page)`
+                    <button type="button">First Focusable</button>
+                    <select-enhancer>
+                      <select${comboboxAttrsOnMount}>
+                        ${testOptions.map((o, i) => `<option${i === 1 ? " selected" : ""}>${o}</option>`).join("")}
+                      </select>
+                    </select-enhancer>
+                    <button type="button">Last Focusable</button>
+                  `;
 
                   await expect(combobox).toHaveJSProperty("disabled", mountDisabled);
                   if (!mountDisabled) await combobox.evaluate((node: ComboboxField) => (node.disabled = true));
