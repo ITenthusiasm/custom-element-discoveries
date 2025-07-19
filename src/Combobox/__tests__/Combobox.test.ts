@@ -891,7 +891,7 @@ for (const { mode } of testConfigs) {
 
             // Open `dialog` and `combobox`
             await dialog.evaluate((node: HTMLDialogElement) => node.showModal());
-            await combobox.click();
+            await combobox.press("ArrowDown");
             await expectOptionsToBeVisible(page);
 
             // Close `combobox` without closing `dialog` (i.e., without causing any side-effects)
@@ -901,7 +901,7 @@ for (const { mode } of testConfigs) {
               });
             });
 
-            await page.keyboard.press("Escape");
+            await combobox.press("Escape");
             await expectComboboxToBeClosed(page);
             await expect(dialog).toHaveJSProperty("open", true);
             expect(await defaultPrevented).toBe(true);
@@ -913,7 +913,7 @@ for (const { mode } of testConfigs) {
               });
             });
 
-            await page.keyboard.press("Escape");
+            await combobox.press("Escape");
             await expect(dialog).toHaveJSProperty("open", false);
             await expect(combobox).not.toBeVisible();
             expect(await defaultNotPrevented).toBe(true);
