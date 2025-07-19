@@ -58,29 +58,23 @@ for (const { mode } of testConfigs) {
     async function renderComponent(page: Page, options?: RenderComponentOptions): Promise<void>;
     async function renderComponent(page: Page, initialValue?: string): Promise<void>;
     async function renderComponent(page: Page, config?: string | RenderComponentOptions): Promise<void> {
-      await page.goto(url);
       const initialValue = typeof config === "object" ? config.initialValue : config;
-      const opts = typeof config === "object" ? (config.options ?? testOptions) : testOptions;
-      const filterIs = typeof config === "object" ? config.filteris : undefined;
+      const options = typeof config === "object" ? (config.options ?? testOptions) : testOptions;
 
-      return page.evaluate(
-        ([options, value, testGroup, filteris]) => {
-          const app = document.getElementById("app") as HTMLDivElement;
-          const extraSelectAttrs = testGroup === "Filterable" ? ` filter filteris="${filteris ?? "unclearable"}"` : "";
+      const filteris = (typeof config === "object" ? config.filteris : undefined) ?? "unclearable";
+      const filterAttrs = mode === "Filterable" ? (` filter filteris="${filteris}"` as const) : "";
 
-          app.innerHTML = `
-          <select-enhancer>
-            <select id="component" name="my-name"${extraSelectAttrs}>
-              ${options.map((o) => `<option${value === o ? " selected" : ""}>${o}</option>`).join("")}
-            </select>
-          </select-enhancer>
-          <div style="font-size: 3rem; font-weight: bold; text-align: right; background-color: red; height: 500vh;">
-            Container for testing scroll prevention
-          </div>
-        `;
-        },
-        [opts, initialValue, mode, filterIs] as const,
-      );
+      await page.goto(url);
+      return renderHTMLToPage(page)`
+        <select-enhancer>
+          <select id="component" name="my-name"${filterAttrs}>
+            ${options.map((o) => `<option${initialValue === o ? " selected" : ""}>${o}</option>`).join("")}
+          </select>
+        </select-enhancer>
+        <div style="font-size: 3rem; font-weight: bold; text-align: right; background-color: red; height: 500vh;">
+          Container for testing scroll prevention
+        </div>
+      `;
     }
 
     /**
