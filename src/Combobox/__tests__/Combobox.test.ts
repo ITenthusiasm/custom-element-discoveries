@@ -891,7 +891,7 @@ for (const { mode } of testConfigs) {
 
             // Open `dialog` and `combobox`
             await dialog.evaluate((node: HTMLDialogElement) => node.showModal());
-            await combobox.click();
+            await combobox.press("ArrowDown");
             await expectOptionsToBeVisible(page);
 
             // Close `combobox` without closing `dialog` (i.e., without causing any side-effects)
@@ -901,7 +901,7 @@ for (const { mode } of testConfigs) {
               });
             });
 
-            await page.keyboard.press("Escape");
+            await combobox.press("Escape");
             await expectComboboxToBeClosed(page);
             await expect(dialog).toHaveJSProperty("open", true);
             expect(await defaultPrevented).toBe(true);
@@ -913,7 +913,7 @@ for (const { mode } of testConfigs) {
               });
             });
 
-            await page.keyboard.press("Escape");
+            await combobox.press("Escape");
             await expect(dialog).toHaveJSProperty("open", false);
             await expect(combobox).not.toBeVisible();
             expect(await defaultNotPrevented).toBe(true);
@@ -4951,9 +4951,13 @@ for (const { mode } of testConfigs) {
 
         // Assert proper relationship between `combobox`, `listbox`, and `option`s
         for (const option of testOptions) {
-          if (mode === "Regular") await page.keyboard.type(option);
-          else await combobox.fill(option);
-          await page.waitForTimeout(550); // Wait for Typeahead Search to reset before continuing
+          if (mode === "Regular") {
+            await page.keyboard.type(option);
+            await page.waitForTimeout(550); // Wait for Typeahead Search to reset before continuing
+          } else {
+            await page.keyboard.press("ControlOrMeta+A");
+            await page.keyboard.press(option.split("").join("+"));
+          }
 
           const optionEl = listbox.getByRole("option", { name: option });
           await expect(combobox).toHaveAttribute("aria-activedescendant", await optionEl.evaluate((o) => o.id));
@@ -4967,7 +4971,10 @@ for (const { mode } of testConfigs) {
         }, newOptionValue);
 
         if (mode === "Regular") await page.keyboard.type(newOptionValue);
-        else await combobox.fill(newOptionValue);
+        else {
+          await page.keyboard.press("ControlOrMeta+A");
+          await page.keyboard.press(newOptionValue.split("").join("+"));
+        }
         const optionEl = listbox.getByRole("option", { name: newOptionValue });
         await expect(combobox).toHaveAttribute("aria-activedescendant", await optionEl.evaluate((o) => o.id));
         await expect(optionEl).toHaveAttribute("id", `${await combobox.getAttribute("id")}-option-${newOptionValue}`);
