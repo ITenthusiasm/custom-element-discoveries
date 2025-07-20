@@ -872,7 +872,13 @@ for (const { mode } of testConfigs) {
             await expectOptionToBeSelected(page, { label: nextOptionValue }, false);
           });
 
-          it("Avoids unintended side-effects (e.g., prematurely closing `dialog`s)", async ({ page }) => {
+          it("Avoids unintended side-effects (e.g., prematurely closing `dialog`s)", async ({ page, browserName }) => {
+            // TODO: Enable this test once https://github.com/microsoft/playwright/issues/36727 is fixed.
+            it.skip(
+              process.platform === "linux" && browserName === "webkit" && mode === "Filterable",
+              "Playwright's WebKit cannot close <dialog>s via [contenteditable] elements on Linux",
+            );
+
             /* ---------- Setup ---------- */
             await page.goto(url);
             await renderHTMLToPage(page)`
