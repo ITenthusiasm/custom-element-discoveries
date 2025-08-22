@@ -2,6 +2,70 @@
 
 My more-detailed notes on certain design decisions that I made for the components in this codebase.
 
+## Can You Explain the Reasoning behind the Behavior with `option` Additions/Removals? (2025-08-04)
+
+Originally, when the `<combobox-field>` was only designed with non-filter mode in mind, the intent of this `option`-handling logic was to maintain as much feature parity with the native `<select>` element as was deemed reasonable. The outcome of this pursuit was the following:
+
+- When all `option`s are removed, the `combobox`'s value is set to `null` (because it can no longer have a real value).
+- If a new `option` is added when the `combobox` has no existing `option`s, then this new `option` becomes the `combobox`'s value.
+- If a new `option` that is `defaultSelected` is added, it becomes the `combobox`'s value.
+- If the currently-selected `option` is removed, the `combobox` value is reset. (Remember that at the time of this writing, multi-selection is not natively supported.)
+
+This behavior more or less matches that of the the `<select>` element. Unlike `<select>`, however, our component sets the `combobox` value to `null` instead of an empty string when no `option`s are present. This more clearly indicates [to developers] that something is "wrong" (i.e., no `option` can be selected). It's also worth noting that the way that our component thinks about form value resets is slightly different from the native `<select>` element (mainly when more complex filter modes like `anyvalue` are used).
+
+Originally, this logic looked great! But when the `clearable`, `unclearable`, and `anyvalue` filter modes were added, I began to call the `option`-handling logic into question. Did it make sense to maintain the same behavior? Or should I manage `option`s differently in filter mode?
+
+Regarding this matter, my main concern was what should happen if people tried to _load `option`s asynchronously_. Regardless of whether or not that practice is recommended, it seems to be a somewhat-common practice in the wild; so I at least wanted to _consider_ the possibility of my `<combobox-field>` supporting such a use case.
+
+Unfortunately, it was difficult to come up with a _clean_ solution for asynchronously-loaded `option`s when I was only implementing the `unclearable` version of the `combobox`; so I left a lot of comments and chose to temporarily ignore the matter. However, now that `anyvalue` mode is on the scene, it seems significantly clearer how I should address this issue.
+
+As I gave the matter some thought, I remembered that I have two rules for the `<combobox-field>` that typically hold precedence: 1&rpar; Maintain a valid value for the component in all situations, at all costs, 2&rpar; Provide a clear/intuitive UX without creating spaghetti code, even if it means forcing developers to write their code a certain way. These two rules are incredibly important, and they are not necessarily at odds with each other. Rather, these two rules work together as the strongest influences over the component's behavior &mdash; including its behavior when it comes to dynamic `option` addition/deletion.
+
+Here is how I ultimately ended up reasoning about the component's dynamic `option` handling.
+
+### In `unclearable` and `clearable` Mode
+
+Both `unclearable` and `clearable` mode require a valid `option` to be selected. Attempting to set the `combobox`'s value to anything _not_ matching a corresponding `option` in this case will fail. The exception to this rule is that the `combobox`'s value can always be set to an empty string if the `combobox` is `clearable`.
+
+Because `unclearable` `combobox`es are just regular `combobox`es with autcomplete, and because `clearable` `combobox`es are just `unclearable` `combobox`es that unconditionally allow empty strings, it made sense to leave the original logic alone for both of these use cases.
+
+One concern with this decision was what could happen if a selected `option` was dynamically added or removed _while the user was typing_. However, I concluded that this concern was irrelevant since the primary, non-negotiable goal is to maintain a valid value/state in the component at all times. Here are some considerations:
+
+- If the selected `option` is removed, the `combobox` value MUST be reset to preserve a valid value.
+- The `combobox` MUST immediately select any `defaultSelected` `option` that is supplied to it.
+- The `combobox` MUST be protected from entering an invalid state when all `option`s are removed. This means setting the value to `null`.
+- The `combobox` MUST get itself out of a `null` state as quickly as possible by selecting the first valid `option` it acquires (if necessary).
+
+All of these rules are in place to keep the component in a valid state. Thus, they override the needs of the User Experience &mdash; which only become a real concern when developers try to do things they shouldn't. For example, if a new `defaultSelected` `option` is added while the user is typing, the `combobox` value and label will be updated, and the user will consequently have to move their cursor. The solution to this dilemma is for developers to avoid adding `defaultSelected` `option`s while the user is typing, as it's a very confusing UX to automatically select a spontaneously-added `option` while the user is typing anyway.
+
+Here's another consideration from a User Experience perspective (rather than a Component State perspective): Let's say a User types into an `(un)clearable` `combobox` that loads `option`s asynchronously. They type, select an asynchrounously-loaded `option`, change the filter so that an **_entirely different_** set of `option`s is loaded, choose _none_ of those newly-loaded `option`s, and then exit the `combobox`. What should happen?
+
+The _originally-loaded_ `option`s are no longer present for the `combobox`. So according to the rules and expectations of `(un)clearable` mode, the `combobox` **_cannot_** maintain/remember the originally-selected value when a new set of `option`s (which don't include the originally-selected) value is loaded. Thus, the safest thing to do is to default back to `null` in this scenario. This is required to maintain healthy developer (and maintainer) expectations, but it results in a confusing User Experience.
+
+What's the solution? **_Don't_** use a mode that has a strict ruleset. Instead, use a more lenient ruleset. In other words, use `anyvalue`. (Technically speaking, a stubborn developer who wants to use `(un)clearable` _and_ load async `option`s could simply guarantee that the user's currently-selected `option` always remains present in the `listbox` as they update the filter to load new `option`s. This might be slightly inconvenient to some people, but it's very doable and simple enough if the developer desires it.)
+
+### In `anyvalue` Mode
+
+In `anyvalue` mode, anything goes! Users can select any `option` provided in the `listbox`, or they can type their own value into the `combobox`. In the latter case, the `combobox`'s previously-selected `option` will become deselected. (This happens even if there is an exact match between the "search" and the corresponding `option`'s label, but remember that auto-selection can be handled with the `autoselectableOption` property.)
+
+In this case, everything needed to support dynamically-loaded `option`s is already available. The `combobox` won't need to reset or update itself when `option`s are added/removed/replaced because the component accepts anything as a value. The state remains valid, and the UX remains clear. Of course, if the developer wants to add a `<combobox-option selected>` to the `listbox` dynamically, they should be allowed to do so (with care).
+
+Perhaps the only concern in this scenario is the one that we mentioned earlier: If the user selects an `option`, loads **_entirely different_** `option`s, and then chooses none of those new `option`s, what should happen?
+
+The answer depends on the UX the developer wants. If they want the user's search to always be the current value, then the developer doesn't have to do anything. If the developer wants the _last selected `option`_ to remain as the `combobox`'s value when the user leaves the field, then they'll have to track this value themselves with an `input`/`change` event listener, then reset the `combobox` to this value when the `combobox` is `blur`red without value selection. This is a little more work on the developer's end, but it is _very little_ work.
+
+### Conclusion
+
+My approach to the matter leaves developers with the ability to provide a good UX &mdash; whether they use `(un)clearable` mode or `anyvalue` mode. However, it requires them to provide a _tiny_ bit more effort up front. In the former case, they have to guarantee that the currently-selected `option` remains in the `listbox` as new `option`s are loaded. In the latter case, they have to track the currently-selected `option` somewhere in the JavaScript so that they can reset the `combobox` value when the loaded `option`s are dismissed via a `blur` event (**_if_** the dev even wants that experience). Neither of these solutions pose any true inconvenience to developers.
+
+Overall, this approach:
+
+1. Keeps developers honest about what the user's currently-selected value is.
+2. Benefits developers (and the maintainers) by providing _consistent_ behavior for the component, even during dynamic `option` addition/removal.
+3. Leaves the door open for satisfactory User Experiences.
+
+So I feel pretty happy and confident about the approach.
+
 ## Why Is `this.#value` Used in the `ComboboxField.#handleSearch` `beforeinput` Method?
 
 One very important comment that we made in the `ComboboxField` code was that if the component's value was being set internally, it should use `set ComboboxField.value()`, **_not_** `ComboboxField.#value`. The only exception to this rule is when the `combobox`'s value needs to be set to `null`, as we don't want the `setter` to support `null`. Setting the `combobox` value to `null` is only for edge cases where the `combobox` needs to declare itself as unitialized (e.g., because it currently has no `option`s). Besides that, the `setter` should always be used.

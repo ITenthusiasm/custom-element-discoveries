@@ -84,7 +84,7 @@ select-enhancer {
           background-color: #2684ff;
         }
 
-        &[data-filtered-out="true"] {
+        &[data-filtered-out] {
           display: none;
         }
 

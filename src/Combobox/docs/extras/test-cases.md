@@ -69,30 +69,30 @@ Each of these attribute states need to consider when the `combobox`'s value or t
 2. [x] ✅ When the `combobox` is `expand`ed by Keyboard Navigation (i.e., **NOT** by `#handleSearch`)
    - [x] ✅ Delete the `autoselectableOption`, if it exists.
      - Reasoning: By expanding the `combobox`, the user has expressed that they're interested in starting a **new** "searching session", but they have not yet started searching for anything. Therefore, conceptually, there is no value that "matches their current search" at this time.
-3. [x] When a **Developer** (or the component) sets the `combobox` value programmatically with **`combobox.value`**:
-   - [x] If the value update causes the `combobox`'s _text content_ to be altered in **any** way, then the `autoselectableOption` should be deleted (if it exists).
+3. [x] ✅ When a **Developer** (or the component) sets the `combobox` value programmatically with **`combobox.value`**:
+   - [x] ✅ If the value update causes the `combobox`'s _text content_ to be altered in **any** way, then the `autoselectableOption` should be deleted (if it exists).
      - Reasoning: If the `combobox`'s text content is programmatically changed by the developer/component (_case sensitive_), then obviously the user's previous filter has been overriden/removed. Therefore, there is no longer an autoselectable `option` based on the user's input. (In this case, an autoselectable `option` would no longer be useful anyway, since a decision was made to explicitly set the value in a different way.)
-   - [x] If the value update would result in **no change** to the `combobox`'s _text content_, then `set textContent(value)` **should not** be called. More specifically, the user's **cursor** should not be displaced.
+   - [x] ✅ If the value update would result in **no change** to the `combobox`'s _text content_, then `set textContent(value)` **should not** be called. More specifically, the user's **cursor** should not be displaced.
      - Reasoning: Whenever possible, we want to avoid disrupting the user's cursor. Of course, we can't control what developers do with our component, so it won't be possible to save all users from our end. Devs should handle cursor management themselves if they make riskier decisions.
    - `anyvalue`
      - If there is an `option` whose `value` matches what the developer supplied:
-       - [x] The `combobox`'s _internal value / form value_ should be updated, **and** the text content of the field must match **the `label` of the `option`**. (Default Behavior)
-       - [x] The matching `option` must **set `selected` to `true`**. (Default Behavior)
-       - [x] If there was a previously-selected `option`, it should be deselected. (Default Behavior)
+       - [x] ✅ The `combobox`'s _internal value / form value_ should be updated, **and** the text content of the field must match **the `label` of the `option`**. (Default Behavior)
+       - [x] ✅ The matching `option` must **set `selected` to `true`**. (Default Behavior)
+       - [x] ✅ If there was a previously-selected `option`, it should be deselected. (Default Behavior)
        - NOTE: All of this means that developers _will not_ be able to use `combobox.value` to set the filter to an Empty String **_if_** a `<combobox-option value="">Choose</combobox-option>` exists. This is by design. There are still ways to accomplish this programmatically if desired. (For example: `combobox.forceEmptyValue()`.)
      - Otherwise (i.e., if there **isn't** a matching `option`):
-       - [x] The `combobox`'s _internal value / form value_ should be updated, **and** the text content of the field must match **the value supplied to the `setter`**.
-       - [x] If there was a previously-selected `option`, it should be deselected. (Default Behavior)
+       - [x] ✅ The `combobox`'s _internal value / form value_ should be updated, **and** the text content of the field must match **the value supplied to the `setter`**.
+       - [x] ✅ If there was a previously-selected `option`, it should be deselected. (Default Behavior)
    - `unclearable`
      - If there **isn't** a matching `option`:
-       - [x] Ignore/Reject the provided value (Default Behavior). That is, do nothing.
+       - [x] ✅ Ignore/Reject the provided value (Default Behavior). That is, do nothing.
      - Otherwise (i.e., if there is an `option` whose `value` matches what the developer supplied):
-       - [x] Replicate the behavior of `anyvalue`. (For clarity, this will **only** replicate the **branch** of `anyvalue` behavior where there **is** a matching `option`.)
+       - [x] ✅ Replicate the behavior of `anyvalue`. (For clarity, this will **only** replicate the **branch** of `anyvalue` behavior where there **is** a matching `option`.)
    - `clearable` (Default)
      - If the `combobox`'s _value_ **is being set** to an empty string:
-       - [x] Replicate the behavior of `anyvalue`. (For clarity, this includes **both** branches of `anyvalue`'s behavior.)
+       - [x] ✅ Replicate the behavior of `anyvalue`. (For clarity, this includes **both** branches of `anyvalue`'s behavior.)
      - Otherwise (i.e., if the `combobox`'s _value_ is **not** being set to an empty string):
-       - [x] Replicate the behavior of `unclearable`. (For clarity, this includes **both** branches of `unclearable`'s behavior.)
+       - [x] ✅ Replicate the behavior of `unclearable`. (For clarity, this includes **both** branches of `unclearable`'s behavior.)
 4. [x] When a **Developer** (or the component) sets the `combobox` value programmatically with **`option.selected = true`**:
    - [x] The `combobox`'s _internal value / form value_ should be updated, **and** the text content of the field must match **the `label` of the selected `option`**. (Default Behavior)
    - [x] If there was a previously-selected `option`, it should be deselected. (Default Behavior)

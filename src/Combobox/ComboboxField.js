@@ -34,7 +34,7 @@ class ComboboxField extends HTMLElement {
   }
 
   static get observedAttributes() {
-    // TODO: Consider `emptymessage` --> `nomatchessage`. Wondering if `emptymessage` is too ambiguous/confusing...
+    // TODO: Consider `emptymessage` --> `nomatchesmessage`. Wondering if `emptymessage` is too ambiguous/confusing...
     return /** @type {const} */ (["required", "filter", "filteris", "emptymessage"]);
   }
 
@@ -110,7 +110,7 @@ class ComboboxField extends HTMLElement {
 
         // Reset `combobox` display if needed
         // NOTE: `option` CAN be `null` or unselected if `combobox` is `clearable`, empty, and `collapsed` with a non-empty filter
-        const textNode = /** @type {Text} */ (combobox.firstChild);
+        const textNode = combobox.text;
         if (!combobox.acceptsFilter(textNode.data)) {
           const option = combobox.getOptionByValue(combobox.value);
           if (combobox.filterIs === "clearable" && !combobox.value && !option?.selected) textNode.data = "";
@@ -127,50 +127,44 @@ class ComboboxField extends HTMLElement {
     }
   });
 
-  /*
-   * TODO: There are some worthwhile thoughts here... Compile this in some useful way so that the text size is bearable.
-   *
-   * NOTE: This observer assumes that the available `option`s don't change while the user types into the searchbox
-   * (if the `combobox` is `filter`able). If we want to suppor that use case (e.g., for asynchronously loading `option`s),
-   * then we'll need to update this observer accordingly. But even then... is a `combobox` really intended to be
-   * an async search box?
-   *
-   * Or ... are we worried about running into unexpected use cases and desiring to support this use case just in case
-   * in the immediate future?
-   *
-   * Actually, this component really shouldn't be used as an async search box. Once the previously-searched (and selected)
-   * value is removed, it wouldn't be submitted to the server anymore. A different approach would seem better here, unless
-   * we were to allow users to leave the `combobox` value as-is after a `blur` event. But that introduces its own sets of
-   * complexities, which don't seem worth addressing at the moment.
-   *
-   * In any case, even if we don't support extra use cases, we might still want to update our filter as DOM nodes are
-   * added/removed. This will help us avoid unexpected problems as the code is changed over time. (Note: We wouldn't
-   * have to iterate over every single option to update the filter if we internally tracked the search string resulting
-   * from an `input` event. Of course, we also don't have to update the filter when nodes are added/removed. In that
-   * case, we don't have to loop over anything and simply have to indicate if a newly-added option should be filtered out.)
-   */
-  // TODO: Consider what to do in this block (if anything) with `anyvalue` if we support this block in `filter` mode
   /** @readonly */ #optionNodesObserver = new MutationObserver((mutations) => {
+    const textNode = this.text;
+    const nullable = this.filterIs !== "anyvalue";
     if (!this.listbox.children.length) {
-      this.#value = null;
-      this.#internals.setFormValue(null);
-      /** @type {Text} */ (this.firstChild).data = "";
+      if (!nullable) this.value = textNode.data;
+      else {
+        this.#value = null;
+        this.#internals.setFormValue(null);
+        textNode.data = "";
+      }
+
       return;
     }
 
+    // TODO: This logic is still buggy for filterable `combobox`es. Gotta figure some things out...
+    const expanded = this.getAttribute(attrs["aria-expanded"]) === String(true);
     for (let i = 0; i < mutations.length; i++) {
       const mutation = mutations[i];
 
       // Handle added nodes first. This keeps us from running redundant Deselect Logic if a newly-added node is `selected`.
       mutation.addedNodes.forEach((node, j) => {
         if (!(node instanceof ComboboxOption)) return;
-        if (node.defaultSelected) return (this.value = node.value);
-        if (j === 0 && this.#value === null) this.value = node.value;
+        if (node.defaultSelected) this.value = node.value;
+        else if (j === 0 && this.#value === null && nullable) this.value = node.value;
+
+        // NOTE: This can produce a confusing UX if the `combobox` was expanded but a filter was NOT applied yet.
+        // However, such a scenario is unlikely and impractical. So we're keeping this logic to help with async loading.
+        if (this.filter && expanded) {
+          node.toggleAttribute("data-filtered-out", !node.label.toLowerCase().startsWith(textNode.data.toLowerCase()));
+        }
       });
 
       mutation.removedNodes.forEach((node) => {
         if (!(node instanceof ComboboxOption)) return;
-        if (node.selected) this.formResetCallback();
+        if (node.selected) {
+          if (nullable) this.formResetCallback();
+          else this.value = textNode.data;
+        }
       });
     }
   });
@@ -180,7 +174,7 @@ class ComboboxField extends HTMLElement {
    * other than `null`, then you should use the {@link value setter} instead.
    *
    * **Note**: A `null` value indicates that the `combobox` value has not yet been initialized (for instance, if
-   * the `combobox` was not rendered with any `option`s).
+   * the `combobox` was rendered without any `option`s).
    */
   #value = null;
 
@@ -305,6 +299,7 @@ class ComboboxField extends HTMLElement {
 
       // NOTE: This initialization of `#matchingOptions` is incompatible with `group`ed `option`s
       if (this.filter) this.#matchingOptions = Array.from(this.listbox.children);
+      this.appendChild(this.text);
       this.#mounted = true;
     }
 
@@ -365,7 +360,7 @@ class ComboboxField extends HTMLElement {
     const activeOption = listbox.querySelector(":scope [role='option'][data-active='true']");
 
     // TODO: Should we allow matching multi-word `option`s by removing empty spaces during a search comparison?
-    //       (NOTE: The native `<select>` element does not support such functionality.)
+    //       (NOTE: The native `<select>` element does not support such functionality, I don't think.)
     if (event.key.length === 1 && event.key !== " " && !event.altKey && !event.ctrlKey && !event.metaKey) {
       setAttributeFor(combobox, attrs["aria-expanded"], String(true));
       this.#searchString += event.key;
@@ -407,7 +402,7 @@ class ComboboxField extends HTMLElement {
      */
     event.preventDefault();
     const combobox = /** @type {ComboboxField} */ (event.currentTarget);
-    const text = /** @type {Text} */ (combobox.firstChild);
+    const text = this.#text;
 
     // Update `combobox`'s Text Content based on user input
     const { inputType } = event;
@@ -451,9 +446,9 @@ class ComboboxField extends HTMLElement {
       if (option === this.#emptyOption) continue;
 
       // NOTE: An "Empty String Option" cannot be `autoselectable` with this approach, and that's intentional
-      if (search && !option.value) option.setAttribute("data-filtered-out", String(true));
+      if (search && !option.value) option.toggleAttribute("data-filtered-out", true);
       else if (search && !option.textContent?.toLowerCase().startsWith(search.toLowerCase()))
-        option.setAttribute("data-filtered-out", String(true));
+        option.toggleAttribute("data-filtered-out", true);
       else {
         // TODO: We can support case-insensitivity in the future here if we want.
         if (option.textContent === search) this.#autoselectableOption = option;
@@ -473,7 +468,11 @@ class ComboboxField extends HTMLElement {
       this.#value = search;
       this.#internals.setFormValue(this.#value);
       if (prevOption?.selected) prevOption.selected = false;
+      this.#validateRequiredConstraint();
 
+      // TODO: Should we dispatch a `change` event `onblur`? Maybe in the `blur` handler?
+      // TODO: Don't forget to test that the proper events get dispatched in the various modes.
+      // TODO: Don't forget to test that none of this block's logic runs for "null `clearable` `combobox`es".
       combobox.dispatchEvent(
         new InputEvent("input", {
           ...event,
@@ -489,10 +488,10 @@ class ComboboxField extends HTMLElement {
 
     if (matches === 0) {
       if (!this.#emptyOption) {
-        // TODO: Should we set a `data-nomatchesmessage` attribute for easy styling?
+        // TODO: Should we set a `data-nomatchesmessage` attribute for easy styling? Or maybe use #internals.states?
         // TODO: Do we really need to set fake `role`s for something that's totally hidden from the A11y Tree?
         //       If we're unwilling to use `aria-disabled` (which would add more clarity), and we don't _need_
-        //       `aria-disabled`, then we should probalby just remove the A11y Data that's just going to be suppressed.
+        //       `aria-disabled`, then we should probably just remove the A11y Data that's just going to be suppressed.
         //       If we really need CSS, maybe we can target `inert` in addition to `option`?
         this.#emptyOption = document.createElement("span");
         this.#emptyOption.textContent = this.emptyMessage;
@@ -525,14 +524,8 @@ class ComboboxField extends HTMLElement {
     this.#value = v;
     this.#internals.setFormValue(this.#value);
     const label = newOption ? newOption.label : this.#value;
-    // NOTE: `nodeValue` is TECHNICALLY faster, but it assumes `combobox` initialization... Might be confusing
-    // for devs? Maybe not a big deal? Something to think about... `textNode.nodeValue` probably won't be our
-    // bottleneck. 🙂 TODO: We should probably document this note in a better place maybe? Or condense this note?
-    // TODO: Actually, we need to change our code to only use `Text` nodes somehow. This will be tricky when it
-    // comes to setting data pre-mount... Or maybe shouldn't allow setting data pre-mount anymore? Hm...
-    //     EDIT: If we store the component's `Text` node locally, that might make things easier here _and_ elsewhere.
     if (this.textContent !== label) {
-      this.textContent = label;
+      this.text.data = label;
       this.#autoselectableOption = null;
     }
 
@@ -552,16 +545,20 @@ class ComboboxField extends HTMLElement {
    */
   forceEmptyValue() {
     if (this.filterIs !== "anyvalue" && this.filterIs !== "clearable") {
-      throw new TypeError(`Method requires \`filter\` mode to be on and \`filteris\` to be "anyvalue" or "clearable"`);
+      throw new TypeError('Method requires `filter` mode to be on and `filteris` to be "anyvalue" or "clearable"');
+    }
+    if (this.#value == null && this.filterIs === "clearable") {
+      throw new TypeError('Cannot coerce value to `""` for a `clearable` `combobox` that owns no `option`s');
     }
 
     const prevOption = this.#value == null ? null : this.getOptionByValue(this.#value);
 
-    /** @type {Text} */ (this.firstChild).nodeValue = "";
+    this.text.data = "";
     this.#value = "";
     this.#internals.setFormValue(this.#value);
     this.#autoselectableOption = null;
     if (prevOption?.selected) prevOption.selected = false;
+    this.#validateRequiredConstraint();
   }
 
   /**
@@ -621,6 +618,19 @@ class ComboboxField extends HTMLElement {
   }
 
   /* ------------------------------ Custom Attributes and Properties ------------------------------ */
+  /** @type {this["text"]} */
+  #text = new Text();
+
+  /**
+   * @readonly The _singular_ {@link Text} Node associated with the `combobox`.
+   *
+   * To alter the `combobox`'s text content, update this node **_instead of_** using {@link textContent}.
+   * @returns {Text}
+   */
+  get text() {
+    return this.#text;
+  }
+
   /** Activates a textbox that can be used to filter the list of `combobox` `option`s. @returns {boolean} */
   get filter() {
     return this.hasAttribute("filter");
@@ -651,9 +661,7 @@ class ComboboxField extends HTMLElement {
     if (!this.filter) return null;
 
     const value = this.getAttribute("filteris");
-    if (value === "anyvalue") return value;
-    if (value === "unclearable") return value;
-    return "clearable";
+    return value === "anyvalue" || value === "unclearable" ? value : "clearable";
   }
 
   /** @param {FilterMode} value */
@@ -668,6 +676,7 @@ class ComboboxField extends HTMLElement {
    */
   acceptsFilter(string) {
     if (!this.filter) return false;
+    if (this.filterIs !== "anyvalue" && this.#value === null) return false;
     return this.filterIs === "anyvalue" || (this.filterIs === "clearable" && string === "");
   }
 
@@ -675,11 +684,11 @@ class ComboboxField extends HTMLElement {
   #autoselectableOption = null;
 
   /**
-   * Returns the `option` whose `label` matches the user's most recent filter input, if one exists.
+   * Returns the `option` whose `label` matches the user's most recent filter input (if one exists).
    *
    * Value will be `null` if:
    * - The user's filter didn't match any `option`s
-   * - The user explicitly selects a value (or the `combobox`'s value is set manually)
+   * - The `combobox`'s text content was altered by a `value` change
    * - The `combobox` was just recently expanded
    * @returns {ComboboxOption | null}
    */
@@ -731,6 +740,8 @@ class ComboboxField extends HTMLElement {
   reportValidity() {
     return this.#internals.reportValidity();
   }
+
+  // TODO: Add a `setCustomValidity` method (e.g., for the `FormValidityObserver`)
 
   /* ------------------------------ Form Control Callbacks ------------------------------ */
   /** @returns {void} */
@@ -800,7 +811,7 @@ class ComboboxField extends HTMLElement {
     const combobox = /** @type {ComboboxField} */ (event.currentTarget);
     if (combobox.hasAttribute("data-mousedown")) return;
 
-    const textNode = /** @type {Text} */ (combobox.firstChild);
+    const textNode = combobox.text;
     document.getSelection()?.setBaseAndExtent(textNode, 0, textNode, textNode.length);
   }
 
