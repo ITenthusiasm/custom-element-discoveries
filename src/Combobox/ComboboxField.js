@@ -472,7 +472,6 @@ class ComboboxField extends HTMLElement {
 
       // TODO: Should we dispatch a `change` event `onblur`? Maybe in the `blur` handler?
       // TODO: Don't forget to test that the proper events get dispatched in the various modes.
-      // TODO: Don't forget to test that none of this block's logic runs for "null `clearable` `combobox`es".
       combobox.dispatchEvent(
         new InputEvent("input", {
           ...event,

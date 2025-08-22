@@ -3553,6 +3553,59 @@ for (const { mode } of testConfigs) {
               });
             });
 
+            createFilterTypeDescribeBlocks(["clearable"], "filter-only", (filtertype) => {
+              it("Rejects empty strings and remains `null` if the `combobox` is uninitialized", async ({ page }) => {
+                /* ---------- Setup ---------- */
+                const name = "my-combobox";
+                await page.goto(url);
+                await renderHTMLToPage(page)`
+                  <form aria-label="Test Form">
+                    <select-enhancer>
+                      <select name="${name}" ${getFilterAttrs(filtertype)} required></select>
+                    </select-enhancer>
+                  </form>
+                `;
+
+                const combobox = page.getByRole("combobox");
+                await expect(combobox).toHaveText("");
+                await expect(combobox).toHaveJSProperty("value", null);
+
+                const form = page.getByRole("form");
+                expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(null);
+
+                /* ---------- Assertions ---------- */
+                // Manually emptying the value
+                await combobox.evaluate((node: ComboboxField) => (node.value = ""));
+
+                await expect(combobox).toHaveText("");
+                await expect(combobox).toHaveJSProperty("value", null);
+                expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(null);
+
+                // Attempting to empty the value by typing
+                await combobox.pressSequentially(String(Math.random()));
+                await combobox.press("ControlOrMeta+A");
+                await combobox.press("Delete");
+
+                await expect(combobox).toHaveText("");
+                await expect(combobox).toHaveJSProperty("value", null);
+                expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(null);
+
+                // Attempting to empty the value by using `forceEmptyValue()`
+                await combobox.evaluate((node: ComboboxField) => node.forceEmptyValue()).catch(() => {});
+
+                await expect(combobox).toHaveText("");
+                await expect(combobox).toHaveJSProperty("value", null);
+                expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(null);
+
+                // Attempting to empty the value with a field reset
+                await combobox.evaluate((node: ComboboxField) => node.formResetCallback());
+
+                await expect(combobox).toHaveText("");
+                await expect(combobox).toHaveJSProperty("value", null);
+                expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(null);
+              });
+            });
+
             createFilterTypeDescribeBlocks(["anyvalue"], "filter-only", (filtertype) => {
               it("Is an empty string when the `combobox` is uninitialized (e.g., if there are no `option`s)", async ({
                 page,
