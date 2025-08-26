@@ -3788,6 +3788,14 @@ for (const { mode } of testConfigs) {
               expect(await combobox.evaluate((node) => node.firstChild === node.lastChild)).toBe(true);
               expect(await combobox.evaluate((node: ComboboxField) => node.firstChild === node.text)).toBe(true);
 
+              // Using `Element.textContent` doesn't work
+              const otherText = String(Math.random());
+              await expect(combobox).not.toHaveText(otherText);
+
+              await combobox.evaluate((node: ComboboxField, t) => (node.textContent = t), otherText);
+              await expect(combobox).not.toHaveText(otherText);
+              await expect(combobox).toHaveText(badText);
+
               // The Text Node does not get removed when the filter is redundantly emptied
               await combobox.evaluate((node: ComboboxField) => (node.filter = true));
               await combobox.press("ControlOrMeta+A");
