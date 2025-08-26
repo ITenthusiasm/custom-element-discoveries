@@ -61,7 +61,7 @@ class SelectEnhancer extends HTMLElement {
       }
 
       // Enable `clearable`/`anyvalue` `combobox`es without a default value to start out as an empty field
-      if (!defaultOptionExists && this.#combobox.acceptsFilter("")) this.#combobox.forceEmptyValue();
+      if (!defaultOptionExists && this.#combobox.acceptsValue("")) this.#combobox.forceEmptyValue();
 
       /* -------------------- Render Elements -------------------- */
       select.replaceWith(this.#listbox);

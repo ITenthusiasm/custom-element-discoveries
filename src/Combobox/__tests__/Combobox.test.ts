@@ -1,3 +1,4 @@
+/* eslint-disable no-inner-declarations */
 /* eslint-disable no-void */
 /* eslint-disable prefer-template */
 /* eslint-disable func-names */
@@ -5,7 +6,6 @@ import { test as it, expect as baseExpect } from "@playwright/test";
 import type { Page, Locator, MatcherReturnType } from "@playwright/test";
 import type SelectEnhancer from "../SelectEnhancer.js";
 import type ComboboxField from "../ComboboxField.js";
-import type { FilterMode } from "../ComboboxField.js";
 import type ComboboxOption from "../ComboboxOption.js";
 
 /*
@@ -49,10 +49,11 @@ for (const { mode } of testConfigs) {
     ] as const);
 
     /* -------------------- Helper Functions -------------------- */
+    type ValueIs = ComboboxField["valueIs"];
     interface RenderComponentOptions {
       options?: ReadonlyArray<string>;
       initialValue?: string;
-      filteris?: Exclude<ComboboxField["filterIs"], null>;
+      valueis?: ValueIs;
     }
 
     async function renderComponent(page: Page, options?: RenderComponentOptions): Promise<void>;
@@ -60,12 +61,12 @@ for (const { mode } of testConfigs) {
     async function renderComponent(page: Page, config?: string | RenderComponentOptions): Promise<void> {
       const initialValue = typeof config === "object" ? config.initialValue : config;
       const options = typeof config === "object" ? (config.options ?? testOptions) : testOptions;
-      const filteris = (typeof config === "object" ? config.filteris : undefined) ?? "unclearable";
+      const valueis = (typeof config === "object" ? config.valueis : undefined) ?? "unclearable";
 
       await page.goto(url);
       return renderHTMLToPage(page)`
         <select-enhancer>
-          <select id="component" name="my-name" ${getFilterAttrs(filteris)}>
+          <select id="component" name="my-name" ${getFilterAttrs(valueis)}>
             ${options.map((o) => `<option${initialValue === o ? " selected" : ""}>${o}</option>`).join("")}
           </select>
         </select-enhancer>
@@ -97,14 +98,32 @@ for (const { mode } of testConfigs) {
      *
      * If the tests are run in `Regular` {@link mode} (or if `undefined` is passed), returns an empty string instead.
      */
-    function getFilterAttrs<T extends FilterMode>(filteris: T | undefined) {
-      if (filteris === undefined) return "";
-      return mode === "Regular" ? "" : (`filter filteris="${filteris}"` as const);
+    function getFilterAttrs<T extends ValueIs>(valueis: T | undefined) {
+      if (valueis === undefined) return "";
+      return mode === "Regular" ? "" : (`filter valueis="${valueis}"` as const);
     }
 
     function getRandomOption<T extends ReadonlyArray<string>>(options: T = testOptions as unknown as T): T[number] {
       const optionIndex = Math.floor(Math.random() * options.length);
       return options[optionIndex];
+    }
+
+    /** Returns a getter that indicates how many times a `<combobox-field>`'s `formResetCallback()` was called */
+    function observeResetCount(combobox: Locator): () => Promise<number> {
+      const resetCountAttribute = "data-reset-count";
+      const setupPromise = combobox.evaluate((node: ComboboxField, attr) => {
+        const { formResetCallback } = node;
+        node.formResetCallback = function () {
+          formResetCallback.call(this);
+          const count = Number(this.getAttribute(attr) ?? 0);
+          this.setAttribute(attr, String(count + 1));
+        };
+      }, resetCountAttribute);
+
+      return async function getResetCount(): Promise<number> {
+        const rawValue = await setupPromise.then(() => combobox.getAttribute(resetCountAttribute));
+        return Number(rawValue ?? 0);
+      };
     }
 
     /** The `option`s used for {@link associateComboboxWithForm} */
@@ -185,7 +204,7 @@ for (const { mode } of testConfigs) {
     }
 
     function createFilterTypeDescribeBlocks<
-      T extends Readonly<[FilterMode, ...FilterMode[]]>,
+      T extends Readonly<[ValueIs, ...ValueIs[]]>,
       B extends "filter-only" | "both",
     >(types: T, behavior: B, callback: (filtertype: T[number] | (B extends "both" ? undefined : never)) => void): void {
       if (mode === "Regular" && behavior === "both") {
@@ -331,7 +350,7 @@ for (const { mode } of testConfigs) {
         await expect(combobox).toHaveText(label);
       }
       // Verify that the `combobox` DOES NOT have the indicated `value`
-      else if (await combobox.evaluate((node: ComboboxField, v) => !node.acceptsFilter(v), optionValue)) {
+      else if (await combobox.evaluate((node: ComboboxField, v) => !node.acceptsValue(v), optionValue)) {
         await expect(combobox).not.toHaveJSProperty("value", optionValue);
         await expect(combobox).not.toHaveText(label);
       }
@@ -352,14 +371,14 @@ for (const { mode } of testConfigs) {
       });
     } else {
       it("Selects the first option by default in `unclearable` mode", async ({ page }) => {
-        await renderComponent(page, { filteris: "unclearable" });
-        await expect(page.getByRole("combobox")).toHaveAttribute("filteris", "unclearable");
+        await renderComponent(page, { valueis: "unclearable" });
+        await expect(page.getByRole("combobox")).toHaveAttribute("valueis", "unclearable");
         await expectOptionToBeSelected(page, { label: testOptions[0] });
       });
 
-      for (const filtertype of ["clearable", "anyvalue"] as const satisfies FilterMode[]) {
+      for (const filtertype of ["clearable", "anyvalue"] as const satisfies ValueIs[]) {
         it(`Defaults the \`combobox\` value to an empty string in \`${filtertype}\` mode`, async ({ page }) => {
-          await renderComponent(page, { filteris: filtertype });
+          await renderComponent(page, { valueis: filtertype });
           const combobox = page.getByRole("combobox");
           await expect(combobox).toHaveJSProperty("value", "");
           await expect(page.getByRole("option", { includeHidden: true, selected: true })).toHaveCount(0);
@@ -1904,9 +1923,9 @@ for (const { mode } of testConfigs) {
             });
 
             it.describe("Behavior with No Matching Options", () => {
-              for (const filtertype of ["unclearable", "clearable"] as const satisfies FilterMode[]) {
+              for (const filtertype of ["unclearable", "clearable"] as const satisfies ValueIs[]) {
                 it(`Tells Users when no matching \`option\`s are found in \`${filtertype}\` mode`, async ({ page }) => {
-                  await renderComponent(page, { filteris: filtertype });
+                  await renderComponent(page, { valueis: filtertype });
                   const combobox = page.getByRole("combobox");
                   await combobox.fill(String(Math.random()));
 
@@ -1928,7 +1947,7 @@ for (const { mode } of testConfigs) {
 
               // NOTE: Since anything goes in `anyvalue` mode, the "No Matches Message" is irrelevant
               it("DOES NOT tell Users when no matches are found in `anyvalue` mode", async ({ page }) => {
-                await renderComponent(page, { filteris: "anyvalue" });
+                await renderComponent(page, { valueis: "anyvalue" });
                 await page.keyboard.press("Tab");
 
                 const combobox = page.getByRole("combobox");
@@ -2213,7 +2232,7 @@ for (const { mode } of testConfigs) {
                 await expect(selectedOption).toHaveText(emptyOptionLabel);
               });
 
-              for (const filtertype of ["anyvalue", "clearable", "unclearable"] as const satisfies FilterMode[]) {
+              for (const filtertype of ["anyvalue", "clearable", "unclearable"] as const satisfies ValueIs[]) {
                 it(`Exposes the option matching the user's current filter in ${filtertype} mode`, async ({ page }) => {
                   /* -------------------- Setup -------------------- */
                   const emptyOptionLabel = "Choose a Word";
@@ -2414,21 +2433,21 @@ for (const { mode } of testConfigs) {
                 unclearable: "in `unclearable` mode",
                 clearable: "in `clearable` mode",
                 anyvalue: "in `anyvalue` mode",
-              } as const satisfies Record<FilterMode, `in \`${FilterMode}\` mode`>;
+              } as const satisfies Record<ValueIs, `in \`${ValueIs}\` mode`>;
 
-              for (const filtertype of ["unclearable", "clearable", "anyvalue"] as const satisfies FilterMode[]) {
+              for (const filtertype of ["unclearable", "clearable", "anyvalue"] as const satisfies ValueIs[]) {
                 it.describe(describeBlockByMode[filtertype], () => {
                   if (filtertype === "anyvalue") {
                     it("Leaves the `combobox` label/filter as is", async ({ page }) => {
                       /* -------------------- Setup -------------------- */
                       const name = "my-combobox";
                       const first = testOptions[0];
-                      await renderComponent(page, { initialValue: first, filteris: filtertype });
+                      await renderComponent(page, { initialValue: first, valueis: filtertype });
 
                       const form = page.getByRole("form");
                       const combobox = page.getByRole("combobox");
                       await associateComboboxWithForm(combobox, { name });
-                      await expect(combobox).toHaveAttribute("filteris", "anyvalue");
+                      await expect(combobox).toHaveAttribute("valueis", "anyvalue");
                       await expectOptionToBeSelected(page, { label: first });
 
                       /* -------------------- Assertions -------------------- */
@@ -2467,7 +2486,7 @@ for (const { mode } of testConfigs) {
 
                       const form = page.getByRole("form");
                       const combobox = page.getByRole("combobox");
-                      await expect(combobox).toHaveAttribute("filteris", filtertype);
+                      await expect(combobox).toHaveAttribute("valueis", filtertype);
                       await expectOptionToBeSelected(page, { label: second, value: "2" });
 
                       /* -------------------- Assertions -------------------- */
@@ -2503,7 +2522,7 @@ for (const { mode } of testConfigs) {
                   it("Moves the cursor to the end of the `combobox`", async ({ page }) => {
                     const first = testOptions[0];
                     const second = testOptions[1];
-                    await renderComponent(page, { initialValue: second, filteris: filtertype });
+                    await renderComponent(page, { initialValue: second, valueis: filtertype });
                     await expectOptionToBeSelected(page, { label: second });
 
                     // Start filtering by `First`, move cursor backwards, then quit
@@ -2538,7 +2557,7 @@ for (const { mode } of testConfigs) {
                     const third = testOptions[2];
                     const second = testOptions[1];
                     expect(third.length).toBeLessThan(second.length);
-                    await renderComponent(page, { initialValue: third, filteris: filtertype });
+                    await renderComponent(page, { initialValue: third, valueis: filtertype });
 
                     // Open `combobox` and activate an `option` with more text
                     const combobox = page.getByRole("combobox");
@@ -3001,7 +3020,7 @@ for (const { mode } of testConfigs) {
             it("Prevents the `combobox` from being interactive", async ({ page }) => {
               // Reused Variables
               const second = testOptions[1];
-              const filtertype = "unclearable" satisfies FilterMode;
+              const filtertype = "unclearable" satisfies ValueIs;
 
               // Reused Locators
               const combobox = page.getByRole("combobox");
@@ -3400,7 +3419,7 @@ for (const { mode } of testConfigs) {
               it("Rejects values that are not found in the available `option`s", async ({ page }) => {
                 /* ---------- Setup ---------- */
                 const initialValue = testOptions[0];
-                await renderComponent(page, { filteris: filtertype, initialValue });
+                await renderComponent(page, { valueis: filtertype, initialValue });
                 await expectOptionToBeSelected(page, { label: initialValue });
 
                 // Associate Combobox with a `form`
@@ -3720,6 +3739,838 @@ for (const { mode } of testConfigs) {
               expect(await combobox.evaluate((n: ComboboxField) => n.listbox instanceof HTMLElement)).toBe(true);
               expect(await combobox.evaluate((n: ComboboxField) => n.listbox.getAttribute("role"))).toBe("listbox");
             });
+          });
+
+          it.describe("filter (Property)", () => {
+            it("Exposes the underlying `filter` attribute", async ({ page }) => {
+              /* ---------- Setup ---------- */
+              await page.goto(url);
+              await renderHTMLToPage(page)`
+                <select-enhancer>
+                  <select filter>
+                    ${testOptions.map((o) => `<option>${o}</option>`).join("")}
+                  </select>
+                </select-enhancer>
+              `;
+
+              /* ---------- Assertions ---------- */
+              // `property` matches initial `attribute`
+              const combobox = page.getByRole("combobox");
+              await expect(combobox).toHaveJSProperty("filter", true);
+
+              // `attribute` responds to `property` updates
+              await combobox.evaluate((node: ComboboxField) => (node.filter = false));
+              await expect(combobox).not.toHaveAttribute("filter");
+
+              await combobox.evaluate((node: ComboboxField) => (node.filter = true));
+              await expect(combobox).toHaveAttribute("filter", "");
+
+              // `property` also responds to `attribute` updates
+              await combobox.evaluate((node) => node.removeAttribute("filter"));
+              await expect(combobox).toHaveJSProperty("filter", false);
+            });
+
+            it("Toggles the Text Editing / Option Filtering functionality of the `combobox`", async ({ page }) => {
+              /* ---------- Setup ---------- */
+              await page.goto(url);
+              await renderHTMLToPage(page)`
+                <select-enhancer>
+                  <select>
+                    ${testOptions.map((o) => `<option>${o}</option>`).join("")}
+                  </select>
+                </select-enhancer>
+              `;
+
+              await expectOptionToBeSelected(page, { label: testOptions[0] });
+
+              /* ---------- Assertions ---------- */
+              // By default, the editing/filtering functionality is disabled
+              const second = testOptions[1];
+              const combobox = page.getByRole("combobox");
+
+              await combobox.press(second.charAt(0));
+              await expect(combobox).not.toHaveText(second.charAt(0));
+              await expect(combobox).toHaveText(testOptions[0]);
+
+              await expect(page.getByRole("option")).toHaveCount(testOptions.length);
+              await expectOptionToBeActive(page, { label: second });
+
+              // When `filter` mode is turned on, editing/filtering is enabled
+              await combobox.evaluate((node: ComboboxField) => (node.filter = true));
+
+              await combobox.press(second.charAt(0));
+              await expect(combobox).toHaveText(second.charAt(0));
+              await expect(combobox).not.toHaveText(testOptions[0]);
+
+              await expect(page.getByRole("option")).not.toHaveCount(testOptions.length);
+              await expect(page.getByRole("option")).toHaveCount(3);
+              await expectOptionToBeActive(page, { label: second });
+
+              // When `filter` mode is turned off, these features are disabled again
+              await combobox.evaluate((node: ComboboxField) => (node.filter = false));
+              await expect(combobox).toHaveText(testOptions[0]);
+              await expectOptionToBeSelected(page, { label: testOptions[0] });
+
+              await combobox.press(second.charAt(0));
+              await expect(combobox).not.toHaveText(second.charAt(0));
+              await expect(combobox).toHaveText(testOptions[0]);
+
+              await expect(page.getByRole("option")).toHaveCount(testOptions.length);
+              await expectOptionToBeActive(page, { label: second });
+            });
+          });
+
+          it.describe("valueIs (Property)", () => {
+            it("Controls the underlying `valueis` attribute", async ({ page }) => {
+              await page.goto(url);
+              await renderHTMLToPage(page)`
+                <select-enhancer>
+                  <select ${mode === "Filterable" ? "filter" : ""}>
+                    ${testOptions.map((o) => `<option>${o}</option>`).join("")}
+                  </select>
+                </select-enhancer>
+              `;
+
+              const combobox = page.getByRole("combobox");
+              const validValues = ["anyvalue", "clearable", "unclearable"] as const satisfies ValueIs[];
+
+              for (const value of [null, ...validValues, "Random Garbage"] as const) {
+                await combobox.evaluate((node: ComboboxField, state) => (node.valueIs = state as ValueIs), value);
+                await expect(combobox).toHaveAttribute("valueis", String(value));
+              }
+            });
+
+            if (mode === "Regular") {
+              it(`Ignores the \`valueis\` attribute and always returns \`${"unclearable" satisfies ValueIs}\``, async ({
+                page,
+              }) => {
+                // Reused Locators/variables
+                const combobox = page.getByRole("combobox");
+                const validValues = ["anyvalue", "clearable", "unclearable"] as const satisfies ValueIs[];
+
+                await page.goto(url);
+                for (const attr of [null, ...validValues, "Random Garbage"] as const) {
+                  await it.step(`Mounted ${attr ? `with "${attr}"` : "without attribute"}`, async () => {
+                    await renderHTMLToPage(page)`
+                      <select-enhancer>
+                        <select ${attr ? `valueis="${attr}"` : ""}>
+                          ${testOptions.map((o) => `<option>${o}</option>`).join("")}
+                        </select>
+                      </select-enhancer>
+                    `;
+
+                    if (attr) await expect(combobox).toHaveAttribute("valueis", attr);
+                    else await expect(combobox).not.toHaveAttribute("valueis");
+
+                    await expect(combobox).not.toHaveAttribute("filter");
+                    await expect(combobox).toHaveJSProperty("isContentEditable", false);
+                    await expect(combobox).toHaveJSProperty("valueIs", "unclearable" satisfies ValueIs);
+                  });
+
+                  await it.step(`Imperatively set to "${attr}"`, async () => {
+                    await renderHTMLToPage(page)`
+                      <select-enhancer>
+                        <select>
+                          ${testOptions.map((o) => `<option>${o}</option>`).join("")}
+                        </select>
+                      </select-enhancer>
+                    `;
+
+                    await combobox.evaluate((node: ComboboxField, state) => (node.valueIs = state as ValueIs), attr);
+                    await expect(combobox).toHaveAttribute("valueis", String(attr));
+
+                    await expect(combobox).not.toHaveAttribute("filter");
+                    await expect(combobox).toHaveJSProperty("isContentEditable", false);
+                    await expect(combobox).toHaveJSProperty("valueIs", "unclearable" satisfies ValueIs);
+                  });
+                }
+              });
+
+              return;
+            }
+
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Helpful for tracking code sections
+            if (mode === "Filterable") {
+              /** A string literal used for writing `describe` blocks or branching logic within a test */
+              const nonFilterMode = "non-filter mode";
+
+              it("Exposes the underlying `valueis` attribute", async ({ page }) => {
+                /* ---------- Setup ---------- */
+                const initialState = "unclearable" as const satisfies ValueIs;
+                await page.goto(url);
+                await renderHTMLToPage(page)`
+                  <select-enhancer>
+                    <select name="${initialState}" filter valueis="${initialState}">
+                      ${testOptions.map((o) => `<option>${o}</option>`).join("")}
+                    </select>
+                  </select-enhancer>
+                `;
+
+                /* ---------- Assertions ---------- */
+                // `property` matches initial `attribute`
+                const combobox = page.getByRole("combobox");
+                await expect(combobox).toHaveJSProperty("valueIs", initialState);
+
+                // `attribute` responds to `property` updates
+                const newProp = "clearable" as const satisfies ValueIs;
+                await combobox.evaluate((node: ComboboxField, prop) => (node.valueIs = prop), newProp);
+                await expect(combobox).toHaveAttribute("valueis", newProp);
+
+                // `property` responds to `attribute` updates
+                const newAttr = "anyvalue" satisfies ValueIs;
+                await combobox.evaluate((node: ComboboxField, attr) => node.setAttribute("valueis", attr), newAttr);
+                await expect(combobox).toHaveJSProperty("valueIs", newAttr);
+              });
+
+              it("Defaults to `clearable` when the underlying attribute is omitted or invalid", async ({ page }) => {
+                await page.goto(url);
+                for (const attr of [null, String(Math.random())] as const) {
+                  await it.step(`Mounted with ${attr ? "invalid" : "omitted"} attribute`, async () => {
+                    await renderHTMLToPage(page)`
+                      <select-enhancer>
+                        <select filter ${attr ? `valueis="${attr}"` : ""}>
+                          ${testOptions.map((o) => `<option>${o}</option>`).join("")}
+                        </select>
+                      </select-enhancer>
+                    `;
+
+                    const combobox = page.getByRole("combobox");
+
+                    if (attr) await expect(combobox).toHaveAttribute("valueis", attr);
+                    else await expect(combobox).not.toHaveAttribute("valueis");
+
+                    await expect(combobox).toHaveJSProperty("valueIs", "clearable");
+
+                    // Imperatively set to another invalid value afterwards
+                    await combobox.evaluate((node: ComboboxField) => (node.valueIs = null as unknown as ValueIs));
+                    await expect(combobox).toHaveAttribute("valueis", String(null));
+                    await expect(combobox).toHaveJSProperty("valueIs", "clearable");
+                  });
+                }
+              });
+
+              /**
+               * Executes a test which verifies that, when transitioning the `valueis` attribute
+               * from `options.from` to `options.to`, the value of the `combobox` will be _coerced_
+               * to an empty string (`""`) _if the filter was empty_.
+               */
+              function testEmptyFilterToEmptyValueCoercion<
+                From extends ValueIs,
+                To extends Exclude<Extract<ValueIs, "anyvalue" | "clearable">, From>,
+              >(options: { from: From; to: To }) {
+                it("Coerces the value to an empty string if the filter is empty", async ({ page }) => {
+                  /* ---------- Setup ---------- */
+                  const name = "my-combobox";
+                  await page.goto(url);
+                  await renderHTMLToPage(page)`
+                    <form aria-label="Test Form">
+                      <select-enhancer>
+                        <select name="${name}" ${getFilterAttrs(options.from)}>
+                          <option value="">Select Something</option>
+                          ${testOptions.map((o, i) => `<option value="${i}" ${!i ? "selected" : ""}>${o}</option>`).join("")}
+                        </select>
+                      </select-enhancer>
+                    </form>
+                  `;
+
+                  const form = page.getByRole("form");
+                  const combobox = page.getByRole("combobox");
+
+                  const initialOption = { label: testOptions[0], value: "0" };
+                  await expectOptionToBeSelected(page, initialOption);
+                  expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("0");
+
+                  /* ---------- Assertions ---------- */
+                  // Clear the `combobox` filter
+                  await combobox.press("ControlOrMeta+A");
+                  await combobox.press("Backspace");
+
+                  if (options.from === "unclearable") {
+                    await expect(combobox).toHaveJSProperty("value", initialOption.value);
+                    expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("0");
+                    await expect(
+                      page.getByRole("option", { name: initialOption.label, selected: true, includeHidden: true }),
+                    ).toBeAttached();
+                  } else {
+                    await expect(combobox).toHaveText("");
+                    await expect(combobox).toHaveJSProperty("value", "");
+                    expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("");
+                    await expect(page.getByRole("option", { selected: true, includeHidden: true })).toHaveCount(0);
+                  }
+
+                  // Update the `valueis` state
+                  await combobox.evaluate((node: ComboboxField, state) => (node.valueIs = state), options.to);
+
+                  await expect(combobox).toHaveText("");
+                  await expect(combobox).toHaveJSProperty("value", "");
+                  expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("");
+                  await expect(page.getByRole("option", { selected: true, includeHidden: true })).toHaveCount(0);
+                });
+              }
+
+              /**
+               * Executes a test which verifies that, when transitioning the `valueis` attribute (or combobox state)
+               * from `options.from` to `options.to`, the _`option`_ whose `value` is an empty string (`""`) &mdash;
+               * if one exists &mdash; will be auto-selected if the `combobox`'s value was originally an empty string.
+               */
+              function testEmptyValueToOptionConversion(options: {
+                from: Extract<ValueIs, "anyvalue" | "clearable">;
+                to: Extract<ValueIs, "unclearable"> | typeof nonFilterMode;
+              }) {
+                it("Converts empty-string values to empty-value `option`s when possible", async ({ page }) => {
+                  /* ---------- Setup ---------- */
+                  const name = "my-combobox";
+                  await page.goto(url);
+                  await renderHTMLToPage(page)`
+                    <form aria-label="Test Form">
+                      <select-enhancer>
+                        <select name="${name}" ${getFilterAttrs(options.from)}>
+                          <option value="">Select Something</option>
+                          ${testOptions.map((o, i) => `<option value="${i}">${o}</option>`).join("")}
+                        </select>
+                      </select-enhancer>
+                    </form>
+                  `;
+
+                  const form = page.getByRole("form");
+                  const combobox = page.getByRole("combobox");
+
+                  /* ---------- Assertions ---------- */
+                  // Clear the `combobox` value
+                  await combobox.press("ControlOrMeta+A");
+                  await combobox.press("Backspace");
+
+                  await expect(combobox).toHaveText("");
+                  await expect(combobox).toHaveJSProperty("value", "");
+                  expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("");
+                  await expect(page.getByRole("option", { selected: true, includeHidden: true })).toHaveCount(0);
+
+                  // Change the component's `valueis`/`filter` state appropriately
+                  if (options.to !== nonFilterMode) {
+                    await combobox.evaluate((node: ComboboxField, state) => (node.valueIs = state), options.to);
+                  } else {
+                    await combobox.evaluate((node: ComboboxField) => node.removeAttribute("filter"));
+                  }
+
+                  await expectOptionToBeSelected(page, { label: "Select Something", value: "" });
+                  expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("");
+                });
+              }
+
+              /**
+               * Executes a test which verifies that, when transitioning the `valueis` attribute (or combobox state)
+               * from `options.from` to `options.to`, the value of the `combobox` will be _reset_
+               * if an `option` corresponding to the current `combobox` value cannot be found.
+               */
+              function testComboboxValueResets(options: {
+                from: Extract<ValueIs, "anyvalue" | "clearable">;
+                to: Extract<ValueIs, "clearable" | "unclearable"> | typeof nonFilterMode;
+              }) {
+                it("Resets the value if no `option` matching the current value is found", async ({ page }) => {
+                  /* ---------- Setup ---------- */
+                  const name = "my-combobox";
+                  await page.goto(url);
+                  await renderHTMLToPage(page)`
+                    <form aria-label="Test Form">
+                      <select-enhancer>
+                        <select name="${name}" ${getFilterAttrs(options.from)}>
+                          ${testOptions.map((o, i) => `<option value="${i}" ${i === 1 ? "selected" : ""}>${o}</option>`).join("")}
+                        </select>
+                      </select-enhancer>
+                    </form>
+                  `;
+
+                  const form = page.getByRole("form");
+                  const combobox = page.getByRole("combobox");
+                  const getResetCount = observeResetCount(combobox);
+
+                  /* ---------- Assertions ---------- */
+                  if (options.from === "anyvalue") {
+                    // Enter a value into the `combobox` that has no corresponding `option`
+                    const subtext = testOptions[1].slice(0, -2);
+                    await combobox.pressSequentially(subtext);
+
+                    await expect(combobox).toHaveJSProperty("value", subtext);
+                    await expect(combobox).toHaveJSProperty("autoselectableOption", null);
+                    expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(subtext);
+                    await expect(page.getByRole("option", { selected: true, includeHidden: true })).toHaveCount(0);
+
+                    // Change the component's `valueis`/`filter` state appropriately
+                    expect(await getResetCount()).toBe(0);
+                    if (options.to !== nonFilterMode) {
+                      await combobox.evaluate((node: ComboboxField, state) => (node.valueIs = state), options.to);
+                    } else {
+                      await combobox.evaluate((node: ComboboxField) => node.removeAttribute("filter"));
+                    }
+                    expect(await getResetCount()).toBe(1);
+
+                    await expectOptionToBeSelected(page, { label: testOptions[1], value: "1" });
+                    expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("1");
+                  }
+
+                  // Execute another test that transitions from an empty value
+                  if (options.to === "clearable") return;
+                  await combobox.evaluate((node: ComboboxField) => (node.filter = true));
+                  await combobox.evaluate((node: ComboboxField, state) => (node.valueIs = state), options.from);
+                  await expect(combobox).not.toHaveJSProperty("value", "");
+                  expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).not.toBe("");
+
+                  // Empty the current value
+                  await combobox.press("ControlOrMeta+A");
+                  await combobox.press("Backspace");
+
+                  await expect(combobox).toHaveText("");
+                  await expect(combobox).toHaveJSProperty("value", "");
+                  expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("");
+
+                  // Change the component's `valueis`/`filter` state appropriately
+                  const previousResets = options.from === "anyvalue" ? 1 : 0;
+                  expect(await getResetCount()).toBe(previousResets);
+                  if (options.to !== nonFilterMode) {
+                    await combobox.evaluate((node: ComboboxField, state) => (node.valueIs = state), options.to);
+                  } else {
+                    await combobox.evaluate((node: ComboboxField) => node.removeAttribute("filter"));
+                  }
+                  expect(await getResetCount()).toBe(previousResets + 1);
+                  await expectOptionToBeSelected(page, { label: testOptions[1], value: "1" });
+                  expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("1");
+                });
+              }
+
+              it.describe(`Transitions from \`${"anyvalue" satisfies ValueIs}\``, () => {
+                /**
+                 * Executes a test which verifies that, when transitioning the `valueis` attribute (or combobox state)
+                 * from `anyvalue` to `options.to`, the `combobox` will auto-select the `autoselectableOption`
+                 * (if one exists).
+                 */
+                function testPreservationOfAutoselectableValues(options: {
+                  to: Extract<ValueIs, "clearable" | "unclearable"> | "non-filter mode";
+                }): void {
+                  it("Preserves values that correspond to the current `autoselectableOption`", async ({ page }) => {
+                    /* ---------- Setup ---------- */
+                    const name = "my-combobox";
+                    await page.goto(url);
+                    await renderHTMLToPage(page)`
+                      <form aria-label="Test Form">
+                        <select-enhancer>
+                          <select name="${name}" ${getFilterAttrs("anyvalue")}>
+                            ${testOptions.map((o, i) => `<option value="${i}" ${!i ? "selected" : ""}>${o}</option>`).join("")}
+                          </select>
+                        </select-enhancer>
+                      </form>
+                    `;
+
+                    const form = page.getByRole("form");
+                    const combobox = page.getByRole("combobox");
+
+                    const initialOption = { label: testOptions[0], value: "0" };
+                    await expectOptionToBeSelected(page, initialOption);
+                    expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("0");
+
+                    /* ---------- Assertions ---------- */
+                    // Change the `value` to something with a corresponding `autoselectableOption`
+                    const newOptionLabel = testOptions[7];
+                    await combobox.pressSequentially(newOptionLabel);
+                    await expect(combobox).toHaveJSProperty("value", newOptionLabel);
+                    await expect(combobox).toHaveJSProperty("autoselectableOption.value", "7");
+                    expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(
+                      newOptionLabel,
+                    );
+
+                    await expect(page.getByRole("option", { selected: true, includeHidden: true })).toHaveCount(0);
+
+                    // Move the cursor backwards
+                    await expect(combobox).toHaveTextSelection("end");
+                    await combobox.press("ArrowLeft+ArrowLeft");
+                    await expect(combobox).toHaveTextSelection({ anchor: 3, focus: 3 });
+
+                    // Change the component's `valueis`/`filter` state appropriately
+                    if (options.to !== "non-filter mode") {
+                      await combobox.evaluate((node: ComboboxField, state) => (node.valueIs = state), options.to);
+                    } else {
+                      await combobox.evaluate((node: ComboboxField) => node.removeAttribute("filter"));
+                    }
+
+                    // Value AND filter/cursor should be correct. (NOTE: Cursor is irrelevant in non-filter mode.)
+                    expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("7");
+                    await expectOptionToBeSelected(page, { label: newOptionLabel, value: "7" });
+                    await expect(combobox).not.toHaveJSProperty("value", newOptionLabel);
+                    await expectOptionToBeSelected(page, initialOption, false);
+
+                    await expect(combobox).toHaveText(newOptionLabel);
+                    await expect(combobox).toHaveTextSelection({ anchor: 3, focus: 3 });
+                  });
+                }
+
+                it.describe(`to \`${"clearable" satisfies ValueIs}\``, () => {
+                  testPreservationOfAutoselectableValues({ to: "clearable" });
+                  testEmptyFilterToEmptyValueCoercion({ from: "anyvalue", to: "clearable" });
+                  testComboboxValueResets({ from: "anyvalue", to: "clearable" });
+                });
+
+                for (const to of ["unclearable" satisfies ValueIs, nonFilterMode] as const) {
+                  it.describe(`to ${to === "unclearable" ? `\`${to}\`` : to}`, () => {
+                    testPreservationOfAutoselectableValues({ to });
+                    testEmptyValueToOptionConversion({ from: "anyvalue", to });
+                    testComboboxValueResets({ from: "anyvalue", to });
+                  });
+                }
+              });
+
+              for (const from of ["clearable", "unclearable"] as const satisfies ValueIs[]) {
+                it.describe(`Transitions from \`${from}\``, () => {
+                  it.describe(`to \`${"anyvalue" satisfies ValueIs}\``, () => {
+                    testEmptyFilterToEmptyValueCoercion({ from, to: "anyvalue" });
+
+                    it("Preserves the currently-selected `option` if the `combobox` is collapsed", async ({ page }) => {
+                      /* ---------- Setup ---------- */
+                      const name = "my-combobox";
+                      const optionsMarkup = testOptions
+                        .map((o, i) => `<option value="${i}" ${i === 1 ? "selected" : ""}>${o}</option>`)
+                        .join("");
+
+                      await page.goto(url);
+                      await renderHTMLToPage(page)`
+                        <form aria-label="Test Form">
+                          <select-enhancer>
+                            <select name="${name}" ${getFilterAttrs(from)}>
+                              ${optionsMarkup}
+                            </select>
+                          </select-enhancer>
+                        </form>
+                      `;
+
+                      const form = page.getByRole("form");
+                      const combobox = page.getByRole("combobox");
+
+                      await expectComboboxToBeClosed(page);
+                      const initialOption = { label: testOptions[1], value: "1" };
+                      await expectOptionToBeSelected(page, initialOption);
+                      expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("1");
+
+                      /* ---------- Assertions ---------- */
+                      await combobox.evaluate((node: ComboboxField) => (node.valueIs = "anyvalue"));
+                      await expectComboboxToBeClosed(page);
+                      await expectOptionToBeSelected(page, initialOption);
+                      expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("1");
+                    });
+
+                    it("Selects the `autoselectableOption` if one exists", async ({ page }) => {
+                      /* ---------- Setup ---------- */
+                      const name = "my-combobox";
+                      await page.goto(url);
+                      await renderHTMLToPage(page)`
+                        <form aria-label="Test Form">
+                          <select-enhancer>
+                            <select name="${name}" ${getFilterAttrs(from)}>
+                              ${testOptions.map((o, i) => `<option value="${i}" ${!i ? "selected" : ""}>${o}</option>`).join("")}
+                            </select>
+                          </select-enhancer>
+                        </form>
+                      `;
+
+                      const form = page.getByRole("form");
+                      const combobox = page.getByRole("combobox");
+
+                      await expectComboboxToBeClosed(page);
+                      const initialOption = { label: testOptions[0], value: "0" };
+                      await expectOptionToBeSelected(page, initialOption);
+                      expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("0");
+
+                      /* ---------- Assertions ---------- */
+                      // Change the filter to something with a corresponding `autoselectableOption`
+                      const newOptionLabel = testOptions[7];
+                      await combobox.pressSequentially(newOptionLabel);
+                      await expect(combobox).toHaveJSProperty("autoselectableOption.value", "7");
+
+                      await expect(combobox).not.toHaveJSProperty("value", newOptionLabel);
+                      await expect(combobox).toHaveJSProperty("value", initialOption.value);
+                      expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("0");
+                      await expect(
+                        page.getByRole("option", { name: testOptions[0], selected: true, includeHidden: true }),
+                      ).toBeAttached();
+
+                      // Move the cursor backwards
+                      await expect(combobox).toHaveTextSelection("end");
+                      await combobox.press("ArrowLeft+ArrowLeft");
+                      await expect(combobox).toHaveTextSelection({ anchor: 3, focus: 3 });
+
+                      // Change `valueis` to `anyvalue`
+                      await combobox.evaluate((node: ComboboxField) => (node.valueIs = "anyvalue"));
+
+                      // Value AND filter/cursor should be correct
+                      await expectOptionToBeSelected(page, initialOption, false);
+                      await expectOptionToBeSelected(page, { label: testOptions[7], value: "7" });
+                      expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("7");
+
+                      await expect(combobox).toHaveText(newOptionLabel);
+                      await expect(combobox).toHaveTextSelection({ anchor: 3, focus: 3 });
+                    });
+
+                    it("Converts the current filter to a value if no `autoselectableOption` exists", async ({
+                      page,
+                    }) => {
+                      /* ---------- Setup ---------- */
+                      const name = "my-combobox";
+                      await page.goto(url);
+                      await renderHTMLToPage(page)`
+                        <form aria-label="Test Form">
+                          <select-enhancer>
+                            <select name="${name}" ${getFilterAttrs(from)}>
+                              ${testOptions.map((o, i) => `<option value="${i}" ${!i ? "selected" : ""}>${o}</option>`).join("")}
+                            </select>
+                          </select-enhancer>
+                        </form>
+                      `;
+
+                      const form = page.getByRole("form");
+                      const combobox = page.getByRole("combobox");
+
+                      await expectComboboxToBeClosed(page);
+                      const initialOption = { label: testOptions[0], value: "0" } as const;
+                      await expectOptionToBeSelected(page, initialOption);
+                      expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("0");
+
+                      /* ---------- Assertions ---------- */
+                      // Change the filter to something with no corresponding `option`
+                      const subtext = testOptions[1].slice(0, -2);
+                      await combobox.pressSequentially(subtext);
+                      await expect(combobox).toHaveJSProperty("autoselectableOption", null);
+
+                      await expect(combobox).not.toHaveJSProperty("value", subtext);
+                      await expect(combobox).toHaveJSProperty("value", initialOption.value);
+                      expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("0");
+                      await expect(
+                        page.getByRole("option", { name: testOptions[0], selected: true, includeHidden: true }),
+                      ).toBeAttached();
+
+                      // Move the cursor backwards
+                      await expect(combobox).toHaveTextSelection("end");
+                      await combobox.press("ArrowLeft+ArrowLeft");
+                      await expect(combobox).toHaveTextSelection({ anchor: 2, focus: 2 });
+
+                      // Change `valueis` to `anyvalue`
+                      await combobox.evaluate((node: ComboboxField) => (node.valueIs = "anyvalue"));
+
+                      // Value AND filter/cursor should be correct
+                      await expect(combobox).toHaveJSProperty("value", subtext);
+                      await expect(page.getByRole("option", { selected: true, includeHidden: true })).toHaveCount(0);
+                      expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(
+                        subtext,
+                      );
+
+                      await expect(combobox).toHaveText(subtext);
+                      await expect(combobox).toHaveTextSelection({ anchor: 2, focus: 2 });
+                    });
+                  });
+                });
+              }
+
+              /**
+               * Executes a test which verifies that, when transitioning the `valueis` attribute
+               * from `clearable` to `unclearable` (or vice-versa), the `combobox` will preserve
+               * the currently-selected `option` without disrupting the current filter or cursor.
+               */
+              function testOptionAndFilterPreservation<
+                From extends Extract<ValueIs, "clearable" | "unclearable">,
+                To extends Exclude<Extract<ValueIs, "clearable" | "unclearable">, From>,
+              >(options: { from: From; to: To }) {
+                it("Preserves the currently-selected `option` without disrupting the filter/cursor", async ({
+                  page,
+                }) => {
+                  /* ---------- Setup ---------- */
+                  const name = "my-combobox";
+                  await page.goto(url);
+                  await renderHTMLToPage(page)`
+                    <form aria-label="Test Form">
+                      <select-enhancer>
+                        <select name="${name}" ${getFilterAttrs(options.from)}>
+                          ${testOptions.map((o, i) => `<option value="${i}" ${!i ? "selected" : ""}>${o}</option>`).join("")}
+                        </select>
+                      </select-enhancer>
+                    </form>
+                  `;
+
+                  const form = page.getByRole("form");
+                  const combobox = page.getByRole("combobox");
+
+                  const initialOption = { label: testOptions[0], value: "0" };
+                  await expectOptionToBeSelected(page, initialOption);
+                  expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("0");
+
+                  /* ---------- Assertions ---------- */
+                  // Enter a filter with an `autoselectableOption` different from the currently-selected `option`
+                  const filter = testOptions[7];
+                  await combobox.pressSequentially(filter);
+                  await expect(combobox).toHaveJSProperty("autoselectableOption.value", "7");
+
+                  await expect(combobox).toHaveJSProperty("value", "0");
+                  expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("0");
+                  await expect(
+                    page.getByRole("option", { name: testOptions[0], selected: true, includeHidden: true }),
+                  ).toBeAttached();
+
+                  // Move cursor backwards
+                  await combobox.press("ArrowLeft+ArrowLeft");
+                  await expect(combobox).toHaveTextSelection({ anchor: 3, focus: 3 });
+
+                  // Change `valueis` attribute
+                  await combobox.evaluate((node: ComboboxField, state) => (node.valueIs = state), options.to);
+
+                  // Value AND Filter/Cursor should have been preserved
+                  await expect(combobox).toHaveJSProperty("value", "0");
+                  expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("0");
+                  await expect(
+                    page.getByRole("option", { name: testOptions[0], selected: true, includeHidden: true }),
+                  ).toBeAttached();
+
+                  await expect(combobox).toHaveText(filter);
+                  await expect(combobox).toHaveTextSelection({ anchor: 3, focus: 3 });
+                });
+              }
+
+              /**
+               * Executes a test which verifies that, when transitioning the combobox state
+               * from `options.from` to {@link nonFilterMode}, the `combobox` will preserve
+               * the currently-selected `option` and update the `combobox`'s text to match that `option`'s label.
+               */
+              function testOptionOnlyPreservation(options: { from: Extract<ValueIs, "clearable" | "unclearable"> }) {
+                it("Preserves the currently-selected `option` and updates the `combobox`'s text content", async ({
+                  page,
+                }) => {
+                  /* ---------- Setup ---------- */
+                  const name = "my-combobox";
+                  await page.goto(url);
+                  await renderHTMLToPage(page)`
+                    <form aria-label="Test Form">
+                      <select-enhancer>
+                        <select name="${name}" ${getFilterAttrs(options.from)}>
+                          ${testOptions.map((o, i) => `<option value="${i}" ${!i ? "selected" : ""}>${o}</option>`).join("")}
+                        </select>
+                      </select-enhancer>
+                    </form>
+                  `;
+
+                  const form = page.getByRole("form");
+                  const combobox = page.getByRole("combobox");
+
+                  const initialOption = { label: testOptions[0], value: "0" };
+                  await expectOptionToBeSelected(page, initialOption);
+                  expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("0");
+
+                  /* ---------- Assertions ---------- */
+                  // Enter a filter with an `autoselectableOption` different from the currently-selected `option`
+                  const filter = testOptions[7];
+                  await combobox.pressSequentially(filter);
+                  await expect(combobox).toHaveJSProperty("autoselectableOption.value", "7");
+
+                  await expect(combobox).toHaveJSProperty("value", "0");
+                  expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("0");
+                  await expect(
+                    page.getByRole("option", { name: testOptions[0], selected: true, includeHidden: true }),
+                  ).toBeAttached();
+
+                  // Transition `combobox` out of `filter` mode
+                  await combobox.evaluate((node: ComboboxField) => node.removeAttribute("filter"));
+
+                  // Value should have been preserved AND text content should have been reset
+                  await expect(combobox).toHaveJSProperty("value", "0");
+                  expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("0");
+                  await expect(
+                    page.getByRole("option", { name: testOptions[0], selected: true, includeHidden: true }),
+                  ).toBeAttached();
+
+                  await expect(combobox).not.toHaveText(filter);
+                  await expect(combobox).toHaveText(initialOption.label);
+                });
+              }
+
+              it.describe(`Transitions from \`${"clearable" satisfies ValueIs}\``, () => {
+                for (const to of ["unclearable" satisfies ValueIs, nonFilterMode] as const) {
+                  it.describe(`to ${to === "unclearable" ? `\`${to}\`` : to}`, () => {
+                    testEmptyValueToOptionConversion({ from: "clearable", to });
+                    testComboboxValueResets({ from: "clearable", to });
+                  });
+                }
+
+                it.describe(`to \`${"unclearable" satisfies ValueIs}\``, () => {
+                  testOptionAndFilterPreservation({ from: "clearable", to: "unclearable" });
+                });
+
+                it.describe(`to non-filter mode`, () => {
+                  testOptionOnlyPreservation({ from: "clearable" });
+                });
+              });
+
+              it.describe(`Transitions from \`${"unclearable" satisfies ValueIs}\``, () => {
+                it.describe(`to \`${"clearable" satisfies ValueIs}\``, () => {
+                  testEmptyFilterToEmptyValueCoercion({ from: "unclearable", to: "clearable" });
+                  testOptionAndFilterPreservation({ from: "unclearable", to: "clearable" });
+                });
+
+                it.describe(`to ${nonFilterMode}`, () => {
+                  testOptionOnlyPreservation({ from: "unclearable" });
+                });
+              });
+
+              it.describe(`Transitions from ${nonFilterMode}`, () => {
+                for (const to of ["anyvalue", "clearable", "unclearable"] as const satisfies ValueIs[]) {
+                  it.describe(`to \`${to}\``, () => {
+                    it("Preserves the currently-selected `option` and highlights the `combobox` text (if focused)", async ({
+                      page,
+                    }) => {
+                      for (const focused of [true, false]) {
+                        await it.step(`Behavior when ${focused ? "" : "NOT "}focused`, async () => {
+                          /* ---------- Setup ---------- */
+                          const name = "my-combobox";
+                          const optionsMarkup = testOptions
+                            .map((o, i) => `<option value="${i}" ${i === 1 ? "selected" : ""}>${o}</option>`)
+                            .join("");
+
+                          await page.goto(url);
+                          await renderHTMLToPage(page)`
+                            <form aria-label="Test Form">
+                              <select-enhancer>
+                                <select name="${name}">
+                                  ${optionsMarkup}
+                                </select>
+                              </select-enhancer>
+                            </form>
+                          `;
+
+                          const form = page.getByRole("form");
+                          const combobox = page.getByRole("combobox");
+                          if (focused) await combobox.focus();
+
+                          const initialOption = { label: testOptions[1], value: "1" };
+                          await expectOptionToBeSelected(page, initialOption);
+                          expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(
+                            "1",
+                          );
+
+                          /* ---------- Assertions ---------- */
+                          // NOTE: It is important to set the `valueis` attribute BEFORE the `filter` attribute
+                          await combobox.evaluate((node: ComboboxField, t) => (node.valueIs = t), to);
+                          await combobox.evaluate((node: ComboboxField) => (node.filter = true));
+
+                          await expect(combobox).toHaveText(initialOption.label);
+                          await expectOptionToBeSelected(page, initialOption);
+                          expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(
+                            "1",
+                          );
+
+                          if (focused) await expect(combobox).toHaveTextSelection("full");
+                          else {
+                            await expect(combobox).not.toBeFocused();
+                            expect(await page.evaluate(() => document.getSelection()?.rangeCount)).toBe(0);
+                          }
+                        });
+                      }
+                    });
+                  });
+                }
+              });
+            }
           });
 
           it.describe("labels (Property)", () => {

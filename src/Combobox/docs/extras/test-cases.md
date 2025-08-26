@@ -141,59 +141,63 @@ Each of these attribute states need to consider when the `combobox`'s value or t
        - [x] The first `option` that the `combobox` has should be programmatically marked as `selected`.
      - `clearable` (Default)
        - [x] Replicate the behavior of `anyvalue`
-8. [x] When a **Developer** modifies the `filteris` (or whatever we call it) attribute:
+8. [x] ✅ When a **Developer** modifies the `valueis` attribute:
+   - [x] ✅ When the `combobox` is not in `filter` mode, act as if `valueis` is `unclearable`.
    - When the attribute is **added**/**updated**:
-     - [x] If the attribute is added when `filter` mode is off, then `filter` mode is **automatically turned on**.
-       - Reasoning: Originally, we played around with the idea of throwing an error at the user or logging a friendly error message. However, the simplest way to keep users from footgunning themselves is by satisfying the prerequisites for them. This is probably a much better DX. And it also allows our code to be less defensive/paranoid.
-     - If the attribute is `anyvalue`:
+     - [x] ✅ If the attribute is added when `filter` mode is off, then **nothing should happen**.
+       - Reasoning: Originally, we played around with the idea of throwing an error at the user or logging a friendly error message. Then, we played around with the idea of automatically turning `filter` mode on for the user. However, both of these were confusing User Experiences. The simplest solution is just to do nothing if `filter` mode is not on, as the attribute holds no real relevance without the mode being enabled.
+     - [x] ✅ If the attribute is `anyvalue`:
        - If the `combobox`'s text content is an empty string
-         - [x] Set the `combobox` value to its current text content (i.e., the empty search string).
-         - [x] **Deselect** the currently-selected `option` (even if it's the Empty String Option).
+         - [x] ✅ Set the `combobox` value to its current text content (i.e., the empty search string).
+         - [x] ✅ **Deselect** the currently-selected `option` (even if it's the Empty String Option).
          - These 2 decisions will avoid User Confusion and perhaps even Developer Confusion.
        - Otherwise, if the `combobox` is collapsed:
-         - [x] Do nothing.
-           - Reasoning: In this scenario, the component should be transitioning _to_ `anyvalue` _from_ `clearable`/`unclearable`, with a text content that is _not_ an empty string. In such a case, the component should already have a valid value since it isn't in the process of being interacted with (as indicated by its collapsed state), and the previous `filteris` states would have required a valid `option` to already be selected.
+         - [x] ✅ Do nothing.
+           - Reasoning: In this scenario, the component should be transitioning _to_ `anyvalue` _from_ `clearable`/`unclearable`, with a text content that is _not_ an [invalid] empty string. In such a case, the component should already have a valid value since it isn't in the process of being interacted with (as indicated by its collapsed state), and the previous `valueis` states would have required a valid value to already exist.
          - Otherwise (i.e., if the `combobox` is **expanded**):
-           - [x] If an `autoselectableOption` exists, set the `combobox`'s value to it.
-             - Reasoning: This will prevent developers from encountering scenarios where an `option` which matches the current filter unexpectedly becomes unselected after `anyvalue` is applied to the component. (Note that this logic _cannot_ be relied on while the `combobox` is collapsed. In such a case, the `combobox` filter was already coerced back to the correct value by `clearable`/`unclearable` when the user `blur`red the field, but the `autoselectableOption` might point to a different `option` which matched the user's filter before they gave up and collapsed the component. This is why the component does nothing if `anyvalue` is turned on while the `combobox` is collapsed; doing so produces more accurate/predictable behavior.)
-           - [x] If no `autoselectableOption` exists, set the `combobox` value to its current text content.
+           - [x] ✅ If an `autoselectableOption` exists, set the `combobox`'s value to it.
+             - Reasoning: This will prevent developers from encountering scenarios where an `option` which matches the current filter unexpectedly becomes unselected after `anyvalue` is applied to the component. (Note that this logic _cannot_ be relied on while the `combobox` is collapsed. In such a case, the `combobox` filter was already coerced back to the correct value by `clearable`/`unclearable` when the user `blur`red the field, but the `autoselectableOption` might point to a different `option` which matched the user's filter before they gave up and collapsed the component. This is why the component does nothing if `anyvalue` is turned on while the `combobox` is collapsed; using this approach so produces more accurate/predictable behavior.)
+           - [x] ✅ If no `autoselectableOption` exists, set the `combobox` value to its current text content.
              - Reasoning: (At this point, this is the closest we can get to a valid state.)
-     - If the attribute is `unclearable`:
+     - [x] ✅ If the attribute is `unclearable`:
        - If the `combobox`'s text content is an empty string (`""`):
-         - [x] If a valid `""` option exists, select it.
-         - [x] Otherwise, **reset** the `combobox`.
+         - [x] ✅ If a valid `[value=""]` option exists, select it.
+         - [x] ✅ Otherwise, **reset** the `combobox`.
        - Otherwise, If the `combobox` was previously `anyvalue`:
-         - [x] If an `autoselectableOption` exists, select it.
-         - [x] If no `autoselectableOption` is found, look through the currently-matching `option`s for something that matches the field's text content.
-           - Reasoning: It probably isn't so performant to loop through all of the matching `option`s like this when the attribute is changed. However, there are 2 important things to consider here: 1&rpar; This behavior results in a more intuitive (albeit slower) UX/DX, and 2&rpar; Developers should **_rarely_** be changing between `filteris` states anyway -- if ever.
-         - [x] If no matching `option` is found, **reset** the `combobox`.
+         - [x] ✅ If an `autoselectableOption` exists, select it.
+         - ~~[x] If no `autoselectableOption` is found, look through the currently-matching `option`s for something that matches the field's text content.~~
+           - ~~Reasoning: This can happen if the following occurs: 1&rpar; A user supplies a filter that has a corresponding `autoselectableOption`, 2&rpar; the user closes the `combobox` &mdash; leaving the `autoselectableOption` that matched their filter unselected, 3&rpar; the user re-expands the `combobox`, 4&rpar; the developer changes the `valueis` attribute from `anyvalue` to something else. It probably isn't so performant to loop through all of the matching `option`s like this when the attribute is changed. However, there are 2 important things to consider here: 1&rpar; This behavior results in a more intuitive (albeit slower) UX/DX, and 2&rpar; Developers should **_rarely_** be changing between `valueis` states anyway -- if ever.~~
+           - **EDIT**: Although this is technically a realistic scenario, it's almost unfathomable why we'd need to support this scenario and incur the performance costs (and bundle size costs, and code complexity costs). No one would practically try to do this. Even if they did, they could search the `option`s themselves to find a matching one (since `#matchingOptions` should just be _all_ of the `option`s on expansion anyway).
+         - [x] ✅ If no matching `option` is found, **reset** the `combobox`.
        - If the `combobox` was previously `clearable`:
-         - [x] **Do nothing**. By the time you get here, `clearable` and `unclearble` behave identically, so there's nothing to "correct" or "compensate for".
-     - If the attribute is `clearable` (Default):
+         - [x] ✅ **Do nothing**. By the time you get here, `clearable` and `unclearble` behave identically, so there's nothing to "correct" or "compensate for".
+     - [x] ✅ If the attribute is `clearable` (Default):
        - If the `combobox`'s text content is an empty string
-         - [x] Set the `combobox` value to its current text content (i.e., the empty search string).
-         - [x] **Deselect** the currently-selected `option` (even if it's the Empty String Option).
+         - [x] ✅ Set the `combobox` value to its current text content (i.e., the empty search string).
+         - [x] ✅ **Deselect** the currently-selected `option` (even if it's the Empty String Option).
        - If the `combobox` previously accepted `anyvalue`:
-         - [x] If an `autoselectableOption` exists, select it.
-         - [x] If no `autoselectableOption` is found, look through the currently-matching `option`s for something that matches the field's text content. (Reasoning is same as above.)
-         - [x] If no `autoselectableOption` is found, **reset** the `combobox`.
-       - [x] If the `combobox` was previously `unsearchable`, **do nothing**. By the time you get here, `clearable` and `unclearable` behave identically.
+         - [x] ✅ If an `autoselectableOption` exists, select it.
+         - ~~[x] If no `autoselectableOption` is found, look through the currently-matching `option`s for something that matches the field's text content. (Reasoning is same as above.)~~ The reason for _canceling_ this test criteria is the same as above.
+         - [x] ✅ If no `autoselectableOption` is found, **reset** the `combobox`.
+       - [x] ✅ If the `combobox` was previously `unsearchable`, **do nothing**. By the time you get here, `clearable` and `unclearable` behave identically.
    - When the attribute is **removed**:
      - If the `combobox` is in `filter` mode:
-       - [x] Act as if the attribute was set to `clearable` (i.e., the default `filteris` value).
-     - Otherwise (i.e., if the `combobox` is **not** in filter mode):
-       - This indicates that the developer implicitly chose to remove the `filteris` attribute by removing the `filter` attribute. (See Section #9 below.)
-       - [x] If the `combobox`'s text content is empty **AND** the `combobox` previously supported clearing (i.e., it was not `unclearable`), then **select the Empty String Option** (if it exists).
-       - [x] Otherwise, if the `combobox` previously rejected invalid/unrecognized values (i.e., it was not `anyvalue`), then **synchronize the `combobox`'s text content with the currently-selected `option`**.
-       - [x] Otherwise, if the `combobox` was previously `anyvalue`:
-         - [x] If an `autoselectableOption` exists, select it.
-         - [x] If no `autoselectableOption` is found, look through the currently-matching `option`s for something that matches the field's text content. (Reasoning is same as above.)
-       - [x] If no `option` was found through any of these _scoped_ searching approaches, **reset** the `combobox`.
-       - Reasoning: These changes are necessary to restore the `combobox` to a valid state since it will no longer be searchable.
-   - Note: The approaches here favor the following three things: 1&rpar; Maintaining a valid value/state for the `combobox`, 2&rpar; preserving the _previously-existing_ behavior as much as possible during transitions between states, and 3&rpar; Avoiding confusing experiences for users/developers (as much as possible, with minor conflicts of interest between both target groups). Since component state is a higher priority than UX (and intentionally so, for developer predictability), devs should avoid changing this attribute while the user is interacting with the `combobox` whenever possible, though transitioning to `anyvalue` should generally always be safe.
-9. [x] When a **Developer** modifies the `filter` attribute
-   - [x] If the `filter` attribute is added and the `filteris` attribute is absent, **do nothing**. (The `combobox` is considered to be in a valid state already.)
-   - [x] If the `filter` attribute is removed and the `filteris` attribute is **present**, then **remove `filteris` automatically**. (This is necessary to avoid unexpected/invalid states and behaviors.) **This action should _avoid_ any unexpected side effects.**
+       - [x] ✅ Act as if the attribute was set to `clearable` (i.e., the default `valueis` value).
+     - If the `combobox` is not in `filter` mode:
+       - [x] ✅ Do nothing.
+   - [x] ✅ When the `combobox` turns off `filter` mode
+     - This indicates that the developer wants to go back to an "enhnaced select" experience &mdash; regardless of the current value of `valueis`.
+     - ✅ [x] If the `combobox`'s text content is empty **AND** the `combobox` previously supported clearing (i.e., it was not `unclearable`), then **select the Empty String Option** (if it exists).
+     - ✅ [x] Otherwise, if the `combobox` previously rejected invalid/unrecognized values (i.e., it was not `anyvalue`), then **synchronize the `combobox`'s text content with the currently-selected `option`**.
+     - ✅ [x] Otherwise, if the `combobox` was previously `anyvalue`:
+       - ✅ [x] If an `autoselectableOption` exists, select it.
+       - ~~[x] If no `autoselectableOption` is found, look through the currently-matching `option`s for something that matches the field's text content. (Reasoning is same as above.)~~ The reason for _canceling_ this test criteria is the same as above.
+     - [x] ✅ If no `option` was found through any of these _scoped_ searching approaches, **reset** the `combobox`.
+     - Reasoning: These changes are necessary to restore the `combobox` to a valid state since it will no longer be searchable.
+   - Note: The approaches here favor the following three things: 1&rpar; Maintaining a valid value/state for the `combobox`, 2&rpar; preserving the _previously-existing_ behavior as much as possible during transitions between states, and 3&rpar; Avoiding confusing experiences for Users/Developers (as much as possible, with minor conflicts of interest between both target groups). Since component state is a higher priority than UX (and intentionally so, for developer predictability), devs should avoid changing this attribute while the user is interacting with the `combobox` whenever possible, though transitioning to `anyvalue` should generally be considered safe.
+9. [x] ✅ When a **Developer** modifies the `filter` attribute
+   - [x] ✅ If the `filter` attribute is added and the `valueis` attribute is absent, **do nothing**. (The `combobox` is considered to be in a valid state already.)
+   - [x] ✅ If the `filter` attribute is removed and the `valueis` attribute is **present**, then active as if the `combobox` was transitioning to `unclearable` mode. (This is necessary to avoid unexpected/invalid states and behaviors.) **This action should _avoid_ any unexpected side effects.**
 10. When the `combobox` is initialized by the `SelectEnhancer` (**Component** action):
     - [x] If the `combobox` that allows empty values (i.e., that is `clearable`/`anyvalue`) is initialized without a default `option`, then force the `combobox` value/filter to an Empty String.
       - Reasoning: We need a simple way to enable developers to default the `combobox` filter/value to an empty string on mount or page load. This seems like the best solution for now. Unfortunately, this approach means that if developers dynamically create a `<select>` element in a `DocumentFragment`, select an `option` in it without setting `defaultSelected`, and then mount that `<select>` element to the DOM within a `<select-enhancer>`, some information will be lost. But the simple solution to that problem is just to set `defaultSelected` during the weird, unorthodox, behind-the-scenes manipulation of a `<select>` element that hasn't yet been placed in the DOM.

@@ -24,6 +24,7 @@
   - **Safari** (18.5): Prevents focusing via Keyboard Navigation (`Tab`bing) and `HTMLElement.focus()`. However, if the element is clicked, it receives a cursor and can still be modified.
   - **Firefox** (140): Does not prevent **_ANY_** of the 3 aforementioned means of focusing an element. To Firefox, if the element is `contenteditable`, it's focusable.
   - Due to these discrepancies, if you want a `[contenteditable]` form control _not_ to be interactive when `disabled`, then you'll have to toggle `[contenteditable]` between `"false"` and `"true"` yourself.
+- Apparently, when a `:focused` element is dynamically given the attribute `[contenteditable="true"]`, a cursor **_is not_** put inside the element. (This is at least true for Google Chrome `138` on MacOS `15.5`.) Although the practicality of such a scenario is probably small, this is still something worth noting. This means that users have no way of knowing that an element with which they're interacting has become editable without leaving the element and re-focusing it. The way that our `<combobox-field>` gets around this issue is by highlighting all of its own text content if it becomes editable while being in focus.
 
 ## `Ranges`, `Selection`, and Reimplementing the `input` Event
 

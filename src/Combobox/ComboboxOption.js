@@ -117,8 +117,8 @@ class ComboboxOption extends HTMLElement {
 
     if (this.selected && combobox.value !== this.value) combobox.value = this.value;
     else if (!this.selected && combobox.value === this.value) {
-      if (combobox.textContent && combobox.acceptsFilter(combobox.textContent)) return;
-      if (combobox.acceptsFilter("")) return combobox.forceEmptyValue();
+      if (combobox.textContent && combobox.acceptsValue(combobox.textContent)) return;
+      if (combobox.acceptsValue("")) return combobox.forceEmptyValue();
       combobox.formResetCallback(); // TODO: This is a BREAKING change! Need to update tests BEFORE `commit`TING!
     }
   }

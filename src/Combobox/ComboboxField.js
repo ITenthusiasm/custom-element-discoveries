@@ -12,8 +12,6 @@ import attrs from "./attrs.js";
  *    (and should never be a practical problem as long as `#emptyOption` is handled correctly).
  */
 
-/** @typedef {"anyvalue" | "clearable" | "unclearable"} FilterMode */
-
 /** 
  * @typedef {keyof Pick<ElementInternals,
      "labels" | "form" | "validity" | "validationMessage" | "willValidate" | "checkValidity" | "reportValidity"
@@ -35,11 +33,12 @@ class ComboboxField extends HTMLElement {
 
   static get observedAttributes() {
     // TODO: Consider `emptymessage` --> `nomatchesmessage`. Wondering if `emptymessage` is too ambiguous/confusing...
-    return /** @type {const} */ (["required", "filter", "filteris", "emptymessage"]);
+    return /** @type {const} */ (["required", "filter", "valueis", "emptymessage"]);
   }
 
   /* ------------------------------ Internals ------------------------------ */
   #mounted = false;
+  static #filterDisabedKey = Symbol("filter-disabled");
   /** @readonly */ #internals = this.attachInternals();
 
   /** @type {string} The temporary search string used for {@link filter _unfiltered_} `combobox`es */
@@ -111,9 +110,9 @@ class ComboboxField extends HTMLElement {
         // Reset `combobox` display if needed
         // NOTE: `option` CAN be `null` or unselected if `combobox` is `clearable`, empty, and `collapsed` with a non-empty filter
         const textNode = combobox.text;
-        if (!combobox.acceptsFilter(textNode.data)) {
+        if (!combobox.acceptsValue(textNode.data)) {
           const option = combobox.getOptionByValue(combobox.value);
-          if (combobox.filterIs === "clearable" && !combobox.value && !option?.selected) textNode.data = "";
+          if (combobox.valueIs === "clearable" && !combobox.value && !option?.selected) textNode.data = "";
           else if (textNode.data !== option?.textContent) textNode.data = /** @type {string} */ (option?.textContent);
         }
 
@@ -129,7 +128,7 @@ class ComboboxField extends HTMLElement {
 
   /** @readonly */ #optionNodesObserver = new MutationObserver((mutations) => {
     const textNode = this.text;
-    const nullable = this.filterIs !== "anyvalue";
+    const nullable = this.valueIs !== "anyvalue";
     if (!this.listbox.children.length) {
       if (!nullable) this.value = textNode.data;
       else {
@@ -199,59 +198,47 @@ class ComboboxField extends HTMLElement {
       return;
     }
 
-    // TODO: Is `allows` a better word than `filteris`? Maybe not?
-    // TODO: Should `filter` and `filteris` be combined into one attribute? Or is that more complicated?
-    if (name === "filteris" && newValue !== oldValue) {
-      if (newValue != null && !this.filter) this.filter = true;
+    if (name === "valueis" && newValue !== oldValue) {
       if (!this.#mounted) return;
+      const filterModeIsBeingDisabled = newValue === /** @type {any} */ (ComboboxField.#filterDisabedKey);
+      if (!this.filter && !filterModeIsBeingDisabled) return;
 
-      /** @satisfies {NonNullable<this["filterIs"]>} */ const trueNewValue =
-        newValue !== "anyvalue" && newValue !== "clearable" && newValue !== "unclearable" ? "clearable" : newValue;
-      /** @satisfies {NonNullable<this["filterIs"]>} */ const trueOldValue =
-        oldValue !== "anyvalue" && oldValue !== "clearable" && oldValue !== "unclearable" ? "clearable" : oldValue;
-      if (trueNewValue === trueOldValue) return;
+      const trueNewValue = this.valueIs;
+      /** @type {this["valueIs"]} */ const trueOldValue =
+        oldValue === "anyvalue" || oldValue === "unclearable" ? oldValue : "clearable";
+      if (trueNewValue === trueOldValue && !filterModeIsBeingDisabled) return;
 
       // `anyvalue` activated
-      if (trueNewValue === "anyvalue") {
-        if (this.textContent === "") return this.forceEmptyValue();
+      if (trueNewValue === "anyvalue" && !filterModeIsBeingDisabled) {
+        if (this.text.data === "") return this.forceEmptyValue();
         if (this.getAttribute(attrs["aria-expanded"]) !== String(true)) return; // A valid value should already exist
 
         if (this.#autoselectableOption) this.value = this.#autoselectableOption.value;
-        else this.value = /** @type {string} */ (this.textContent);
+        else this.value = this.text.data;
       }
-      // `unclearable` activated
-      else if (trueNewValue === "unclearable") {
-        /** @type {ComboboxOption | null | undefined} */ let option;
+      // `clearable` activated (default when `filter` mode is ON)
+      else if (trueNewValue === "clearable" && !filterModeIsBeingDisabled) {
+        if (this.text.data === "") return this.forceEmptyValue();
+        if (trueOldValue !== "anyvalue") return; // A valid value should already exist
 
-        if (this.textContent === "") option = this.getOptionByValue("");
-        else if (trueOldValue !== "anyvalue") return;
-        else option = this.#autoselectableOption ?? this.#matchingOptions.find((o) => o.label === this.textContent);
-
-        if (!option) return this.formResetCallback();
-        option.selected = true;
-        if (this.textContent !== option.label) this.textContent = option.label;
+        if (this.#autoselectableOption) this.value = this.#autoselectableOption.value;
+        else this.formResetCallback();
       }
-      // `clearable` (default) activated
-      else if (this.filter) {
-        if (this.textContent === "") return this.forceEmptyValue();
-        if (trueOldValue !== "anyvalue") return;
-        const option = this.#autoselectableOption ?? this.#matchingOptions.find((o) => o.label === this.textContent);
-
-        if (!option) return this.formResetCallback();
-        option.selected = true;
-        if (this.textContent !== option.label) this.textContent = option.label;
-      }
-      // `filter` mode is off AND `filteris` was just recently removed for cleanup
+      // `unclearable` activated (default when `filter` mode is OFF)
       else {
         /** @type {ComboboxOption | null | undefined} */ let option;
 
-        if (this.textContent === "" && trueOldValue !== "unclearable") option = this.getOptionByValue("");
-        else if (trueOldValue !== "anyvalue") option = this.#value == null ? null : this.getOptionByValue(this.#value);
-        else option = this.#autoselectableOption ?? this.#matchingOptions.find((o) => o.label === this.textContent);
+        if (trueOldValue !== "unclearable" && this.text.data === "") option = this.getOptionByValue("");
+        else if (trueOldValue === "anyvalue") option = this.#autoselectableOption;
+        else {
+          // A valid value should already exist in `filter` mode. In that case, don't disrupt User's current filter.
+          if (!filterModeIsBeingDisabled) return;
+          option = this.#value == null ? null : this.getOptionByValue(this.#value);
+        }
 
         if (!option) return this.formResetCallback();
         option.selected = true;
-        if (this.textContent !== option.label) this.textContent = option.label;
+        if (this.text.data !== option.label) this.text.data = option.label;
       }
 
       return;
@@ -261,7 +248,23 @@ class ComboboxField extends HTMLElement {
       if (newValue == null) {
         this.removeAttribute("aria-autocomplete");
         this.removeAttribute("contenteditable");
-        this.removeAttribute("filteris");
+
+        // NOTE: The old `valueIs` value/property has to be calculated here because the `filter` attribute was removed.
+        // This means that `this.filterIs` would return `unclearable` in some cases where it should return `clearable`.
+        const rawValueIs = this.getAttribute("valueis");
+        /** @type {this["valueIs"]} */
+        const oldValueIs = rawValueIs === "anyvalue" || rawValueIs === "unclearable" ? rawValueIs : "clearable";
+        this.attributeChangedCallback("valueis", oldValueIs, /** @type {any} */ (ComboboxField.#filterDisabedKey));
+
+        // TODO: This is also used in the `expand` logic. We should consider making this a re-usable method.
+        // Also, should we only run this logic if the `combobox` is already expanded?
+        this.#emptyOption?.remove();
+        if (this.#matchingOptions.length !== this.listbox.children.length) {
+          this.#matchingOptions = Array.from(this.listbox.children, (option) => {
+            option.removeAttribute("data-filtered-out");
+            return option;
+          });
+        }
 
         if (this.isConnected) {
           this.removeEventListener("mousedown", ComboboxField.#handleMousedown);
@@ -270,8 +273,17 @@ class ComboboxField extends HTMLElement {
           this.addEventListener("keydown", this.#handleTypeahead, { passive: true });
         }
       } else {
+        const root = /** @type {Document | ShadowRoot} */ (this.getRootNode());
+        if (root.activeElement === this) {
+          this.ownerDocument.getSelection()?.setBaseAndExtent(this.text, 0, this.text, this.text.length);
+        }
+
         this.setAttribute("aria-autocomplete", "list");
         this.setAttribute("contenteditable", String(!this.disabled));
+        // TODO: We should consider updating `#matchingOptions` on `expand` instead of `collapse`.
+        //       Maybe not, though? That may complicate the `option`-filtering logic...
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- This is due to our own TS Types. :\
+        this.#matchingOptions ??= Array.from(this.listbox.children);
 
         if (this.isConnected) {
           this.removeEventListener("keydown", this.#handleTypeahead);
@@ -463,7 +475,7 @@ class ComboboxField extends HTMLElement {
     this.#matchingOptions.splice(matches);
 
     // NOTE: We MUST set the internal value DIRECTLY here to produce desirable behavior. See Development Notes for details.
-    if (combobox.acceptsFilter(search)) {
+    if (combobox.acceptsValue(search)) {
       const prevOption = this.#value == null ? null : this.getOptionByValue(this.#value);
       this.#value = search;
       this.#internals.setFormValue(this.#value);
@@ -517,13 +529,13 @@ class ComboboxField extends HTMLElement {
     if (v === this.#value && newOption?.selected === true) return;
 
     /* ---------- Update Values ---------- */
-    if (!newOption && !this.acceptsFilter(v)) return; // Ignore invalid values
+    if (!newOption && !this.acceptsValue(v)) return; // Ignore invalid values
     const prevOption = this.#value == null ? null : this.getOptionByValue(this.#value);
 
     this.#value = v;
     this.#internals.setFormValue(this.#value);
     const label = newOption ? newOption.label : this.#value;
-    if (this.textContent !== label) {
+    if (this.text.data !== label) {
       this.text.data = label;
       this.#autoselectableOption = null;
     }
@@ -539,14 +551,14 @@ class ComboboxField extends HTMLElement {
    * if one exists (including any `option` whose value is an empty string).
    *
    * @returns {void}
-   * @throws {TypeError} if the `combobox` is not {@link filter filterable}, or if {@link filterIs} not `anyvalue` or
-   * `clearable`.
+   * @throws {TypeError} if the `combobox` is not {@link filter filterable}, or if its value
+   * {@link valueIs cannot be cleared}.
    */
   forceEmptyValue() {
-    if (this.filterIs !== "anyvalue" && this.filterIs !== "clearable") {
-      throw new TypeError('Method requires `filter` mode to be on and `filteris` to be "anyvalue" or "clearable"');
+    if (this.valueIs !== "anyvalue" && this.valueIs !== "clearable") {
+      throw new TypeError('Method requires `filter` mode to be on and `valueis` to be "anyvalue" or "clearable"');
     }
-    if (this.#value == null && this.filterIs === "clearable") {
+    if (this.#value == null && this.valueIs === "clearable") {
       throw new TypeError('Cannot coerce value to `""` for a `clearable` `combobox` that owns no `option`s');
     }
 
@@ -640,43 +652,42 @@ class ComboboxField extends HTMLElement {
   }
 
   /**
-   * Indicates how a {@link filter filterable} `combobox` will behave.
+   * Indicates how a `combobox`'s value will behave.
    * - `unclearable`: The field's {@link value `value`} must be a string matching one of the `option`s,
-   * and it cannot be cleared.
-   * - `clearable` (Default): The field's `value` must be a string matching one of the `option`s,
-   * but it can be cleared.
+   * and it cannot be cleared. (Default when {@link filter `filter`} mode is off.)
+   * - `clearable`: The field's `value` must be a string matching one of the `option`s,
+   * but it can be cleared. (Default in `filter` mode. Requires enabling `filter`.)
    * - `anyvalue`: The field's `value` can be any string, and it will automatically be set to
-   * whatever value the user types.
+   * whatever value the user types. (Requires enabling `filter`.)
    *
    * <!--
    * TODO: Link to Documentation for More Details (like TS does for MDN). The deeper details of the behavior
    * are too sophisticated to place them all in a JSDoc, which should be [sufficiently] clear and succinct
    * -->
    *
-   * @returns {FilterMode | null} One of the above values if the `combobox` is
+   * @returns {"unclearable" | "clearable" | "anyvalue"} One of the above values if the `combobox` is
    * {@link filter filterable}. Otherwise, returns `null`.
    */
-  get filterIs() {
-    if (!this.filter) return null;
+  get valueIs() {
+    if (!this.filter) return "unclearable";
 
-    const value = this.getAttribute("filteris");
+    const value = this.getAttribute("valueis");
     return value === "anyvalue" || value === "unclearable" ? value : "clearable";
   }
 
-  /** @param {FilterMode} value */
-  set filterIs(value) {
-    this.setAttribute("filteris", value);
+  set valueIs(value) {
+    this.setAttribute("valueis", value);
   }
 
   /**
-   * @param {string} string
-   * @returns {boolean} `true` if the `combobox` will preserve the provided `string` as a valid value/filter when
-   * collapsed or `blur`red. Otherwise, returns `false`.
+   * @param {string} value
+   * @returns {boolean} `true` if the `combobox` will accept the provided `value` when no corresponding `option` exists.
+   * Otherwise, returns `false`.
    */
-  acceptsFilter(string) {
+  acceptsValue(value) {
     if (!this.filter) return false;
-    if (this.filterIs !== "anyvalue" && this.#value === null) return false;
-    return this.filterIs === "anyvalue" || (this.filterIs === "clearable" && string === "");
+    if (this.valueIs !== "anyvalue" && this.#value === null) return false;
+    return this.valueIs === "anyvalue" || (this.valueIs === "clearable" && value === "");
   }
 
   /** @type {this["autoselectableOption"]} */
@@ -752,7 +763,7 @@ class ComboboxField extends HTMLElement {
     const defaultOption = listbox.querySelector(":scope [role='option']:nth-last-child(1 of [selected])");
 
     if (defaultOption) this.value = defaultOption.value;
-    else if (this.filterIs === "anyvalue" || this.filterIs === "clearable") this.value = "";
+    else if (this.valueIs === "anyvalue" || this.valueIs === "clearable") this.value = "";
     else if (listbox.firstElementChild) this.value = listbox.firstElementChild.value;
   }
 
