@@ -3741,6 +3741,71 @@ for (const { mode } of testConfigs) {
             });
           });
 
+          it.describe("text (Property)", () => {
+            it("Exposes the `combobox`'s singular Text Node", async ({ page }) => {
+              const initialValue = testOptions[0];
+              await renderComponent(page, initialValue);
+
+              /* Verify that `ComboboxField.text` reflects the field's current text content */
+              // On Mount
+              const combobox = page.getByRole("combobox");
+              await expect(combobox).toHaveText(initialValue);
+              await expect(combobox).toHaveJSProperty("text.data", initialValue);
+
+              // With value changes
+              await combobox.press("End+Enter");
+              await expectOptionToBeSelected(page, { label: testOptions.at(-1) as string });
+              await expect(combobox).toHaveText(testOptions.at(-1) as string);
+              await expect(combobox).toHaveJSProperty("text.data", testOptions.at(-1));
+
+              // With text node modifications
+              const badText = String(Math.random());
+              await combobox.evaluate((node: ComboboxField, string) => (node.text.data = string), badText);
+              await expect(combobox).toHaveText(badText);
+              await expect(combobox).toHaveJSProperty("text.data", badText);
+
+              /* Verify that the `ComboboxField` only allows its singular Text Node as a child */
+              // Adding Children doesn't work
+              await combobox.evaluate((node) => node.prepend(document.createElement("div")));
+              await expect(combobox).toHaveJSProperty("childNodes.length", 1);
+              expect(await combobox.evaluate((node) => node.firstChild === node.lastChild)).toBe(true);
+              expect(await combobox.evaluate((node: ComboboxField) => node.lastChild === node.text)).toBe(true);
+
+              await combobox.evaluate((node) => node.append(document.createTextNode("oof")));
+              await expect(combobox).toHaveJSProperty("childNodes.length", 1);
+              expect(await combobox.evaluate((node) => node.firstChild === node.lastChild)).toBe(true);
+              expect(await combobox.evaluate((node: ComboboxField) => node.lastChild === node.text)).toBe(true);
+
+              // Replacing the Node doesn't work
+              await combobox.evaluate((node) => node.replaceChildren(document.createElement("span")));
+              await expect(combobox).toHaveJSProperty("childNodes.length", 1);
+              expect(await combobox.evaluate((node) => node.firstChild === node.lastChild)).toBe(true);
+              expect(await combobox.evaluate((node: ComboboxField) => node.lastChild === node.text)).toBe(true);
+
+              // Removing the Text Node doesn't work
+              await combobox.evaluate((node: ComboboxField) => node.text.remove());
+              await expect(combobox).toHaveJSProperty("childNodes.length", 1);
+              expect(await combobox.evaluate((node) => node.firstChild === node.lastChild)).toBe(true);
+              expect(await combobox.evaluate((node: ComboboxField) => node.firstChild === node.text)).toBe(true);
+
+              // The Text Node does not get removed when the filter is redundantly emptied
+              await combobox.evaluate((node: ComboboxField) => (node.filter = true));
+              await combobox.press("ControlOrMeta+A");
+              await combobox.press("Backspace+Backspace");
+              await expect(combobox).toHaveJSProperty("childNodes.length", 1);
+              expect(await combobox.evaluate((node) => node.firstChild === node.lastChild)).toBe(true);
+              expect(await combobox.evaluate((node: ComboboxField) => node.firstChild === node.text)).toBe(true);
+
+              await expect(combobox).toHaveText("");
+              await expect(combobox).toHaveJSProperty("text.data", "");
+
+              const second = testOptions[1];
+              await combobox.pressSequentially(second);
+              await expect(combobox).toHaveText(second);
+              await expect(combobox).toHaveJSProperty("text.data", second);
+            });
+          });
+
           it.describe("filter (Property)", () => {
             it("Exposes the underlying `filter` attribute", async ({ page }) => {
               /* ---------- Setup ---------- */
@@ -4036,10 +4101,12 @@ for (const { mode } of testConfigs) {
                   const combobox = page.getByRole("combobox");
 
                   /* ---------- Assertions ---------- */
-                  // Clear the `combobox` value
+                  // NOTE: This is redundant because the `combobox` value and filter should already be empty on mount.
+                  // However, this code caught a bug that Safari has for `[contenteditable]` elements, so we're keeping it.
                   await combobox.press("ControlOrMeta+A");
                   await combobox.press("Backspace");
 
+                  // Verify that the `combobox` value is empty.
                   await expect(combobox).toHaveText("");
                   await expect(combobox).toHaveJSProperty("value", "");
                   expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe("");

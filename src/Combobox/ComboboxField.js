@@ -59,6 +59,7 @@ class ComboboxField extends HTMLElement {
    */
   #activeIndex = 0;
 
+  /** @readonly */ #textNodeObserver = new MutationObserver(ComboboxField.#preserveTextNode);
   /** @readonly */ #activeDescendantObserver = new MutationObserver(ComboboxField.#watchActiveDescendant);
   /** @readonly */ #expansionObserver = new MutationObserver((mutations) => {
     for (let i = 0; i < mutations.length; i++) {
@@ -322,6 +323,7 @@ class ComboboxField extends HTMLElement {
 
     // Setup Mutation Observers
     this.#optionNodesObserver.observe(this.listbox, { childList: true });
+    this.#textNodeObserver.observe(this, { childList: true });
     this.#expansionObserver.observe(this, { attributes: true, attributeFilter: [attrs["aria-expanded"]] });
     this.#activeDescendantObserver.observe(this, {
       attributes: true,
@@ -348,6 +350,7 @@ class ComboboxField extends HTMLElement {
     // TODO: We should consider handling `disconnection` more safely/robustly with `takeRecords` since
     //       this element could be relocated (rather than being completely removed from the DOM).
     this.#optionNodesObserver.disconnect();
+    this.#textNodeObserver.disconnect();
     this.#expansionObserver.disconnect();
     this.#activeDescendantObserver.disconnect();
 
@@ -414,7 +417,7 @@ class ComboboxField extends HTMLElement {
      */
     event.preventDefault();
     const combobox = /** @type {ComboboxField} */ (event.currentTarget);
-    const text = this.#text;
+    const { text } = combobox;
 
     // Update `combobox`'s Text Content based on user input
     const { inputType } = event;
@@ -943,6 +946,16 @@ class ComboboxField extends HTMLElement {
   };
 
   /* ------------------------------ Combobox Mutation Observer Details ------------------------------ */
+  /**
+   * @param {MutationRecord[]} mutations
+   * @returns {void}
+   */
+  static #preserveTextNode(mutations) {
+    const combobox = /** @type {ComboboxField} */ (mutations[0].target);
+    const { text } = combobox;
+    if (text !== combobox.firstChild || text !== combobox.lastChild) combobox.replaceChildren(text);
+  }
+
   /**
    * @param {MutationRecord[]} mutations
    * @returns {void}
