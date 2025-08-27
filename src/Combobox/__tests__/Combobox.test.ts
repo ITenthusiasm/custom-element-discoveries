@@ -305,6 +305,237 @@ for (const { mode } of testConfigs) {
 
         return { name, pass, message, expected, actual: { anchor, focus } };
       },
+      /** Asserts that the provided `combobox` is accessibly expanded */
+      async toBeExpanded(
+        combobox: Locator,
+        options?: {
+          timeout?: number;
+          /**
+           * The specific `option`s that should be visible when the `combobox` is expanded.
+           * Use `all` if every `option` in the `combobox`'s `listbox` should be visible (Default).
+           */
+          options?: "all" | (string | Pick<OptionInfo, "label">)[];
+        },
+      ) {
+        const name = "toBeExpanded";
+        const timeout = options?.timeout ?? this.timeout;
+
+        try {
+          // `combobox` state
+          await baseExpect(combobox).toHaveRole("combobox", { timeout });
+          await baseExpect(combobox).toHaveAttribute(attrs["aria-expanded"], String(!this.isNot), { timeout });
+
+          // `listbox` display
+          const listboxId = (await combobox.getAttribute("aria-controls", { timeout })) ?? "";
+          const listbox = combobox
+            .page()
+            .getByRole("listbox")
+            .and(combobox.page().locator(`[id="${listboxId}"]`));
+
+          await baseExpect(listbox).toBeVisible({ visible: !this.isNot, timeout });
+
+          // `option`s display
+          const visibleOptions = listbox.getByRole("option");
+
+          if (this.isNot) await baseExpect(visibleOptions).toHaveCount(0, { timeout });
+          else if (!options?.options || options.options === "all") {
+            const visibleOptionsCount = await visibleOptions.count();
+            await baseExpect(listbox.getByRole("option", { includeHidden: true })).toHaveCount(visibleOptionsCount, {
+              timeout,
+            });
+          } else {
+            await Promise.all(
+              options.options.map((o) => {
+                const label = typeof o === "string" ? o : o.label;
+                return baseExpect(listbox.getByRole("option", { name: label, exact: true })).toBeVisible({ timeout });
+              }),
+            );
+          }
+
+          // Error Messaging is handled by `catch` block, so an empty string is fine here.
+          return { name, pass: !this.isNot, message: () => "" };
+        } catch (error) {
+          const { matcherResult } = error as { matcherResult: MatcherReturnType };
+          return { ...matcherResult, name, pass: this.isNot };
+        }
+      },
+      /**
+       * Asserts that the `combobox`'s currently-active `option` is the one having the `expected` label
+       * @param combobox
+       * @param expected The `label` of the target `option`
+       * @param options
+       */
+      async toHaveActiveOption(combobox: Locator, expected: string, options?: { timeout?: number }) {
+        const name = "toHaveActiveOption";
+        const timeout = options?.timeout ?? this.timeout;
+
+        try {
+          await baseExpect(combobox).toHaveRole("combobox", { timeout });
+        } catch (error) {
+          const { matcherResult } = error as { matcherResult: MatcherReturnType };
+          return { ...matcherResult, name, pass: this.isNot };
+        }
+
+        const listboxId = (await combobox.getAttribute("aria-controls", { timeout })) ?? "";
+        const listbox = combobox
+          .page()
+          .getByRole("listbox")
+          .and(combobox.page().locator(`[id="${listboxId}"]`));
+        const option = listbox.getByRole("option", { name: expected, exact: true });
+
+        try {
+          // Active `option` is clear to VISUAL USERS (HTML + CSS)
+          if (this.isNot) await baseExpect(option).not.toHaveAttribute(attrs["data-active"]);
+          else await baseExpect(option).toHaveAttribute(attrs["data-active"], String(true));
+
+          // Active `option` is ACCESSIBLE
+          const optionId = (await option.getAttribute("id")) as string;
+          const comboboxExpectation = this.isNot ? baseExpect(combobox).not : baseExpect(combobox);
+          await comboboxExpectation.toHaveAttribute(attrs["aria-activedescendant"], optionId);
+
+          // Error Messaging is handled by `catch` block, so an empty string is fine here.
+          return { name, pass: !this.isNot, message: () => "" };
+        } catch (error) {
+          const { matcherResult } = error as { matcherResult: MatcherReturnType };
+          return { ...matcherResult, name, pass: this.isNot };
+        }
+      },
+      /** Asserts that the `combobox`'s currently-selected `option` is the one having the specified `label` (and `value`) */
+      async toHaveSelectedOption(combobox: Locator, expected: OptionInfo, options?: { timeout?: number }) {
+        const name = "toHaveSelectedOption";
+        const timeout = options?.timeout ?? this.timeout;
+
+        try {
+          await baseExpect(combobox).toHaveRole("combobox", { timeout });
+        } catch (error) {
+          const { matcherResult } = error as { matcherResult: MatcherReturnType };
+          return { ...matcherResult, name, pass: this.isNot };
+        }
+
+        // Verify that the `option` has the correct attributes/properties WITHOUT disrupting other tests.
+        // This approach allows us to verify the accessible state of `option`s without requiring an expanded `combobox`.
+        const listboxId = (await combobox.getAttribute("aria-controls", { timeout })) ?? "";
+        const listbox = combobox
+          .page()
+          .getByRole("listbox", { includeHidden: true })
+          .and(combobox.page().locator(`[id="${listboxId}"]`));
+
+        const option = listbox.getByRole("option", { name: expected.label, exact: true, includeHidden: true });
+
+        try {
+          await baseExpect(option).toHaveJSProperty("value", expected.value ?? expected.label, { timeout });
+          await baseExpect(option).toHaveAttribute(attrs["aria-selected"], String(!this.isNot), { timeout });
+          await baseExpect(option).toHaveJSProperty("selected", !this.isNot, { timeout });
+
+          // Error Messaging is handled by `catch` block, so an empty string is fine here.
+          return { name, pass: !this.isNot, message: () => "" };
+        } catch (error) {
+          const { matcherResult } = error as { matcherResult: MatcherReturnType };
+          return { ...matcherResult, name, pass: this.isNot };
+        }
+      },
+      async toHaveComboboxValue(
+        combobox: Locator,
+        expected: ComboboxField["value"],
+        options?: {
+          timeout?: number;
+          /**
+           * When `true`, additionally asserts that the `combobox` has an owning `<form>` element whose
+           * `FormData` includes the `combobox`'s value. Requires the `combobox` to have a valid `name`.
+           */
+          form?: boolean;
+        },
+      ) {
+        const name = "toHaveComboboxValue";
+        const timeout = options?.timeout ?? this.timeout;
+
+        try {
+          await baseExpect(combobox).toHaveRole("combobox", { timeout });
+          const valueExpectation = this.isNot ? baseExpect(combobox).not : baseExpect(combobox);
+          await valueExpectation.toHaveJSProperty("value", expected, { timeout });
+        } catch (error) {
+          const { matcherResult } = error as { matcherResult: MatcherReturnType };
+          return { ...matcherResult, name, pass: this.isNot };
+        }
+
+        const formInfo = !options?.form
+          ? null
+          : await combobox.evaluate(
+              (node: ComboboxField) => {
+                if (!node.form) return { hasForm: false, formValue: null };
+                return { hasForm: true, formValue: new FormData(node.form).get(node.name) };
+              },
+              undefined,
+              { timeout },
+            );
+
+        if (options?.form) {
+          if (!formInfo?.hasForm) {
+            return {
+              name,
+              pass: this.isNot,
+              message: () =>
+                this.utils.matcherHint(name, "locator", "expected", { isNot: this.isNot, promise: this.promise }) +
+                "\n\n" +
+                `Locator: ${combobox}\n` +
+                `Expected: ${combobox} to have an owning <form> element\n`,
+            };
+          }
+
+          try {
+            const formValueExpectation = this.isNot
+              ? baseExpect(formInfo.formValue).not
+              : baseExpect(formInfo.formValue);
+            formValueExpectation.toBe(expected);
+          } catch (error) {
+            const { matcherResult } = error as { matcherResult: MatcherReturnType };
+            const not = this.isNot ? " not" : "";
+
+            return {
+              ...matcherResult,
+              name,
+              pass: this.isNot,
+              message: () =>
+                this.utils.matcherHint(name, "locator", "expected", { isNot: this.isNot, promise: this.promise }) +
+                "\n\n" +
+                `Locator: ${combobox}\n` +
+                `Expected: ${combobox}${not} to have associated form value ${this.utils.printExpected(expected)}\n` +
+                `Received: ${this.utils.printReceived(matcherResult.actual)}`,
+            };
+          }
+        }
+
+        // Error Messaging is handled by all of the earlier logic, so an empty string is fine here.
+        return { name, pass: !this.isNot, message: () => "" };
+      },
+      /** Performs both the `toHaveComboboxValue()` and the `toHaveSelectedOption()` assertions. */
+      async toHaveSyncedComboboxValue(
+        combobox: Locator,
+        expected: OptionInfo,
+        options?: {
+          timeout?: number;
+          /** The `form` option passed to `toHaveComboboxValue()` */
+          form?: boolean;
+          /** When `true`, additionally asserts that the `combobox`'s text content matches the selected `option`'s `label` */
+          matchingLabel?: boolean;
+        },
+      ) {
+        const name = "toHaveSynchronizedComboboxValue";
+        const timeout = options?.timeout ?? this.timeout;
+
+        try {
+          const expectation = this.isNot ? expect(combobox).not : expect(combobox);
+          if (options?.matchingLabel) await expectation.toHaveText(expected.label, { timeout });
+          await expectation.toHaveComboboxValue(expected.value ?? expected.label, options);
+          await expectation.toHaveSelectedOption(expected, options);
+
+          // Error Messaging is handled by `catch` block, so an empty string is fine here.
+          return { name, pass: !this.isNot, message: () => "" };
+        } catch (error) {
+          const { matcherResult } = error as { matcherResult: MatcherReturnType };
+          return { ...matcherResult, name, pass: this.isNot };
+        }
+      },
     });
 
     // TODO: Should we provide the ability to pass in options besides `testOptions`?
@@ -520,7 +751,7 @@ for (const { mode } of testConfigs) {
           // It's not clear what triggers this behavior in Firefox/Chrome, so we have to check the attribute manually
           const combobox = page.getByRole("combobox");
           const listboxId = (await combobox.getAttribute("aria-controls")) as string;
-          const listbox = page.getByRole("listbox", { includeHidden: true }).and(page.locator(`#${listboxId}`));
+          const listbox = page.getByRole("listbox", { includeHidden: true }).and(page.locator(`[id="${listboxId}"]`));
           await expect(listbox).toHaveAttribute("tabindex", String(-1));
         });
 
@@ -4647,6 +4878,194 @@ for (const { mode } of testConfigs) {
               });
             }
           });
+
+          if (mode === "Filterable") {
+            it.describe("autoselectableOption (Property)", () => {
+              it("Exposes the `option` that exactly corresponds to the User's current filter", async ({ page }) => {
+                await page.goto(url);
+                await renderHTMLToPage(page)`
+                  <select-enhancer>
+                    <select ${getFilterAttrs("unclearable")}>
+                      ${testOptions.map((o, i) => `<option value=${i}>${o}</option>`).join("")}
+                    </select>
+                  </select-enhancer>
+                `;
+
+                const combobox = page.getByRole("combobox");
+                await expect(combobox).toHaveSyncedComboboxValue({ label: testOptions[0], value: "0" });
+
+                // `combobox` starts without auto-selectable `option`
+                await expect(combobox).toHaveJSProperty("autoselectableOption", null);
+
+                // Entering a filter that only matches part of an `option` doesn't make it auto-selectable
+                const second = testOptions[1];
+                await combobox.pressSequentially(second.slice(0, -1));
+                await expect(combobox).toHaveJSProperty("autoselectableOption", null);
+
+                // A filter that exactly matches an `option` does make the `option` auto-selectable
+                await combobox.press(second.at(-1) as string);
+                await expect(combobox).toHaveJSProperty("autoselectableOption.value", "1");
+                await expect(combobox).toHaveJSProperty("autoselectableOption.label", second);
+                await expect(combobox).toHaveJSProperty("autoselectableOption.tagName", "COMBOBOX-OPTION");
+                await expect(combobox).not.toHaveSyncedComboboxValue({ label: second, value: "1" });
+
+                // Updating the filter to something without a matching `option` deletes the auto-selectable, however
+                const third = testOptions[2];
+                await combobox.press(third[0]);
+                await expect(combobox).toHaveJSProperty("autoselectableOption", null);
+              });
+
+              it("Becomes `null` when the `combobox` is expanded", async ({ page }) => {
+                const first = testOptions[0];
+                await renderComponent(page, first);
+
+                // Enter a filter with an `autoselectableOption`
+                const third = testOptions[2];
+                const combobox = page.getByRole("combobox");
+                await combobox.pressSequentially(third);
+
+                await expect(combobox).toHaveJSProperty("autoselectableOption.value", third);
+                await expect(combobox).toHaveJSProperty("autoselectableOption.label", third);
+                await expect(combobox).toHaveJSProperty("autoselectableOption.tagName", "COMBOBOX-OPTION");
+                await expect(combobox).not.toHaveSyncedComboboxValue({ label: third });
+                await expect(combobox).toHaveSyncedComboboxValue({ label: first });
+
+                // Close the `combobox`
+                await combobox.press("Escape");
+                await expectComboboxToBeClosed(page);
+                await expect(combobox).toHaveSyncedComboboxValue({ label: first }, { matchingLabel: true });
+
+                await expect(combobox).toHaveJSProperty("autoselectableOption.value", third);
+                await expect(combobox).toHaveJSProperty("autoselectableOption.label", third);
+                await expect(combobox).toHaveJSProperty("autoselectableOption.tagName", "COMBOBOX-OPTION");
+                await expect(combobox).not.toHaveSyncedComboboxValue({ label: third });
+
+                // Re-expand the `combobox`
+                await combobox.press("Alt+ArrowDown");
+                await expectOptionsToBeVisible(page);
+                await expect(combobox).toHaveJSProperty("autoselectableOption", null);
+              });
+
+              it("Becomes `null` when a value update changes the `combobox` text", async ({ page }) => {
+                const first = testOptions[0];
+                await renderComponent(page, first);
+
+                // Enter a filter with an `autoselectableOption`
+                const seventh = testOptions[6];
+                const combobox = page.getByRole("combobox");
+                await combobox.pressSequentially(seventh);
+
+                await expect(combobox).toHaveJSProperty("autoselectableOption.value", seventh);
+                await expect(combobox).toHaveJSProperty("autoselectableOption.label", seventh);
+                await expect(combobox).toHaveJSProperty("autoselectableOption.tagName", "COMBOBOX-OPTION");
+                await expect(combobox).toHaveSyncedComboboxValue({ label: first });
+                await expect(combobox).not.toHaveSyncedComboboxValue({ label: seventh });
+
+                // Apply a value that doesn't alter the `combobox` filter
+                await combobox.evaluate((node: ComboboxField, v) => (node.value = v), seventh);
+                await expect(combobox).toHaveSyncedComboboxValue({ label: seventh }, { matchingLabel: true });
+                await expect(combobox).not.toHaveSyncedComboboxValue({ label: first });
+                await expect(combobox).toHaveJSProperty("autoselectableOption.value", seventh);
+                await expect(combobox).toHaveJSProperty("autoselectableOption.label", seventh);
+                await expect(combobox).toHaveJSProperty("autoselectableOption.tagName", "COMBOBOX-OPTION");
+
+                // Apply a value that is rejected by the `combobox`
+                await combobox.evaluate((node: ComboboxField, v) => (node.value = v), String(Math.random()));
+                await expect(combobox).toHaveSyncedComboboxValue({ label: seventh }, { matchingLabel: true });
+                await expect(combobox).toHaveJSProperty("autoselectableOption.value", seventh);
+                await expect(combobox).toHaveJSProperty("autoselectableOption.label", seventh);
+                await expect(combobox).toHaveJSProperty("autoselectableOption.tagName", "COMBOBOX-OPTION");
+
+                // Apply a value that disrupts the current filter
+                await combobox.evaluate((node: ComboboxField, v) => (node.value = v), first);
+                await expect(combobox).toHaveSyncedComboboxValue({ label: first }, { matchingLabel: true });
+                await expect(combobox).not.toHaveSyncedComboboxValue({ label: seventh });
+                await expect(combobox).toHaveJSProperty("autoselectableOption", null);
+              });
+            });
+
+            it.describe("emptyMessage (Property)", () => {
+              const defaultMessage = "No options found";
+
+              it("Exposes the underlying `emptymessage` attribute", async ({ page }) => {
+                /* ---------- Setup ---------- */
+                const initialAttr = "This is bad";
+                await page.goto(url);
+                await renderHTMLToPage(page)`
+                  <select-enhancer>
+                    <select ${getFilterAttrs("unclearable")} emptymessage="${initialAttr}">
+                      ${testOptions.map((o) => `<option>${o}</option>`).join("")}
+                    </select>
+                  </select-enhancer>
+                `;
+
+                /* ---------- Assertions ---------- */
+                // `property` matches initial `attribute`
+                const combobox = page.getByRole("combobox");
+                await expect(combobox).toHaveJSProperty("emptyMessage", initialAttr);
+
+                // `attribute` responds to `property` updates
+                const newProp = "property bad";
+                await combobox.evaluate((node: ComboboxField, prop) => (node.emptyMessage = prop), newProp);
+                await expect(combobox).toHaveAttribute("emptymessage", newProp);
+
+                // `property` responds to `attribute` updates
+                const newAttr = "attribute-badness";
+                await combobox.evaluate((node: ComboboxField, a) => node.setAttribute("emptymessage", a), newAttr);
+                await expect(combobox).toHaveJSProperty("emptyMessage", newAttr);
+              });
+
+              it("Provides a default message when the attribute is omitted", async ({ page }) => {
+                await page.goto(url);
+                await renderHTMLToPage(page)`
+                  <select-enhancer>
+                    <select ${getFilterAttrs("unclearable")}>
+                      ${testOptions.map((o) => `<option>${o}</option>`).join("")}
+                    </select>
+                  </select-enhancer>
+                `;
+
+                const combobox = page.getByRole("combobox");
+                await expect(combobox).not.toHaveAttribute("emptymessage");
+                await expect(combobox).toHaveJSProperty("emptyMessage", defaultMessage);
+              });
+
+              it('Controls the "No Matches" Message displayed to users', async ({ page }) => {
+                const customMessage = "Don't have anything for you...";
+                await page.goto(url);
+                await renderHTMLToPage(page)`
+                  <select-enhancer>
+                    <select ${getFilterAttrs("unclearable")} emptymessage="${customMessage}">
+                      ${testOptions.map((o) => `<option>${o}</option>`).join("")}
+                    </select>
+                  </select-enhancer>
+                `;
+
+                const combobox = page.getByRole("combobox");
+                await expect(combobox).toHaveAttribute("emptymessage", customMessage);
+                expect(customMessage).not.toBe(defaultMessage);
+
+                // Enter a bad filter
+                await combobox.pressSequentially(String(Math.random()));
+
+                // Custom "No Matches" message should be displayed based on the mounted attribute
+                const customMessageElement = page.getByText(customMessage);
+                await expect(customMessageElement).toBeVisible();
+
+                // The default message will be displayed instead if the attribute is removed
+                await combobox.evaluate((node) => node.removeAttribute("emptymessage"));
+                await expect(customMessageElement).not.toBeVisible();
+
+                const defaultMessageElement = page.getByText(defaultMessage);
+                await expect(defaultMessageElement).toBeVisible();
+
+                // But the custom message can be brought back by updating the attribute/property again
+                await combobox.evaluate((node: ComboboxField, m) => (node.emptyMessage = m), customMessage);
+                await expect(defaultMessageElement).not.toBeVisible();
+                await expect(customMessageElement).toBeVisible();
+              });
+            });
+          }
 
           it.describe("labels (Property)", () => {
             it("Exposes any `label`s associated with the `combobox`", async ({ page }) => {
