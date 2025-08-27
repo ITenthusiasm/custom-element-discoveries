@@ -8,8 +8,8 @@ import attrs from "./attrs.js";
  * (Probably should move this comment to a markdown file)
  *
  * 1) `#matchingOptions` could technically be `null` but is `ComboboxOption[]` (never a practical problem)
- * 2) `listbox` could technically have `#emptyOption` if mis-handled, but is typed as only having `ComboboxOption`s
- *    (and should never be a practical problem as long as `#emptyOption` is handled correctly).
+ * 2) `listbox` could technically have `#noMatchesElement` if mis-handled, but is typed as only having `ComboboxOption`s.
+ *    (This should never be a practical problem as long as `#noMatchesElement` is handled correctly).
  */
 
 /** 
@@ -32,8 +32,7 @@ class ComboboxField extends HTMLElement {
   }
 
   static get observedAttributes() {
-    // TODO: Consider `emptymessage` --> `nomatchesmessage`. Wondering if `emptymessage` is too ambiguous/confusing...
-    return /** @type {const} */ (["required", "filter", "valueis", "emptymessage"]);
+    return /** @type {const} */ (["required", "filter", "valueis", "nomatchesmessage"]);
   }
 
   /* ------------------------------ Internals ------------------------------ */
@@ -83,7 +82,7 @@ class ComboboxField extends HTMLElement {
         const activeOption =
           listbox.querySelector(":scope [role='option'][aria-selected='true']:not([data-filtered-out])") ??
           listbox.querySelector(":scope [role='option']:not([data-filtered-out])");
-        const activeOptionExists = activeOption && activeOption !== this.#emptyOption;
+        const activeOptionExists = activeOption && activeOption !== this.#noMatchesElement;
 
         if (combobox.filter) {
           this.#autoselectableOption = null;
@@ -100,7 +99,7 @@ class ComboboxField extends HTMLElement {
         if (!combobox.filter || combobox.value == null) return;
 
         // Reset filtered `option`s. (NOTE: Approach is incompatible with `group`ed `option`s)
-        this.#emptyOption?.remove();
+        this.#noMatchesElement?.remove();
         if (this.#matchingOptions.length !== listbox.children.length) {
           this.#matchingOptions = Array.from(listbox.children, (option) => {
             option.removeAttribute("data-filtered-out");
@@ -180,10 +179,9 @@ class ComboboxField extends HTMLElement {
 
   /**
    * @type {HTMLSpanElement | undefined}
-   * The default "`option`" displayed to the user when no `option`s match the user's search input.
-   * ({@link filter filterable} `combobox`es only)
+   * The element which contains and displays the {@link noMatchesMessage}. ({@link filter filterable} `combobox`es only)
    */
-  #emptyOption;
+  #noMatchesElement;
 
   /* ------------------------------ Lifecycle Callbacks ------------------------------ */
   /**
@@ -194,8 +192,8 @@ class ComboboxField extends HTMLElement {
    */
   attributeChangedCallback(name, oldValue, newValue) {
     if (name === "required") return this.#validateRequiredConstraint();
-    if (name === "emptymessage" && this.#emptyOption && newValue !== oldValue) {
-      this.#emptyOption.textContent = this.emptyMessage;
+    if (name === "nomatchesmessage" && this.#noMatchesElement && newValue !== oldValue) {
+      this.#noMatchesElement.textContent = this.noMatchesMessage;
       return;
     }
 
@@ -259,7 +257,7 @@ class ComboboxField extends HTMLElement {
 
         // TODO: This is also used in the `expand` logic. We should consider making this a re-usable method.
         // Also, should we only run this logic if the `combobox` is already expanded?
-        this.#emptyOption?.remove();
+        this.#noMatchesElement?.remove();
         if (this.#matchingOptions.length !== this.listbox.children.length) {
           this.#matchingOptions = Array.from(this.listbox.children, (option) => {
             option.removeAttribute("data-filtered-out");
@@ -458,7 +456,7 @@ class ComboboxField extends HTMLElement {
     // NOTE: The responsibility of setting `autoselectableOption` to a non-null `option` belongs to this handler ONLY.
     // However, what is _done_ with said `option` is ultimately up to the developer, not this component.
     for (let option = listbox.firstElementChild; option; option = /** @type {any} */ (option.nextElementSibling)) {
-      if (option === this.#emptyOption) continue;
+      if (option === this.#noMatchesElement) continue;
 
       // NOTE: An "Empty String Option" cannot be `autoselectable` with this approach, and that's intentional
       if (search && !option.value) option.toggleAttribute("data-filtered-out", true);
@@ -497,27 +495,27 @@ class ComboboxField extends HTMLElement {
       );
 
       // NOTE/TODO: Depending on where we move the wrapping `if` block, we might need to move this line elsewhere.
-      return this.#emptyOption?.remove();
+      return this.#noMatchesElement?.remove();
     }
 
     if (matches === 0) {
-      if (!this.#emptyOption) {
+      if (!this.#noMatchesElement) {
         // TODO: Should we set a `data-nomatchesmessage` attribute for easy styling? Or maybe use #internals.states?
         // TODO: Do we really need to set fake `role`s for something that's totally hidden from the A11y Tree?
         //       If we're unwilling to use `aria-disabled` (which would add more clarity), and we don't _need_
         //       `aria-disabled`, then we should probably just remove the A11y Data that's just going to be suppressed.
         //       If we really need CSS, maybe we can target `inert` in addition to `option`?
-        this.#emptyOption = document.createElement("span");
-        this.#emptyOption.textContent = this.emptyMessage;
-        this.#emptyOption.setAttribute("role", "option");
-        this.#emptyOption.setAttribute("aria-selected", String(false));
-        this.#emptyOption.setAttribute("aria-hidden", String(true));
-        this.#emptyOption.inert = true;
+        this.#noMatchesElement = document.createElement("span");
+        this.#noMatchesElement.textContent = this.noMatchesMessage;
+        this.#noMatchesElement.setAttribute("role", "option");
+        this.#noMatchesElement.setAttribute("aria-selected", String(false));
+        this.#noMatchesElement.setAttribute("aria-hidden", String(true));
+        this.#noMatchesElement.inert = true;
       }
 
-      listbox.appendChild(this.#emptyOption);
+      listbox.appendChild(this.#noMatchesElement);
       setAttributeFor(combobox, attrs["aria-activedescendant"], "");
-    } else this.#emptyOption?.remove();
+    } else this.#noMatchesElement?.remove();
   };
 
   /* ------------------------------ Exposed Form Properties ------------------------------ */
@@ -710,12 +708,12 @@ class ComboboxField extends HTMLElement {
   }
 
   /** The message displayed to users when none of the `combobox`'s `option`s match their filter. @returns {string} */
-  get emptyMessage() {
-    return this.getAttribute("emptymessage") ?? "No options found";
+  get noMatchesMessage() {
+    return this.getAttribute("nomatchesmessage") ?? "No options found";
   }
 
-  set emptyMessage(value) {
-    this.setAttribute("emptymessage", value);
+  set noMatchesMessage(value) {
+    this.setAttribute("nomatchesmessage", value);
   }
 
   /* ------------------------------ Exposed `ElementInternals` ------------------------------ */

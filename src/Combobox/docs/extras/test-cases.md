@@ -35,8 +35,8 @@ These are test cases that we discovered after starting work on the filterable `c
 - [x] ✅ Test that the filtered `option`s don't update if the user attempts to "delete" nothing
   - This can be tested by pressing `Delete` at the very end of the searchbox before `expand`ing it.
 - [x] ✅ **Bug Fix**: Verify that the `combobox` doesn't try to mark the "No Options Message" as `active` during navigation keystrokes.
-- [x] ✅ **Bug Fix**: Test that `#emptyOption` is excluded from the Matching Options if the filter matches the "No Matches Message". (Related to above if not the exact same.)
-  - **NOTE**: Since the `#emptyOption` is typically removed from the DOM when there are matching `option`s, you WILL need to verify this by attempting keyboard navigation through the MATCHING `option`s.
+- [x] ✅ **Bug Fix**: Test that `#noMatchesElement` is excluded from the Matching Options if the filter matches the "No Matches Message". (Related to above if not the exact same.)
+  - **NOTE**: Since the `#noMatchesElement` is typically removed from the DOM when there are matching `option`s, you WILL need to verify this by attempting keyboard navigation through the MATCHING `option`s.
 - [x] ✅ **Bug Fix**: Verify that the "No Matches Message" will be displayed EVERY TIME the user provides a filter that doesn't match any of the `option`s. (Previously, there was a bug where the Message would show up the first time; but as the user continued to adjust the filter, it would not appear later times. This was because the `noMatches` element would get `data-filtered-out` _before_ being removed from the DOM in some cases.)
 - [x] ✅ **Bug Fix**: Test that `#emptyOption` is excluded from the Filter Reset if 0 matching results were present _immediately before_ the `combobox` was `collapse`d.
 

@@ -2170,7 +2170,7 @@ for (const { mode } of testConfigs) {
                   await expect(listbox.getByRole("option")).not.toBeVisible();
 
                   // Visual Users need to see that no `option`s are available.
-                  const noMatchMessage = await combobox.evaluate((node: ComboboxField) => node.emptyMessage);
+                  const noMatchMessage = await combobox.evaluate((node: ComboboxField) => node.noMatchesMessage);
                   expect(noMatchMessage).toBeTruthy();
                   await expect(page.getByText(noMatchMessage)).toBeVisible();
                 });
@@ -2196,7 +2196,7 @@ for (const { mode } of testConfigs) {
                 // Visual Users won't see the `listbox` or the "No Matches Message" AT ALL
                 await expect(listbox).toHaveCSS("clip-path", "inset(50%)");
 
-                const noMatchMessage = await combobox.evaluate((node: ComboboxField) => node.emptyMessage);
+                const noMatchMessage = await combobox.evaluate((node: ComboboxField) => node.noMatchesMessage);
                 expect(noMatchMessage).toBeTruthy();
                 await expect(page.getByText(noMatchMessage)).not.toBeVisible();
               });
@@ -2225,7 +2225,7 @@ for (const { mode } of testConfigs) {
                 const listbox = page.getByRole("listbox");
                 const noMatchesMessage = `${f}ailed Matching`;
                 const noMatchesElement = listbox.getByText(noMatchesMessage);
-                await combobox.evaluate((node: ComboboxField, msg) => (node.emptyMessage = msg), noMatchesMessage);
+                await combobox.evaluate((node: ComboboxField, msg) => (node.noMatchesMessage = msg), noMatchesMessage);
 
                 await page.keyboard.press("Z");
                 await expect(visibleOptions).toHaveCount(0);
@@ -2270,7 +2270,7 @@ for (const { mode } of testConfigs) {
                 const combobox = page.getByRole("combobox");
                 await combobox.fill(String(Math.random()));
 
-                const noMatchesMessage = await combobox.evaluate((node: ComboboxField) => node.emptyMessage);
+                const noMatchesMessage = await combobox.evaluate((node: ComboboxField) => node.noMatchesMessage);
                 const noMatchesElement = page.getByRole("listbox").getByText(noMatchesMessage);
                 await expect(noMatchesElement).toBeVisible();
 
@@ -2647,7 +2647,7 @@ for (const { mode } of testConfigs) {
                 await combobox.fill(Math.random().toString());
 
                 // Verify that the `No Matches` message is displayed
-                const noMatchMessage = await combobox.evaluate((node: ComboboxField) => node.emptyMessage);
+                const noMatchMessage = await combobox.evaluate((node: ComboboxField) => node.noMatchesMessage);
                 expect(noMatchMessage).toBeTruthy();
 
                 const listbox = page.getByRole("listbox", { includeHidden: true });
@@ -2822,7 +2822,7 @@ for (const { mode } of testConfigs) {
                 await renderComponent(page, { initialValue: seventh });
                 const combobox = page.getByRole("combobox");
 
-                const noMatchesMessage = await combobox.evaluate((node: ComboboxField) => node.emptyMessage);
+                const noMatchesMessage = await combobox.evaluate((node: ComboboxField) => node.noMatchesMessage);
                 expect(noMatchesMessage).toBeTruthy();
                 const noMatchesElement = page.getByRole("listbox").getByText(noMatchesMessage);
 
@@ -2917,7 +2917,7 @@ for (const { mode } of testConfigs) {
                 await renderComponent(page, { initialValue: seventh });
                 const combobox = page.getByRole("combobox");
 
-                const noMatchesMessage = await combobox.evaluate((node: ComboboxField) => node.emptyMessage);
+                const noMatchesMessage = await combobox.evaluate((node: ComboboxField) => node.noMatchesMessage);
                 expect(noMatchesMessage).toBeTruthy();
                 const noMatchesElement = page.getByRole("listbox").getByText(noMatchesMessage);
 
@@ -3099,7 +3099,7 @@ for (const { mode } of testConfigs) {
               await combobox.fill(String(Math.random()));
 
               const activeOption = page.getByRole("option").and(page.locator(`[data-active="${true}"]`));
-              const noMatchMessage = await combobox.evaluate((node: ComboboxField) => node.emptyMessage);
+              const noMatchMessage = await combobox.evaluate((node: ComboboxField) => node.noMatchesMessage);
               const noMatchElement = page.getByText(noMatchMessage);
 
               await expect(combobox).toHaveAttribute(attrs["aria-activedescendant"], "");
@@ -3215,7 +3215,6 @@ for (const { mode } of testConfigs) {
       });
     });
 
-    // TODO: Don't forget to add tests for the `emptyMessage` property, along with any other new properties!
     it.describe("API", () => {
       it.describe("Combobox Field (Web Component Part)", () => {
         it.describe("Exposed Properties and Attributes", () => {
@@ -4984,16 +4983,16 @@ for (const { mode } of testConfigs) {
               });
             });
 
-            it.describe("emptyMessage (Property)", () => {
+            it.describe("noMatchesMessage (Property)", () => {
               const defaultMessage = "No options found";
 
-              it("Exposes the underlying `emptymessage` attribute", async ({ page }) => {
+              it("Exposes the underlying `nomatchesmessage` attribute", async ({ page }) => {
                 /* ---------- Setup ---------- */
                 const initialAttr = "This is bad";
                 await page.goto(url);
                 await renderHTMLToPage(page)`
                   <select-enhancer>
-                    <select ${getFilterAttrs("unclearable")} emptymessage="${initialAttr}">
+                    <select ${getFilterAttrs("unclearable")} nomatchesmessage="${initialAttr}">
                       ${testOptions.map((o) => `<option>${o}</option>`).join("")}
                     </select>
                   </select-enhancer>
@@ -5002,17 +5001,17 @@ for (const { mode } of testConfigs) {
                 /* ---------- Assertions ---------- */
                 // `property` matches initial `attribute`
                 const combobox = page.getByRole("combobox");
-                await expect(combobox).toHaveJSProperty("emptyMessage", initialAttr);
+                await expect(combobox).toHaveJSProperty("noMatchesMessage", initialAttr);
 
                 // `attribute` responds to `property` updates
                 const newProp = "property bad";
-                await combobox.evaluate((node: ComboboxField, prop) => (node.emptyMessage = prop), newProp);
-                await expect(combobox).toHaveAttribute("emptymessage", newProp);
+                await combobox.evaluate((node: ComboboxField, prop) => (node.noMatchesMessage = prop), newProp);
+                await expect(combobox).toHaveAttribute("nomatchesmessage", newProp);
 
                 // `property` responds to `attribute` updates
                 const newAttr = "attribute-badness";
-                await combobox.evaluate((node: ComboboxField, a) => node.setAttribute("emptymessage", a), newAttr);
-                await expect(combobox).toHaveJSProperty("emptyMessage", newAttr);
+                await combobox.evaluate((node: ComboboxField, a) => node.setAttribute("nomatchesmessage", a), newAttr);
+                await expect(combobox).toHaveJSProperty("noMatchesMessage", newAttr);
               });
 
               it("Provides a default message when the attribute is omitted", async ({ page }) => {
@@ -5026,8 +5025,8 @@ for (const { mode } of testConfigs) {
                 `;
 
                 const combobox = page.getByRole("combobox");
-                await expect(combobox).not.toHaveAttribute("emptymessage");
-                await expect(combobox).toHaveJSProperty("emptyMessage", defaultMessage);
+                await expect(combobox).not.toHaveAttribute("nomatchesmessage");
+                await expect(combobox).toHaveJSProperty("noMatchesMessage", defaultMessage);
               });
 
               it('Controls the "No Matches" Message displayed to users', async ({ page }) => {
@@ -5035,14 +5034,14 @@ for (const { mode } of testConfigs) {
                 await page.goto(url);
                 await renderHTMLToPage(page)`
                   <select-enhancer>
-                    <select ${getFilterAttrs("unclearable")} emptymessage="${customMessage}">
+                    <select ${getFilterAttrs("unclearable")} nomatchesmessage="${customMessage}">
                       ${testOptions.map((o) => `<option>${o}</option>`).join("")}
                     </select>
                   </select-enhancer>
                 `;
 
                 const combobox = page.getByRole("combobox");
-                await expect(combobox).toHaveAttribute("emptymessage", customMessage);
+                await expect(combobox).toHaveAttribute("nomatchesmessage", customMessage);
                 expect(customMessage).not.toBe(defaultMessage);
 
                 // Enter a bad filter
@@ -5053,14 +5052,14 @@ for (const { mode } of testConfigs) {
                 await expect(customMessageElement).toBeVisible();
 
                 // The default message will be displayed instead if the attribute is removed
-                await combobox.evaluate((node) => node.removeAttribute("emptymessage"));
+                await combobox.evaluate((node) => node.removeAttribute("nomatchesmessage"));
                 await expect(customMessageElement).not.toBeVisible();
 
                 const defaultMessageElement = page.getByText(defaultMessage);
                 await expect(defaultMessageElement).toBeVisible();
 
                 // But the custom message can be brought back by updating the attribute/property again
-                await combobox.evaluate((node: ComboboxField, m) => (node.emptyMessage = m), customMessage);
+                await combobox.evaluate((node: ComboboxField, m) => (node.noMatchesMessage = m), customMessage);
                 await expect(defaultMessageElement).not.toBeVisible();
                 await expect(customMessageElement).toBeVisible();
               });
