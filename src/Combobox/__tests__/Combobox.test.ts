@@ -5235,6 +5235,247 @@ for (const { mode } of testConfigs) {
           });
         });
 
+        /*
+         * NOTE: Methods that we DON'T care to support for library consumers WILL NOT be tested.
+         *
+         * For example: The `getOptionByValue()` method is really just an internal helper for the component.
+         * However, making the method public allows for some event handlers to remain `static`, and there was no
+         * risk in exposing the method to the public. Moreover, this method might be useful for some developers.
+         * Thus, it remains public, but it shouldn't be tested.
+         *
+         * Then there are other methods like `connectedCallback()` and `formResetCallback()`. These are _reactionary_
+         * callbacks that should be tested _through User Interaction only_. They should not be tested directly with
+         * unit tests. We only guarantee User Interaction behavior, not unsupported calls to these methods.
+         */
+        it.describe("Supported Method", () => {
+          it.describe("forceEmptyValue()", () => {
+            if (mode === "Filterable") {
+              it("Coerces the `combobox` value to an empty string and deselects the current `option`", async ({
+                page,
+              }) => {
+                const name = "my-combobox";
+                await page.goto(url);
+
+                for (const valueis of ["anyvalue", "clearable"] as const satisfies ValueIs[]) {
+                  await it.step(`In \`${valueis}\` mode`, async () => {
+                    await renderHTMLToPage(page)`
+                      <form aria-label="Test Form">
+                        <select-enhancer>
+                          <select name="${name}" ${getFilterAttrs(valueis)}>
+                            ${testOptions.map((o, i) => `<option ${i === 1 ? "selected" : ""}>${o}</option>`).join("")}
+                          </select>
+                        </select-enhancer>
+                      </form>
+                    `;
+
+                    const second = testOptions[1];
+                    const combobox = page.getByRole("combobox");
+                    await expect(combobox).toHaveSyncedComboboxValue(
+                      { label: second },
+                      { form: true, matchingLabel: true },
+                    );
+
+                    // Coerce value immediately after initial mounting
+                    await combobox.evaluate((node: ComboboxField) => node.forceEmptyValue());
+                    await expect(combobox).toHaveComboboxValue("", { form: true });
+                    await expect(combobox).toHaveText("");
+
+                    const selectedOptions = page.getByRole("option", { selected: true, includeHidden: true });
+                    await expect(selectedOptions).toHaveCount(0);
+
+                    // Coerce value after a manual value update
+                    const newValue = valueis === "anyvalue" ? String(Math.random()) : testOptions[2];
+                    await combobox.evaluate((node: ComboboxField, v) => (node.value = v), newValue);
+
+                    await expect(combobox).not.toHaveText("");
+                    await expect(combobox).toHaveComboboxValue(newValue, { form: true });
+                    if (valueis === "clearable") await expect(combobox).toHaveSelectedOption({ label: newValue });
+
+                    await combobox.evaluate((node: ComboboxField) => node.forceEmptyValue());
+                    await expect(combobox).toHaveText("");
+                    await expect(combobox).toHaveComboboxValue("", { form: true });
+                    await expect(selectedOptions).toHaveCount(0);
+
+                    // Method deletes the `autoselectableOption` since it manipulates the field's text content
+                    const seventh = testOptions[6];
+                    await combobox.pressSequentially(seventh);
+                    if (valueis === "anyvalue") await expect(combobox).toHaveComboboxValue(seventh, { form: true });
+                    await expect(combobox).toHaveJSProperty("autoselectableOption.value", seventh);
+                    await expect(combobox).toHaveJSProperty("autoselectableOption.label", seventh);
+                    await expect(combobox).toHaveJSProperty("autoselectableOption.tagName", "COMBOBOX-OPTION");
+
+                    await combobox.evaluate((node: ComboboxField) => node.forceEmptyValue());
+                    await expect(combobox).toHaveJSProperty("autoselectableOption", null);
+                    await expect(combobox).toHaveComboboxValue("", { form: true });
+                    await expect(combobox).toHaveText("");
+
+                    // Redundant calls don't cause any errors
+                    await combobox.evaluate((node: ComboboxField) => node.forceEmptyValue());
+                    await expect(combobox).toHaveText("");
+                    await expect(combobox).toHaveComboboxValue("", { form: true });
+                    await expect(selectedOptions).toHaveCount(0);
+                  });
+                }
+              });
+            }
+
+            it("Fails if the `combobox` value does not currently accept empty strings", async ({ page }) => {
+              /* ---------- Setup ---------- */
+              const name = "my-combobox";
+              const combobox = page.getByRole("combobox");
+
+              const badValueIsError =
+                'Method requires `filter` mode to be on and `valueis` to be "anyvalue" or "clearable"';
+              const nullValueError = 'Cannot coerce value to `""` for a `clearable` `combobox` that owns no `option`s';
+
+              await page.goto(url);
+              await renderHTMLToPage(page)`
+                <form aria-label="Test Form">
+                  <select-enhancer>
+                    <select name="${name}">
+                      ${testOptions.map((o, i) => `<option ${i === 1 ? "selected" : ""}>${o}</option>`).join("")}
+                    </select>
+                  </select-enhancer>
+                </form>
+              `;
+
+              const second = testOptions[1];
+              await expect(combobox).toHaveSyncedComboboxValue({ label: second }, { form: true, matchingLabel: true });
+
+              /**
+               * Attempts to call {@link ComboboxField.forceEmptyValue} on the provided `element`,
+               * expecting an error to be thrown in the process.
+               *
+               * @returns The details of the error that was thrown, or `null` if no error was thrown
+               * (indicating a test failure).
+               */
+              function tryForceEmptyValue(element: Locator) {
+                return element.evaluate((node: ComboboxField) => {
+                  try {
+                    node.forceEmptyValue();
+                    return null;
+                  } catch (error) {
+                    const typedError = error as Error;
+                    return { instance: typedError.constructor.name, message: typedError.message };
+                  }
+                });
+              }
+
+              /* ---------- Assertions ---------- */
+              // In non-filter mode
+              await expect(combobox).toHaveJSProperty("filter", false);
+              const errorDetails1 = await tryForceEmptyValue(combobox);
+
+              expect(errorDetails1?.instance).toBe(TypeError.name);
+              expect(errorDetails1?.message).toBe(badValueIsError);
+              await expect(combobox).toHaveSyncedComboboxValue({ label: second }, { form: true, matchingLabel: true });
+
+              // In `unclearable` mode
+              await combobox.evaluate((node: ComboboxField) => (node.filter = true));
+              await combobox.evaluate((node: ComboboxField) => (node.valueIs = "unclearable"));
+              const errorDetails2 = await tryForceEmptyValue(combobox);
+
+              expect(errorDetails2?.instance).toBe(TypeError.name);
+              expect(errorDetails2?.message).toBe(badValueIsError);
+              await expect(combobox).toHaveSyncedComboboxValue({ label: second }, { form: true, matchingLabel: true });
+
+              // In `clearable` mode, when uninitialized
+              await combobox.evaluate((node: ComboboxField) => (node.valueIs = "clearable"));
+              await combobox.evaluate((node: ComboboxField) => node.listbox.replaceChildren());
+              await expect(combobox).toHaveComboboxValue(null, { form: true });
+              await expect(combobox).toHaveText("");
+
+              const errorDetails3 = await tryForceEmptyValue(combobox);
+              expect(errorDetails3?.instance).toBe(TypeError.name);
+              expect(errorDetails3?.message).toBe(nullValueError);
+              await expect(combobox).toHaveComboboxValue(null, { form: true });
+              await expect(combobox).toHaveText("");
+            });
+          });
+
+          it.describe("acceptsValue()", () => {
+            it("Returns `true` if the `combobox` accepts the argument as a value without a corresponding `option`", async ({
+              page,
+            }) => {
+              await page.goto(url);
+              const states =
+                mode === "Filterable"
+                  ? (["anyvalue", "clearable", "unclearable"] as const satisfies ValueIs[])
+                  : (["non-filter"] as const);
+
+              for (const state of states) {
+                await it.step(`In ${state === "non-filter" ? state : `\`${state}\``} mode`, async () => {
+                  /* ---------- Setup ---------- */
+                  await renderHTMLToPage(page)`
+                    <select-enhancer>
+                      <select ${state === "non-filter" ? "" : getFilterAttrs(state)}>
+                        ${testOptions.map((o, i) => `<option ${i === 1 ? "selected" : ""}>${o}</option>`).join("")}
+                      </select>
+                    </select-enhancer>
+                  `;
+
+                  const combobox = page.getByRole("combobox");
+                  await expect(combobox).toHaveJSProperty("filter", state !== "non-filter");
+                  if (state === "non-filter") await expect(combobox).not.toHaveAttribute("valueis");
+                  else await expect(combobox).toHaveAttribute("valueis", state);
+
+                  const initialValue = testOptions[1];
+                  await expect(combobox).toHaveSyncedComboboxValue({ label: initialValue }, { matchingLabel: true });
+
+                  /* ---------- Assertions ---------- */
+                  // Empty Values
+                  const clearable = state === "anyvalue" || state === "clearable";
+                  expect(await combobox.evaluate((node: ComboboxField) => node.acceptsValue(""))).toBe(clearable);
+
+                  const option = page.getByRole("option", { includeHidden: true });
+                  const emptyStringOption = option.and(page.locator('[value=""]'));
+                  await expect(emptyStringOption).not.toBeAttached();
+
+                  await combobox.evaluate((node: ComboboxField) => (node.value = ""));
+                  await expect(combobox).toHaveComboboxValue(clearable ? "" : initialValue);
+                  await expect(combobox).toHaveText(clearable ? "" : initialValue);
+
+                  // Any kind of Value
+                  await combobox.evaluate((node: ComboboxField) => node.formResetCallback());
+                  const valueWithoutOption = String(Math.random());
+                  expect(
+                    await combobox.evaluate((node: ComboboxField, v) => node.acceptsValue(v), valueWithoutOption),
+                  ).toBe(state === "anyvalue");
+
+                  const randomOption = option.and(page.locator(`[value="${valueWithoutOption}"]`));
+                  await expect(randomOption).not.toBeAttached();
+
+                  await combobox.evaluate((node: ComboboxField, v) => (node.value = v), valueWithoutOption);
+                  await expect(combobox).toHaveComboboxValue(state === "anyvalue" ? valueWithoutOption : initialValue);
+                  await expect(combobox).toHaveText(state === "anyvalue" ? valueWithoutOption : initialValue);
+                });
+              }
+            });
+
+            if (mode === "Filterable") {
+              it(`Returns \`false\` in \`${"clearable" satisfies ValueIs}\` mode when uninitialized`, async ({
+                page,
+              }) => {
+                await page.goto(url);
+                await renderHTMLToPage(page)`
+                  <select-enhancer>
+                    <select ${getFilterAttrs("clearable")}></select>
+                  </select-enhancer>
+                `;
+
+                const combobox = page.getByRole("combobox");
+                await expect(combobox).toHaveText("");
+                await expect(combobox).toHaveComboboxValue(null);
+                expect(await combobox.evaluate((node: ComboboxField) => node.acceptsValue(""))).toBe(false);
+
+                await combobox.evaluate((node: ComboboxField) => (node.value = ""));
+                await expect(combobox).toHaveComboboxValue(null);
+                await expect(combobox).toHaveText("");
+              });
+            }
+          });
+        });
+
         it.describe("Validation Methods", () => {
           /*
            * NOTE: Currently, according to our knowledge, there's no way to run assertions on the native error bubbles
