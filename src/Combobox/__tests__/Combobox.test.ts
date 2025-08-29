@@ -5066,6 +5066,148 @@ for (const { mode } of testConfigs) {
             });
           }
 
+          it.describe("valueMissingError (Property)", () => {
+            const defaultRequiredError = "Please select an item in the list.";
+
+            it("Exposes the underlying `valuemissingerror` attribute", async ({ page }) => {
+              /* ---------- Setup ---------- */
+              const initialAttr = "I think you forgot something?";
+              await page.goto(url);
+              await renderHTMLToPage(page)`
+                <select-enhancer>
+                  <select ${getFilterAttrs("unclearable")} valuemissingerror="${initialAttr}">
+                    ${testOptions.map((o) => `<option>${o}</option>`).join("")}
+                  </select>
+                </select-enhancer>
+              `;
+
+              /* ---------- Assertions ---------- */
+              // `property` matches initial `attribute`
+              const combobox = page.getByRole("combobox");
+              await expect(combobox).toHaveJSProperty("valueMissingError", initialAttr);
+
+              // `attribute` responds to `property` updates
+              const newProp = "property error";
+              await combobox.evaluate((node: ComboboxField, prop) => (node.valueMissingError = prop), newProp);
+              await expect(combobox).toHaveAttribute("valuemissingerror", newProp);
+
+              // `property` responds to `attribute` updates
+              const newAttr = "attribute-error";
+              await combobox.evaluate((node: ComboboxField, a) => node.setAttribute("valuemissingerror", a), newAttr);
+              await expect(combobox).toHaveJSProperty("valueMissingError", newAttr);
+            });
+
+            it("Provides a default message when the attribute is omitted", async ({ page }) => {
+              await page.goto(url);
+              await renderHTMLToPage(page)`
+                <select-enhancer>
+                  <select ${getFilterAttrs("unclearable")}>
+                    ${testOptions.map((o) => `<option>${o}</option>`).join("")}
+                  </select>
+                </select-enhancer>
+              `;
+
+              const combobox = page.getByRole("combobox");
+              await expect(combobox).not.toHaveAttribute("valuemissingerror");
+              await expect(combobox).toHaveJSProperty("valueMissingError", defaultRequiredError);
+            });
+
+            it("Controls the error displayed to users when the `required` constraint is broken", async ({ page }) => {
+              const requiredError = "Why won't you interact with me?";
+              await page.goto(url);
+              await renderHTMLToPage(page)`
+                <select-enhancer>
+                  <select ${getFilterAttrs("unclearable")} valuemissingerror="${requiredError}" required>
+                    <option value="" selected>Select Something</option>
+                    ${testOptions.map((o) => `<option>${o}</option>`).join("")}
+                  </select>
+                </select-enhancer>
+              `;
+
+              const combobox = page.getByRole("combobox");
+              await expect(combobox).toHaveAttribute("valuemissingerror", requiredError);
+              expect(requiredError).not.toBe(defaultRequiredError);
+
+              // "Value Missing" Error Message should be displayed because the component was invalid when mounted
+              await expect(combobox).toHaveJSProperty("validity.valid", false);
+              await expect(combobox).toHaveJSProperty("validity.valueMissing", true);
+              await expect(combobox).toHaveJSProperty("validationMessage", requiredError);
+
+              // The default error message will be displayed instead if the attribute is removed
+              await combobox.evaluate((node) => node.removeAttribute("valuemissingerror"));
+              await expect(combobox).toHaveJSProperty("validity.valid", false);
+              await expect(combobox).toHaveJSProperty("validity.valueMissing", true);
+              await expect(combobox).toHaveJSProperty("validationMessage", defaultRequiredError);
+
+              // But the custom message can be brought back by updating the attribute/property again
+              await combobox.evaluate((node: ComboboxField, e) => (node.valueMissingError = e), requiredError);
+              await expect(combobox).toHaveJSProperty("validity.valid", false);
+              await expect(combobox).toHaveJSProperty("validity.valueMissing", true);
+              await expect(combobox).toHaveJSProperty("validationMessage", requiredError);
+              await expect(combobox).not.toHaveJSProperty("validationMessage", defaultRequiredError);
+            });
+
+            it("Respects the priority of the existing errors when updated", async ({ page }) => {
+              /* ---------- Setup ---------- */
+              const requiredError = "You left me with nothing!";
+              await page.goto(url);
+              await renderHTMLToPage(page)`
+                <select-enhancer>
+                  <select ${getFilterAttrs("unclearable")} valuemissingerror="${requiredError}" required>
+                    <option value="" selected>Select Something</option>
+                    ${testOptions.map((o) => `<option>${o}</option>`).join("")}
+                  </select>
+                </select-enhancer>
+              `;
+
+              // Custom Error is not Default Error
+              const combobox = page.getByRole("combobox");
+              await expect(combobox).toHaveAttribute("valuemissingerror", requiredError);
+              expect(requiredError).not.toBe(defaultRequiredError);
+
+              // Component already has a "Value Missing" Error, but NOT a "Custom Error"
+              await expect(combobox).toHaveJSProperty("validity.valid", false);
+              await expect(combobox).toHaveJSProperty("validity.valueMissing", true);
+              await expect(combobox).toHaveJSProperty("validity.customError", false);
+              await expect(combobox).toHaveJSProperty("validationMessage", requiredError);
+
+              /* ---------- Assertions ---------- */
+              // Apply `customError`
+              const customError = "This is a different kind of error...";
+              await combobox.evaluate((node: ComboboxField, e) => node.setCustomValidity(e), customError);
+              await expect(combobox).toHaveJSProperty("validity.valid", false);
+              await expect(combobox).toHaveJSProperty("validity.valueMissing", true);
+              await expect(combobox).toHaveJSProperty("validity.customError", true);
+              await expect(combobox).toHaveJSProperty("validationMessage", customError);
+
+              // Updating `valuemissingerror` will not override the `customError`
+              await combobox.evaluate((node) => node.removeAttribute("valuemissingerror"));
+              await expect(combobox).toHaveJSProperty("validity.valid", false);
+              await expect(combobox).toHaveJSProperty("validity.valueMissing", true);
+              await expect(combobox).toHaveJSProperty("validity.customError", true);
+              await expect(combobox).toHaveJSProperty("validationMessage", customError);
+
+              // However, the UPDATED `valueMissing` error will be visible once the `customError` is resolved
+              await combobox.evaluate((node: ComboboxField) => node.setCustomValidity(""));
+              await expect(combobox).toHaveJSProperty("validity.valid", false);
+              await expect(combobox).toHaveJSProperty("validity.valueMissing", true);
+              await expect(combobox).toHaveJSProperty("validity.customError", false);
+              await expect(combobox).toHaveJSProperty("validationMessage", defaultRequiredError);
+              await expect(combobox).not.toHaveJSProperty("validationMessage", requiredError);
+
+              // And other updates to the `valueMissing` error will also be acknowledged at this point
+              const newRequiredError = "VOID";
+              expect(newRequiredError).not.toBe(requiredError);
+              expect(newRequiredError).not.toBe(defaultRequiredError);
+              await combobox.evaluate((node: ComboboxField, e) => (node.valueMissingError = e), newRequiredError);
+
+              await expect(combobox).toHaveJSProperty("validity.valid", false);
+              await expect(combobox).toHaveJSProperty("validity.valueMissing", true);
+              await expect(combobox).toHaveJSProperty("validity.customError", false);
+              await expect(combobox).toHaveJSProperty("validationMessage", newRequiredError);
+            });
+          });
+
           it.describe("labels (Property)", () => {
             it("Exposes any `label`s associated with the `combobox`", async ({ page }) => {
               /* ---------- Setup ---------- */
@@ -5482,65 +5624,185 @@ for (const { mode } of testConfigs) {
            * created by browsers.
            */
           for (const method of ["checkValidity", "reportValidity"] as const) {
-            it(`Performs field validation when \`${method}\` is called`, async ({ page }) => {
+            it.describe(`${method}()`, () => {
+              it("Performs field validation when called", async ({ page }) => {
+                /* ---------- Setup ---------- */
+                await page.goto(url);
+                await renderHTMLToPage(page)`
+                  <select-enhancer>
+                    <select ${getFilterAttrs("unclearable")} required>
+                      <option value="">Select an Option</option>
+                      ${testOptions.map((o) => `<option>${o}</option>`).join("")}
+                    </select>
+                  </select-enhancer>
+                `;
+
+                /* ---------- Assertions ---------- */
+                // Validation on an invalid `combobox`
+                const combobox = page.getByRole("combobox");
+                const invalidEventEmitted = combobox.evaluate((node: ComboboxField) => {
+                  return new Promise<boolean>((resolve, reject) => {
+                    const timeout = setTimeout(
+                      reject,
+                      3000,
+                      "The `invalid` event was never emitted by a <combobox-field>",
+                    );
+
+                    node.addEventListener(
+                      "invalid",
+                      (event) => {
+                        if (!event.isTrusted) return;
+                        clearTimeout(timeout);
+                        resolve(true);
+                      },
+                      { once: true },
+                    );
+                  });
+                });
+
+                expect(await combobox.evaluate((node: ComboboxField, m) => node[m](), method)).toBe(false);
+                expect(await invalidEventEmitted).toBe(true);
+
+                // Validation on a valid `combobox`
+                const invalidEventNotEmitted = combobox.evaluate((node: ComboboxField) => {
+                  return new Promise<boolean>((resolve, reject) => {
+                    const timeout = setTimeout(resolve, 3000, true);
+
+                    node.addEventListener(
+                      "invalid",
+                      () => {
+                        clearTimeout(timeout);
+                        reject(new Error("The `invalid` event should not have been emitted by the <combobox-field>"));
+                      },
+                      { once: true },
+                    );
+                  });
+                });
+
+                await combobox.evaluate((node: ComboboxField) => node.removeAttribute("required"));
+                expect(await combobox.evaluate((node: ComboboxField, m) => node[m](), method)).toBe(true);
+                expect(await invalidEventNotEmitted).toBe(true);
+              });
+            });
+          }
+
+          it.describe("setCustomValidity()", () => {
+            it("Sets/Clears the custom error message for the `combobox`", async ({ page }) => {
               /* ---------- Setup ---------- */
               await page.goto(url);
               await renderHTMLToPage(page)`
                 <select-enhancer>
-                  <select ${getFilterAttrs("unclearable")} required>
-                    <option value="">Select an Option</option>
+                  <select ${getFilterAttrs("unclearable")}>
                     ${testOptions.map((o) => `<option>${o}</option>`).join("")}
                   </select>
                 </select-enhancer>
               `;
 
-              /* ---------- Assertions ---------- */
-              // Validation on an invalid `combobox`
               const combobox = page.getByRole("combobox");
-              const invalidEventEmitted = combobox.evaluate((node: ComboboxField) => {
-                return new Promise<boolean>((resolve, reject) => {
-                  const timeout = setTimeout(
-                    reject,
-                    3000,
-                    "The `invalid` event was never emitted by a <combobox-field>",
-                  );
+              await expect(combobox).toHaveJSProperty("validity.valid", true);
+              await expect(combobox).toHaveJSProperty("validity.customError", false);
+              await expect(combobox).toHaveJSProperty("validationMessage", "");
 
-                  node.addEventListener(
-                    "invalid",
-                    (event) => {
-                      if (!event.isTrusted) return;
-                      clearTimeout(timeout);
-                      resolve(true);
-                    },
-                    { once: true },
-                  );
-                });
-              });
+              /* ---------- Assertions ---------- */
+              // Applying a custom error
+              const customError = "This is an AWFUL value, bro...";
+              await combobox.evaluate((node: ComboboxField, e) => node.setCustomValidity(e), customError);
+              await expect(combobox).toHaveJSProperty("validity.valid", false);
+              await expect(combobox).toHaveJSProperty("validity.customError", true);
+              await expect(combobox).toHaveJSProperty("validationMessage", customError);
 
-              expect(await combobox.evaluate((node: ComboboxField, m) => node[m](), method)).toBe(false);
-              expect(await invalidEventEmitted).toBe(true);
-
-              // Validation on a valid `combobox`
-              const invalidEventNotEmitted = combobox.evaluate((node: ComboboxField) => {
-                return new Promise<boolean>((resolve, reject) => {
-                  const timeout = setTimeout(resolve, 3000, true);
-
-                  node.addEventListener(
-                    "invalid",
-                    () => {
-                      clearTimeout(timeout);
-                      reject(new Error("The `invalid` event should not have been emitted by the <combobox-field>"));
-                    },
-                    { once: true },
-                  );
-                });
-              });
-
-              await combobox.evaluate((node: ComboboxField) => node.removeAttribute("required"));
-              expect(await combobox.evaluate((node: ComboboxField, m) => node[m](), method)).toBe(true);
-              expect(await invalidEventNotEmitted).toBe(true);
+              // Clearing a custom error
+              await combobox.evaluate((node: ComboboxField, e) => node.setCustomValidity(e), "");
+              await expect(combobox).toHaveJSProperty("validity.valid", true);
+              await expect(combobox).toHaveJSProperty("validity.customError", false);
+              await expect(combobox).toHaveJSProperty("validationMessage", "");
             });
-          }
+
+            it('Overrides the "Value Missing" Error Message', async ({ page }) => {
+              /* ---------- Setup ---------- */
+              const valueMissingError = "Please select an item in the list.";
+              const customError = "WHAT HAVE YOU DONE?!?";
+              const first = testOptions[1];
+
+              await page.goto(url);
+              await renderHTMLToPage(page)`
+                <select-enhancer>
+                  <select ${getFilterAttrs("unclearable")} required>
+                    <option value="">Select an Option</option>
+                    ${testOptions.map((o, i) => `<option ${!i ? "selected" : ""}>${o}</option>`).join("")}
+                  </select>
+                </select-enhancer>
+              `;
+
+              const combobox = page.getByRole("combobox");
+              await expect(combobox).toHaveJSProperty("required", true);
+              await expect(combobox).toHaveJSProperty("validity.valid", true);
+              await expect(combobox).toHaveJSProperty("validity.valueMissing", false);
+              await expect(combobox).toHaveJSProperty("validity.customError", false);
+              await expect(combobox).toHaveJSProperty("validationMessage", "");
+
+              /* ---------- Assertions ---------- */
+              await it.step("Applying `valueMissing`, then `customError`", async () => {
+                // Apply `valueMissing`
+                await combobox.evaluate((node: ComboboxField) => (node.value = ""));
+                await expect(combobox).toHaveJSProperty("validity.valid", false);
+                await expect(combobox).toHaveJSProperty("validity.valueMissing", true);
+                await expect(combobox).toHaveJSProperty("validity.customError", false);
+                await expect(combobox).toHaveJSProperty("validationMessage", valueMissingError);
+
+                // Apply `customError`
+                await combobox.evaluate((node: ComboboxField, e) => node.setCustomValidity(e), customError);
+                await expect(combobox).toHaveJSProperty("validity.valid", false);
+                await expect(combobox).toHaveJSProperty("validity.valueMissing", true);
+                await expect(combobox).toHaveJSProperty("validity.customError", true);
+                await expect(combobox).toHaveJSProperty("validationMessage", customError);
+
+                // Remove `customError`
+                await combobox.evaluate((node: ComboboxField) => node.setCustomValidity(""));
+                await expect(combobox).toHaveJSProperty("validity.valid", false);
+                await expect(combobox).toHaveJSProperty("validity.valueMissing", true);
+                await expect(combobox).toHaveJSProperty("validity.customError", false);
+                await expect(combobox).toHaveJSProperty("validationMessage", valueMissingError);
+
+                // Remove `valueMissing`
+                await combobox.evaluate((node: ComboboxField, v) => (node.value = v), first);
+                await expect(combobox).toHaveJSProperty("validity.valid", true);
+                await expect(combobox).toHaveJSProperty("validity.valueMissing", false);
+                await expect(combobox).toHaveJSProperty("validity.customError", false);
+                await expect(combobox).toHaveJSProperty("validationMessage", "");
+              });
+
+              await it.step("Applying `customError`, then `valueMissing`", async () => {
+                // Apply `customError`
+                await combobox.evaluate((node: ComboboxField, e) => node.setCustomValidity(e), customError);
+                await expect(combobox).toHaveJSProperty("validity.valid", false);
+                await expect(combobox).toHaveJSProperty("validity.valueMissing", false);
+                await expect(combobox).toHaveJSProperty("validity.customError", true);
+                await expect(combobox).toHaveJSProperty("validationMessage", customError);
+
+                // Apply `valueMissing`
+                await combobox.evaluate((node: ComboboxField) => (node.value = ""));
+                await expect(combobox).toHaveJSProperty("validity.valid", false);
+                await expect(combobox).toHaveJSProperty("validity.valueMissing", true);
+                await expect(combobox).toHaveJSProperty("validity.customError", true);
+                await expect(combobox).toHaveJSProperty("validationMessage", customError);
+
+                // Remove `valueMissing`
+                await combobox.evaluate((node: ComboboxField) => node.removeAttribute("required"));
+                await expect(combobox).toHaveJSProperty("validity.valid", false);
+                await expect(combobox).toHaveJSProperty("validity.valueMissing", false);
+                await expect(combobox).toHaveJSProperty("validity.customError", true);
+                await expect(combobox).toHaveJSProperty("validationMessage", customError);
+
+                // Remove `customError`
+                await combobox.evaluate((node: ComboboxField) => node.setCustomValidity(""));
+                await expect(combobox).toHaveJSProperty("validity.valid", true);
+                await expect(combobox).toHaveJSProperty("validity.valueMissing", false);
+                await expect(combobox).toHaveJSProperty("validity.customError", false);
+                await expect(combobox).toHaveJSProperty("validationMessage", "");
+              });
+            });
+          });
         });
 
         it.describe("Dispatched Events", () => {

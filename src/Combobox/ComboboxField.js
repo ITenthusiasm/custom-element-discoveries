@@ -13,9 +13,13 @@ import attrs from "./attrs.js";
  */
 
 /** 
- * @typedef {keyof Pick<ElementInternals,
+ * @typedef {Pick<ElementInternals,
      "labels" | "form" | "validity" | "validationMessage" | "willValidate" | "checkValidity" | "reportValidity"
    >} ExposedInternals
+ */
+
+/**
+ * @typedef {Pick<HTMLInputElement, "name" | "required" | "disabled" | "setCustomValidity">} FieldPropertiesAndMethods
  */
 
 /*
@@ -23,7 +27,7 @@ import attrs from "./attrs.js";
  * properly showing white spaces, etc.). We should probably explain all such things to developers.
  */
 // NOTE: We expect that `ComboboxField`s will always have only one child: a single Text Node. (IMPORTANT ASSUMPTION!)
-/** @implements {Pick<ElementInternals, ExposedInternals>} */
+/** @implements {ExposedInternals} @implements {FieldPropertiesAndMethods} */
 class ComboboxField extends HTMLElement {
   /* ------------------------------ Custom Element Settings ------------------------------ */
   /** @returns {true} */
@@ -32,11 +36,12 @@ class ComboboxField extends HTMLElement {
   }
 
   static get observedAttributes() {
-    return /** @type {const} */ (["required", "filter", "valueis", "nomatchesmessage"]);
+    return /** @type {const} */ (["required", "filter", "valueis", "nomatchesmessage", "valuemissingerror"]);
   }
 
   /* ------------------------------ Internals ------------------------------ */
   #mounted = false;
+  /** Internally used to indicate when the `combobox` is transitioning out of {@link filter} mode. */
   static #filterDisabedKey = Symbol("filter-disabled");
   /** @readonly */ #internals = this.attachInternals();
 
@@ -194,6 +199,11 @@ class ComboboxField extends HTMLElement {
     if (name === "required") return this.#validateRequiredConstraint();
     if (name === "nomatchesmessage" && this.#noMatchesElement && newValue !== oldValue) {
       this.#noMatchesElement.textContent = this.noMatchesMessage;
+      return;
+    }
+    if (name === "valuemissingerror" && newValue !== oldValue) {
+      const { valueMissing, customError } = this.validity;
+      if (valueMissing && !customError) this.#internals.setValidity({ valueMissing }, this.valueMissingError);
       return;
     }
 
@@ -584,7 +594,7 @@ class ComboboxField extends HTMLElement {
     return option;
   }
 
-  /** Sets or retrieves the name of the object. @returns {HTMLInputElement["name"]} */
+  /** @returns {HTMLInputElement["name"]} */
   get name() {
     return this.getAttribute("name") ?? "";
   }
@@ -609,16 +619,6 @@ class ComboboxField extends HTMLElement {
 
   set required(value) {
     this.toggleAttribute("required", Boolean(value));
-  }
-
-  /** @returns {void} */
-  #validateRequiredConstraint() {
-    // NOTE: We don't check for `this.value == null` here because that would only be Developer Error, not User Error
-    if (this.required && this.value === "") {
-      return this.#internals.setValidity({ valueMissing: true }, "Please select an item in the list.");
-    }
-
-    this.#internals.setValidity({});
   }
 
   /**
@@ -716,6 +716,15 @@ class ComboboxField extends HTMLElement {
     this.setAttribute("nomatchesmessage", value);
   }
 
+  /** The error message displayed to users when the `combobox`'s `required` constraint is broken. @returns {string} */
+  get valueMissingError() {
+    return this.getAttribute("valuemissingerror") ?? "Please select an item in the list.";
+  }
+
+  set valueMissingError(value) {
+    this.setAttribute("valuemissingerror", value);
+  }
+
   /* ------------------------------ Exposed `ElementInternals` ------------------------------ */
   /** @returns {ElementInternals["labels"]} */
   get labels() {
@@ -752,7 +761,27 @@ class ComboboxField extends HTMLElement {
     return this.#internals.reportValidity();
   }
 
-  // TODO: Add a `setCustomValidity` method (e.g., for the `FormValidityObserver`)
+  /** @type {HTMLInputElement["setCustomValidity"]} */
+  setCustomValidity(error) {
+    const { valueMissing } = this.validity;
+    const errorMessage = valueMissing && !error ? this.valueMissingError : error;
+    this.#internals.setValidity({ valueMissing, customError: Boolean(error) }, errorMessage);
+  }
+
+  /** @returns {void} */
+  #validateRequiredConstraint() {
+    const { customError } = this.validity;
+
+    // NOTE: We don't check for `this.value == null` here because that would only be a Developer Error, not a User Error
+    if (this.required && this.value === "") {
+      return this.#internals.setValidity(
+        { valueMissing: true, customError },
+        this.validationMessage || this.valueMissingError,
+      );
+    }
+
+    this.#internals.setValidity({ valueMissing: false, customError }, this.validationMessage);
+  }
 
   /* ------------------------------ Form Control Callbacks ------------------------------ */
   /** @returns {void} */
