@@ -1,7 +1,6 @@
 /** @import {HTMLElementWithChildren} from "./Combobox.js" */
 import { setAttributeFor } from "../utils/dom.js";
 import ComboboxOption from "./ComboboxOption.js";
-import attrs from "./attrs.js";
 
 /*
  * "TypeScript Lies" to Be Aware of:
@@ -11,6 +10,12 @@ import attrs from "./attrs.js";
  * 2) `listbox` could technically have `#noMatchesElement` if mis-handled, but is typed as only having `ComboboxOption`s.
  *    (This should never be a practical problem as long as `#noMatchesElement` is handled correctly).
  */
+
+/** The attributes _commonly_ used by the `ComboboxField` component. (These are declared to help avoid typos.) */
+const attrs = Object.freeze({
+  "aria-activedescendant": "aria-activedescendant",
+  "aria-expanded": "aria-expanded",
+});
 
 /** 
  * @typedef {Pick<ElementInternals,
@@ -351,6 +356,10 @@ class ComboboxField extends HTMLElement {
     } else {
       this.addEventListener("keydown", this.#handleTypeahead, { passive: true });
     }
+
+    this.listbox.addEventListener("mouseover", ComboboxField.#handleDelegatedOptionHover, { passive: true });
+    this.listbox.addEventListener("click", ComboboxField.#handleDelegatedOptionClick, { passive: true });
+    this.listbox.addEventListener("mousedown", ComboboxField.#handleDelegatedMousedown);
   }
 
   /** "On Unmount" for Custom Elements @returns {void} */
@@ -370,6 +379,10 @@ class ComboboxField extends HTMLElement {
     this.removeEventListener("focus", ComboboxField.#handleFocus);
     this.removeEventListener("beforeinput", this.#handleSearch);
     this.removeEventListener("keydown", this.#handleTypeahead);
+
+    this.listbox.removeEventListener("mouseover", ComboboxField.#handleDelegatedOptionHover);
+    this.listbox.removeEventListener("click", ComboboxField.#handleDelegatedOptionClick);
+    this.listbox.removeEventListener("mousedown", ComboboxField.#handleDelegatedMousedown);
   }
 
   /**
@@ -971,6 +984,48 @@ class ComboboxField extends HTMLElement {
       return form.requestSubmit();
     }
   };
+
+  /* -------------------- Listbox Handlers -------------------- */
+  /**
+   * @param {MouseEvent} event
+   * @returns {void}
+   */
+  static #handleDelegatedOptionHover(event) {
+    const listbox = /** @type {HTMLElement} */ (event.currentTarget);
+    const option = /** @type {HTMLElement} */ (event.target).closest("combobox-option");
+    if (!option) return; // We hovered the `listbox`, not an `option`
+
+    const combobox = /** @type {ComboboxField} */ (listbox.previousElementSibling);
+    setAttributeFor(combobox, attrs["aria-activedescendant"], option.id);
+  }
+
+  /**
+   * @param {MouseEvent} event
+   * @returns {void}
+   */
+  static #handleDelegatedOptionClick(event) {
+    const listbox = /** @type {HTMLElement} */ (event.currentTarget);
+    const option = /** @type {HTMLElement} */ (event.target).closest("combobox-option");
+    if (!option) return; // We clicked the `listbox`, not an `option`
+    if (option.disabled) return;
+
+    const combobox = /** @type {ComboboxField} */ (listbox.previousElementSibling);
+    combobox.setAttribute(attrs["aria-expanded"], String(false));
+
+    if (option.selected) return;
+    combobox.value = option.value;
+    combobox.dispatchEvent(new Event("input", { bubbles: true, composed: true, cancelable: false }));
+    combobox.dispatchEvent(new Event("change", { bubbles: true, composed: false, cancelable: false }));
+  }
+
+  /**
+   * @param {MouseEvent} event
+   * @returns {void}
+   */
+  static #handleDelegatedMousedown(event) {
+    const listbox = /** @type {HTMLElement} */ (event.currentTarget);
+    if (listbox.contains(/** @type {HTMLElement} */ (event.target))) return event.preventDefault();
+  }
 
   /* ------------------------------ Combobox Mutation Observer Details ------------------------------ */
   /**

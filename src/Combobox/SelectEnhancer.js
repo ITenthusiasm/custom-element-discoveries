@@ -1,7 +1,3 @@
-/** @import ComboboxField from "./ComboboxField.js" */
-import { setAttributeFor } from "../utils/dom.js";
-import attrs from "./attrs.js";
-
 class SelectEnhancer extends HTMLElement {
   // Internals
   #mounted = false;
@@ -68,60 +64,6 @@ class SelectEnhancer extends HTMLElement {
       this.#listbox.insertAdjacentElement("beforebegin", this.#combobox);
       this.#mounted = true;
     }
-
-    /* -------------------- Setup Event Listeners -------------------- */
-    this.#listbox.addEventListener("mouseover", SelectEnhancer.#handleDelegatedOptionHover, { passive: true });
-    this.#listbox.addEventListener("click", SelectEnhancer.#handleDelegatedOptionClick, { passive: true });
-    this.addEventListener("mousedown", SelectEnhancer.#handleDelegatedMousedown);
-  }
-
-  /** "On Unmount" for Custom Elements @returns {void} */
-  disconnectedCallback() {
-    this.#listbox.removeEventListener("mouseover", SelectEnhancer.#handleDelegatedOptionHover);
-    this.#listbox.removeEventListener("click", SelectEnhancer.#handleDelegatedOptionClick);
-    this.removeEventListener("mousedown", SelectEnhancer.#handleDelegatedMousedown);
-  }
-
-  /* -------------------- Listbox Handlers -------------------- */
-  /**
-   * @param {MouseEvent} event
-   * @returns {void}
-   */
-  static #handleDelegatedOptionHover(event) {
-    const listbox = /** @type {HTMLElement} */ (event.currentTarget);
-    const option = /** @type {HTMLElement} */ (event.target).closest("combobox-option");
-    if (!option) return; // We hovered the `listbox`, not an `option`
-
-    const combobox = /** @type {ComboboxField} */ (listbox.previousElementSibling);
-    setAttributeFor(combobox, attrs["aria-activedescendant"], option.id);
-  }
-
-  /**
-   * @param {MouseEvent} event
-   * @returns {void}
-   */
-  static #handleDelegatedOptionClick(event) {
-    const listbox = /** @type {HTMLElement} */ (event.currentTarget);
-    const option = /** @type {HTMLElement} */ (event.target).closest("combobox-option");
-    if (!option) return; // We clicked the `listbox`, not an `option`
-    if (option.disabled) return;
-
-    const combobox = /** @type {ComboboxField} */ (listbox.previousElementSibling);
-    combobox.setAttribute(attrs["aria-expanded"], String(false));
-
-    if (option.selected) return;
-    combobox.value = option.value;
-    combobox.dispatchEvent(new Event("input", { bubbles: true, composed: true, cancelable: false }));
-    combobox.dispatchEvent(new Event("change", { bubbles: true, composed: false, cancelable: false }));
-  }
-
-  /* -------------------- Container Handlers -------------------- */
-  /**
-   * @param {MouseEvent} event
-   * @returns {void}
-   */
-  static #handleDelegatedMousedown(event) {
-    if (/** @type {HTMLElement} */ (event.target).closest("combobox-option")) return event.preventDefault();
   }
 }
 

@@ -653,23 +653,23 @@ for (const { mode } of testConfigs) {
           });
         }
 
-        it("Hides the list of `option`s when anything besides an `option` is clicked", async ({ page }) => {
+        it("Hides the list of `option`s when anything outside the owning `listbox` is clicked", async ({ page }) => {
           await renderComponent(page);
           const combobox = page.getByRole("combobox");
 
           // Clicking `listbox`
           await combobox.click();
-          await expectOptionsToBeVisible(page);
+          await expect(combobox).toBeExpanded({ options: "all" });
 
-          await page.getByRole("listbox").click({ position: { x: 0, y: 0 } });
-          await expectComboboxToBeClosed(page);
+          const listbox = page.getByRole("listbox");
+          const { x, y, height } = await listbox.evaluate((node) => node.getBoundingClientRect());
+
+          await page.mouse.click(x, y + height / 2);
+          await expect(combobox).toBeExpanded({ options: "all" });
 
           // Clicking `document.body`
-          await combobox.click();
-          await expectOptionsToBeVisible(page);
-
           await page.locator("body").click();
-          await expectComboboxToBeClosed(page);
+          await expect(combobox).not.toBeExpanded();
         });
 
         it("Marks the most recently hovered option as `active`", async ({ page }) => {
