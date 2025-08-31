@@ -5855,58 +5855,24 @@ for (const { mode } of testConfigs) {
               await expect(combobox).not.toBeExpanded();
               await expect(combobox).toHaveSyncedComboboxValue({ label: initialValue }, { matchingLabel: true });
 
+              const events = await trackEvents(page, "Event", event);
+
               /* ---------- Assertions ---------- */
               // event is emitted AFTER the value is changed
               const newValue = getRandomOption(testOptions.filter((o) => o !== initialValue));
-              const eventEmitted = page.evaluate((e) => {
-                return new Promise<boolean>((resolve, reject) => {
-                  const timeout = setTimeout(
-                    reject,
-                    3000,
-                    `The \`${e}\` event was never emitted by a <combobox-field>.`,
-                  );
-
-                  document.addEventListener(
-                    e,
-                    (evt) => {
-                      if (evt.constructor !== Event) return;
-                      if (evt.target?.constructor !== customElements.get("combobox-field")) return;
-                      clearTimeout(timeout);
-                      resolve(true);
-                    },
-                    { once: true },
-                  );
-                });
-              }, event);
-
               await combobox.click();
               await page.getByRole("option", { name: newValue }).click();
 
               await expect(combobox).toHaveSyncedComboboxValue({ label: newValue }, { matchingLabel: true });
               await expect(combobox).not.toHaveSyncedComboboxValue({ label: initialValue }, { matchingLabel: true });
-              expect(await eventEmitted).toBe(true);
+              expect(events).toHaveLength(1);
 
               // event is NOT emitted if the value does not change
-              const eventNotEmitted = page.evaluate((e) => {
-                return new Promise<boolean>((resolve, reject) => {
-                  const timeout = setTimeout(resolve, 3000, true);
-
-                  document.addEventListener(
-                    e,
-                    () => {
-                      clearTimeout(timeout);
-                      reject(new Error(`The \`${e}\` event should not have been emitted by the <combobox-field>`));
-                    },
-                    { once: true },
-                  );
-                });
-              }, event);
-
               await combobox.click();
               await page.getByRole("option", { name: newValue }).click();
 
               await expect(combobox).toHaveSyncedComboboxValue({ label: newValue }, { matchingLabel: true });
-              expect(await eventNotEmitted).toBe(true);
+              expect(events).toHaveLength(1);
             });
           }
 
