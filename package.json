@@ -22,7 +22,7 @@
     "eslint-config-prettier": "^9.1.0",
     "prettier": "^3.5.3",
     "typescript": "^5.9.2",
-    "vite": "^6.3.5"
+    "vite": "^7.1.3"
   },
   "author": "Isaiah Thomason",
   "license": "MIT"
