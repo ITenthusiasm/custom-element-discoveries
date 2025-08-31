@@ -11,6 +11,11 @@ import ComboboxOption from "./ComboboxOption.js";
  *    (This should never be a practical problem as long as `#noMatchesElement` is handled correctly).
  */
 
+/** Internally used to retrieve the value that the `combobox` had when it was focused. */
+const valueOnFocusKey = Symbol("value-on-focus-key");
+/** Internally used to determine if the `combobox`'s value is actively being modified through user filter changes. */
+const editingKey = Symbol("editing-key");
+
 /** The attributes _commonly_ used by the `ComboboxField` component. (These are declared to help avoid typos.) */
 const attrs = Object.freeze({
   "aria-activedescendant": "aria-activedescendant",
@@ -186,6 +191,8 @@ class ComboboxField extends HTMLElement {
    * the `combobox` was rendered without any `option`s).
    */
   #value = null;
+  /** @private @type {string | null} */ [valueOnFocusKey] = null;
+  /** @private @type {boolean} */ [editingKey] = false;
 
   /**
    * @type {HTMLSpanElement | undefined}
@@ -408,7 +415,7 @@ class ComboboxField extends HTMLElement {
 
       while (nextActiveOption !== null) {
         nextActiveOption = nextActiveOption.nextElementSibling ?? listbox.firstElementChild;
-        if (nextActiveOption?.textContent?.toLowerCase().startsWith(this.#searchString.toLowerCase())) break;
+        if (nextActiveOption?.textContent.toLowerCase().startsWith(this.#searchString.toLowerCase())) break;
         if (nextActiveOption === lastOptionToEvaluate) nextActiveOption = null;
       }
 
@@ -437,6 +444,7 @@ class ComboboxField extends HTMLElement {
      * If it does become a point of contention/need in the future, then we can make a history `Stack` that is opt-in.
      */
     event.preventDefault();
+    if (!event.isTrusted) return;
     const combobox = /** @type {ComboboxField} */ (event.currentTarget);
     const { text } = combobox;
 
@@ -483,7 +491,7 @@ class ComboboxField extends HTMLElement {
 
       // NOTE: An "Empty String Option" cannot be `autoselectable` with this approach, and that's intentional
       if (search && !option.value) option.toggleAttribute("data-filtered-out", true);
-      else if (search && !option.textContent?.toLowerCase().startsWith(search.toLowerCase()))
+      else if (search && !option.textContent.toLowerCase().startsWith(search.toLowerCase()))
         option.toggleAttribute("data-filtered-out", true);
       else {
         // TODO: We can support case-insensitivity in the future here if we want.
@@ -506,12 +514,17 @@ class ComboboxField extends HTMLElement {
       if (prevOption?.selected) prevOption.selected = false;
       this.#validateRequiredConstraint();
 
-      // TODO: Should we dispatch a `change` event `onblur`? Maybe in the `blur` handler?
-      // TODO: Don't forget to test that the proper events get dispatched in the various modes.
+      // TODO: We might want to document that this `InputEvent` is not cancelable (and why ... e.g., user always needs filter)
+      combobox[editingKey] = true;
       combobox.dispatchEvent(
         new InputEvent("input", {
-          ...event,
+          bubbles: event.bubbles,
+          composed: event.composed,
           cancelable: false,
+          view: event.view,
+          detail: event.detail,
+          inputType: event.inputType,
+          isComposing: event.isComposing,
           data: event.data || event.dataTransfer ? data : null,
           dataTransfer: null,
         }),
@@ -862,6 +875,7 @@ class ComboboxField extends HTMLElement {
    */
   static #handleFocus(event) {
     const combobox = /** @type {ComboboxField} */ (event.currentTarget);
+    combobox[valueOnFocusKey] = combobox.value;
     if (combobox.hasAttribute("data-mousedown")) return;
 
     const textNode = combobox.text;
@@ -875,6 +889,14 @@ class ComboboxField extends HTMLElement {
   static #handleBlur(event) {
     const combobox = /** @type {ComboboxField} */ (event.currentTarget);
     setAttributeFor(combobox, attrs["aria-expanded"], String(false));
+
+    // Determine if a `change` event should be dispatched (for `clearable` and `anyvalue` mode only)
+    const { [valueOnFocusKey]: valueOnFocus, [editingKey]: editing } = combobox;
+    if (valueOnFocus !== combobox.value && editing && combobox.value !== null) {
+      combobox.dispatchEvent(new Event("change", { bubbles: true, composed: false, cancelable: false }));
+    }
+    combobox[valueOnFocusKey] = null;
+    combobox[editingKey] = false;
   }
 
   /**
@@ -1016,6 +1038,7 @@ class ComboboxField extends HTMLElement {
     combobox.value = option.value;
     combobox.dispatchEvent(new Event("input", { bubbles: true, composed: true, cancelable: false }));
     combobox.dispatchEvent(new Event("change", { bubbles: true, composed: false, cancelable: false }));
+    combobox[editingKey] = false;
   }
 
   /**

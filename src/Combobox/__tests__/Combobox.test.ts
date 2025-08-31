@@ -5806,19 +5806,58 @@ for (const { mode } of testConfigs) {
         });
 
         it.describe("Dispatched Events", () => {
+          /**
+           * Tracks the number of times an `event` of the specified `type` is dispatched on the provided `page`.
+           *
+           * Note: Events are only counted if they bubble all the way up to the owning `Document`.
+           *
+           * @param event
+           * @param type
+           * @returns An array containing the events that were dispatched. Each item in the array will include
+           * the `name` of the event's `constructor`.
+           */
+          async function trackEvents<
+            C extends "Event" | "InputEvent",
+            E extends C extends "InputEvent" ? InputEvent : Event,
+            T extends "input" | "change",
+          >(page: Page, event: C, type: T): Promise<(E & { constructor: C })[]> {
+            const events: (E & { constructor: C })[] = [];
+            const funcName = `${type.charAt(0).toUpperCase()}${type.slice(1)}` as Capitalize<T>;
+            type EnhancedWindow = Window & { [funcName](e: (typeof events)[number]): void };
+            await page.exposeFunction(funcName, ((e) => events.push(e)) satisfies EnhancedWindow[typeof funcName]);
+
+            await page.evaluate(
+              ([constructor, t, fn]) => {
+                document.addEventListener(t, (e) => {
+                  if (!eval(`e.constructor === ${constructor}`)) return;
+                  if (e.target?.constructor !== customElements.get("combobox-field")) return;
+
+                  const props = {} as E;
+                  // @ts-expect-error -- Not worth the effort of correcting the types that we already know are right
+                  // eslint-disable-next-line guard-for-in
+                  for (const key in e) props[key] = e[key as keyof typeof e];
+                  (window as unknown as EnhancedWindow)[fn]({ constructor: constructor as C, ...props });
+                });
+              },
+              [event, type, funcName] as const,
+            );
+
+            return events;
+          }
+
           for (const event of ["input", "change"] as const) {
-            it(`Dispatches an \`${event}\` event when the user selects a new \`option\``, async ({ page }) => {
+            it(`Dispatches a(n) \`${event}\` event when the user selects a new \`option\``, async ({ page }) => {
               /* ---------- Setup ---------- */
               const initialValue = getRandomOption(testOptions.slice(1));
               await renderComponent(page, initialValue);
-              await expectComboboxToBeClosed(page);
-              await expectOptionToBeSelected(page, { label: initialValue });
+
+              const combobox = page.getByRole("combobox");
+              await expect(combobox).not.toBeExpanded();
+              await expect(combobox).toHaveSyncedComboboxValue({ label: initialValue }, { matchingLabel: true });
 
               /* ---------- Assertions ---------- */
               // event is emitted AFTER the value is changed
               const newValue = getRandomOption(testOptions.filter((o) => o !== initialValue));
-              const combobox = page.getByRole("combobox");
-
               const eventEmitted = page.evaluate((e) => {
                 return new Promise<boolean>((resolve, reject) => {
                   const timeout = setTimeout(
@@ -5843,8 +5882,8 @@ for (const { mode } of testConfigs) {
               await combobox.click();
               await page.getByRole("option", { name: newValue }).click();
 
-              await expectOptionToBeSelected(page, { label: newValue });
-              await expectOptionToBeSelected(page, { label: initialValue }, false);
+              await expect(combobox).toHaveSyncedComboboxValue({ label: newValue }, { matchingLabel: true });
+              await expect(combobox).not.toHaveSyncedComboboxValue({ label: initialValue }, { matchingLabel: true });
               expect(await eventEmitted).toBe(true);
 
               // event is NOT emitted if the value does not change
@@ -5866,8 +5905,389 @@ for (const { mode } of testConfigs) {
               await combobox.click();
               await page.getByRole("option", { name: newValue }).click();
 
-              await expectOptionToBeSelected(page, { label: newValue });
+              await expect(combobox).toHaveSyncedComboboxValue({ label: newValue }, { matchingLabel: true });
               expect(await eventNotEmitted).toBe(true);
+            });
+          }
+
+          createFilterTypeDescribeBlocks(["anyvalue", "clearable"], "filter-only", (valueis) => {
+            it("Dispatches an `input` event when a filter change causes a value update", async ({ page }) => {
+              /* ---------- Setup ---------- */
+              const second = testOptions[1];
+              await renderComponent(page, { initialValue: second, valueis });
+
+              const combobox = page.getByRole("combobox");
+              await expect(combobox).toHaveJSProperty("valueIs", valueis);
+              await expect(combobox).toHaveSyncedComboboxValue({ label: second }, { matchingLabel: true });
+
+              const selectedOption = page.getByRole("option", { selected: true, includeHidden: true });
+              await expect(selectedOption).toBeAttached();
+
+              const events = await trackEvents(page, "InputEvent", "input");
+
+              /* ---------- Assertions ---------- */
+              // Clearing the `combobox` value
+              await combobox.press("ControlOrMeta+A");
+              await combobox.press("Backspace");
+
+              await expect(selectedOption).not.toBeAttached();
+              await expect(combobox).toHaveComboboxValue("");
+              await expect(combobox).toHaveText("");
+
+              expect(events).toHaveLength(1);
+              expect(events[0].data).toBe(null);
+              expect(events[0].dataTransfer).toBe(null);
+              expect(events[0].inputType).toBe("deleteContentBackward");
+
+              // Updating the `combobox` filter/value through key strokes
+              const seventh = testOptions[6];
+              for (let i = 0; i < seventh.length; i++) {
+                const letter = seventh.charAt(i);
+                await combobox.press(letter);
+
+                const partialFilter = seventh.slice(0, i + 1);
+                await expect(selectedOption).not.toBeAttached();
+                await expect(combobox).toHaveText(partialFilter);
+                await expect(combobox).toHaveComboboxValue(valueis === "clearable" ? "" : partialFilter);
+
+                if (valueis === "anyvalue") {
+                  expect(events).toHaveLength(i + 2);
+                  expect(events[i + 1].data).toBe(letter);
+                  expect(events[i + 1].dataTransfer).toBe(null);
+                  expect(events[i + 1].inputType).toBe("insertText");
+                }
+              }
+
+              expect(events).toHaveLength(valueis === "clearable" ? 1 : seventh.length + 1);
+
+              // Updating the `combobox` filter/value through pasting
+              const first = testOptions[0];
+              await page.evaluate((v) => (document.body.appendChild(document.createElement("input")).value = v), first);
+              await page.getByRole("textbox").selectText();
+              await page.getByRole("textbox").press("ControlOrMeta+C");
+
+              await combobox.press("ControlOrMeta+A");
+              await combobox.press("ControlOrMeta+V");
+
+              await expect(selectedOption).not.toBeAttached();
+              await expect(combobox).toHaveText(first);
+              await expect(combobox).toHaveComboboxValue(valueis === "clearable" ? "" : first);
+
+              expect(events).toHaveLength(valueis === "clearable" ? 1 : seventh.length + 2);
+              if (valueis === "anyvalue") {
+                expect(events.at(-1)?.data).toBe(first);
+                expect(events.at(-1)?.dataTransfer).toBe(null);
+                expect(events.at(-1)?.inputType).toBe("insertFromPaste");
+              }
+            });
+
+            it("Dispatches a `change` event when a filter-initiated value update is committed", async ({ page }) => {
+              /* ---------- Setup ---------- */
+              const second = testOptions[1];
+              await renderComponent(page, { initialValue: second, valueis });
+
+              const combobox = page.getByRole("combobox");
+              await expect(combobox).toHaveJSProperty("valueIs", valueis);
+              await expect(combobox).toHaveSyncedComboboxValue({ label: second }, { matchingLabel: true });
+
+              const selectedOption = page.getByRole("option", { selected: true, includeHidden: true });
+              await expect(selectedOption).toBeAttached();
+
+              const events = await trackEvents(page, "Event", "change");
+
+              /* ---------- Assertions ---------- */
+              // Clearing the `combobox` value
+              await combobox.press("ControlOrMeta+A");
+              await combobox.press("Backspace");
+
+              await expect(selectedOption).not.toBeAttached();
+              await expect(combobox).toHaveComboboxValue("");
+              await expect(combobox).toHaveText("");
+
+              expect(events).toHaveLength(0);
+              await page.locator("body").click();
+              expect(events).toHaveLength(1);
+
+              // Updating the `combobox` filter/value through key strokes
+              const seventh = testOptions[6];
+              await combobox.pressSequentially(seventh);
+              await expect(selectedOption).not.toBeAttached();
+              await expect(combobox).toHaveText(seventh);
+              await expect(combobox).toHaveComboboxValue(valueis === "anyvalue" ? seventh : "");
+
+              expect(events).toHaveLength(1);
+              await page.locator("body").click();
+              expect(events).toHaveLength(valueis === "anyvalue" ? 2 : 1);
+            });
+
+            it("Does not dispatch a `change` event if no filter-based value change has occurred", async ({ page }) => {
+              /* ---------- Setup ---------- */
+              await page.goto(url);
+              await renderHTMLToPage(page)`
+                <select-enhancer>
+                  <select ${getFilterAttrs(valueis)}>
+                    ${testOptions.map((o) => `<option>${o}</option>`).join("")}
+                  </select>
+                </select-enhancer>
+              `;
+
+              const combobox = page.getByRole("combobox");
+              await expect(combobox).toHaveJSProperty("valueIs", valueis);
+              await expect(combobox).toHaveComboboxValue("");
+              await expect(combobox).toHaveText("");
+
+              const selectedOption = page.getByRole("option", { selected: true, includeHidden: true });
+              await expect(selectedOption).not.toBeAttached();
+
+              const changeEvents = await trackEvents(page, "Event", "change");
+              const inputEvents = await trackEvents(page, "InputEvent", "input");
+
+              /* ---------- Assertions ---------- */
+              // Enter text and re-clear the `combobox`
+              const first = testOptions[0];
+              await combobox.pressSequentially(first);
+              await combobox.press("ControlOrMeta+A");
+              await combobox.press("Backspace");
+
+              await expect(combobox).toHaveText("");
+              await expect(combobox).toHaveComboboxValue("");
+              await expect(selectedOption).not.toBeAttached();
+              expect(inputEvents).toHaveLength(valueis === "anyvalue" ? first.length + 1 : 1);
+
+              expect(changeEvents).toHaveLength(0);
+              await page.locator("body").click();
+              expect(changeEvents).toHaveLength(0);
+
+              // Enter text and re-type a previously-existing value (`anyvalue` mode only)
+              if (valueis !== "anyvalue") return;
+              const ninth = testOptions[8];
+              await combobox.evaluate((node: ComboboxField, v) => (node.value = v), ninth);
+
+              await expect(combobox).not.toBeFocused();
+              await combobox.press("ArrowRight");
+              await combobox.press("Backspace");
+              await combobox.press(ninth.at(-1) as string);
+
+              await expect(combobox).toHaveText(ninth);
+              await expect(combobox).toHaveComboboxValue(ninth);
+              expect(inputEvents).toHaveLength(first.length + 3);
+
+              expect(changeEvents).toHaveLength(0);
+              await page.locator("body").click();
+              expect(changeEvents).toHaveLength(0);
+            });
+          });
+
+          createFilterTypeDescribeBlocks(["clearable"], "filter-only", (valueis) => {
+            it("Does not dispatch `change` events if the `combobox` value is `null`", async ({ page }) => {
+              /* ---------- Setup ---------- */
+              const second = testOptions[1];
+              await renderComponent(page, { initialValue: second, valueis });
+
+              const combobox = page.getByRole("combobox");
+              await expect(combobox).toHaveJSProperty("valueIs", valueis);
+              await expect(combobox).toHaveSyncedComboboxValue({ label: second }, { matchingLabel: true });
+
+              const selectedOption = page.getByRole("option", { selected: true, includeHidden: true });
+              await expect(selectedOption).toBeAttached();
+
+              const changeEvents = await trackEvents(page, "Event", "change");
+              const inputEvents = await trackEvents(page, "InputEvent", "input");
+
+              /* ---------- Assertions ---------- */
+              // Clear the `combobox` value
+              await combobox.press("ControlOrMeta+A");
+              await combobox.press("Backspace");
+
+              await expect(selectedOption).not.toBeAttached();
+              await expect(combobox).toHaveComboboxValue("");
+              await expect(combobox).toHaveText("");
+              expect(inputEvents).toHaveLength(1);
+
+              // Make the `combobox` value `null` by deleting all the `option`s
+              await combobox.evaluate((node: ComboboxField) => node.listbox.replaceChildren());
+              await expect(combobox).toHaveComboboxValue(null);
+
+              // `blur` the `combobox`
+              expect(changeEvents).toHaveLength(0);
+              await page.locator("body").click();
+              expect(changeEvents).toHaveLength(0);
+              expect(inputEvents).toHaveLength(1);
+            });
+          });
+
+          if (mode === "Filterable") {
+            // NOTE: This is consistent with the behavior of native `<input type="text">` elements
+            it("Maintains its logic for dispatching filter-initiated `change` events when manual value changes occur", async ({
+              page,
+            }) => {
+              /* ---------- Setup ---------- */
+              const first = testOptions[0];
+              await renderComponent(page, { initialValue: first, valueis: "anyvalue" });
+
+              const combobox = page.getByRole("combobox");
+              await expect(combobox).toHaveSyncedComboboxValue({ label: first }, { matchingLabel: true });
+
+              const selectedOption = page.getByRole("option", { selected: true, includeHidden: true });
+              await expect(selectedOption).toBeAttached();
+
+              const changeEvents = await trackEvents(page, "Event", "change");
+              const inputEvents = await trackEvents(page, "InputEvent", "input");
+
+              /* ---------- Assertions ---------- */
+              // Change the `combobox` value by updating the filter
+              const third = testOptions[2];
+              await combobox.pressSequentially(third);
+              await expect(combobox).toHaveComboboxValue(third);
+              await expect(selectedOption).not.toBeAttached();
+              expect(inputEvents).toHaveLength(third.length);
+
+              // Change the `combobox` value manually, then `blur` the field
+              const fourth = testOptions[3];
+              await combobox.evaluate((node: ComboboxField, v) => (node.value = v), fourth);
+              await expect(combobox).not.toHaveComboboxValue(third);
+              await expect(combobox).toHaveSyncedComboboxValue({ label: fourth }, { matchingLabel: true });
+
+              // The `change` event is still EMITTED, even with the manual value update
+              expect(changeEvents).toHaveLength(0);
+              await page.locator("body").click();
+              expect(changeEvents).toHaveLength(1);
+              expect(inputEvents).toHaveLength(third.length);
+
+              // Manually change the `combobox` value to something random
+              const randomValue = String(Math.random());
+              await combobox.evaluate((node: ComboboxField, v) => (node.value = v), randomValue);
+              await expect(combobox).toHaveComboboxValue(randomValue);
+              await expect(combobox).toHaveText(randomValue);
+              await expect(selectedOption).not.toBeAttached();
+
+              // Update the filter again
+              await expect(combobox).not.toBeFocused();
+
+              await combobox.pressSequentially(first);
+              await expect(combobox).toHaveComboboxValue(first);
+              await expect(selectedOption).not.toBeAttached();
+              expect(inputEvents).toHaveLength(third.length + first.length);
+
+              // Manually revert to the random value, then `blur` the field
+              await combobox.evaluate((node: ComboboxField, v) => (node.value = v), randomValue);
+              await expect(combobox).toHaveComboboxValue(randomValue);
+              await expect(combobox).toHaveText(randomValue);
+              await expect(selectedOption).not.toBeAttached();
+
+              // The `change` event is still SUPPRESSED, even with the manual value update
+              expect(changeEvents).toHaveLength(1);
+              await page.locator("body").click();
+              expect(changeEvents).toHaveLength(1);
+              expect(inputEvents).toHaveLength(third.length + first.length);
+            });
+
+            it("Does not dispatch a filter-initiated `change` event if an `option` was selected right before `blur`", async ({
+              page,
+            }) => {
+              /* ---------- Setup ---------- */
+              const first = testOptions[0];
+              await renderComponent(page, { initialValue: first, valueis: "anyvalue" });
+
+              const combobox = page.getByRole("combobox");
+              await expect(combobox).toHaveSyncedComboboxValue({ label: first }, { matchingLabel: true });
+
+              const selectedOption = page.getByRole("option", { selected: true, includeHidden: true });
+              await expect(selectedOption).toBeAttached();
+
+              const changeEvents = await trackEvents(page, "Event", "change");
+              const inputEvents = await trackEvents(page, "InputEvent", "input");
+
+              /* ---------- Assertions ---------- */
+              // Change the `combobox` value by updating the filter
+              const second = testOptions[1];
+              await combobox.pressSequentially(second);
+              await expect(combobox).toHaveComboboxValue(second);
+              await expect(selectedOption).not.toBeAttached();
+              expect(inputEvents).toHaveLength(second.length);
+
+              // Select the `option`, then `blur` the field
+              await combobox.press("Enter");
+              await expect(combobox).toHaveSyncedComboboxValue({ label: second }, { matchingLabel: true });
+
+              // NOTE: The `inputEvents` count didn't change because we're only counting `InputEvent`s, not `Event`s.
+              // The `change` event always uses a regular `Event`, so the count will be incremented as usual during selection.
+              expect(inputEvents).toHaveLength(second.length);
+              expect(changeEvents).toHaveLength(1);
+
+              // A 2nd `change` event is not fired on `blur` since an `option` was just recently selected.
+              await page.locator("body").click();
+              expect(changeEvents).not.toHaveLength(2);
+              expect(changeEvents).toHaveLength(1);
+
+              // The `change` event will still be dispatched if additional edits occur _after_ `option` selection
+              const third = testOptions[2];
+              await expect(combobox).not.toBeFocused();
+
+              await combobox.pressSequentially(third);
+              await expect(combobox).toHaveComboboxValue(third);
+              await expect(selectedOption).not.toBeAttached();
+              expect(inputEvents).toHaveLength(second.length + third.length);
+
+              await combobox.press("Enter");
+              await expect(combobox).toHaveSyncedComboboxValue({ label: third }, { matchingLabel: true });
+              expect(inputEvents).toHaveLength(second.length + third.length);
+              expect(changeEvents).toHaveLength(2);
+
+              await combobox.press("Z");
+              await expect(combobox).toHaveComboboxValue(`${third}Z`);
+              await expect(selectedOption).not.toBeAttached();
+              expect(inputEvents).toHaveLength(second.length + third.length + 1);
+
+              expect(changeEvents).toHaveLength(2);
+              await page.locator("body").click();
+              expect(changeEvents).toHaveLength(3);
+            });
+
+            it("Does nothing in response to `beforeinput` events that don't come from user interactions", async ({
+              page,
+            }) => {
+              /* ---------- Setup ---------- */
+              await renderComponent(page, { valueis: "anyvalue" });
+
+              const combobox = page.getByRole("combobox");
+              await expect(combobox).toHaveComboboxValue("");
+              await expect(combobox).toHaveText("");
+
+              const selectedOption = page.getByRole("option", { selected: true, includeHidden: true });
+              await expect(selectedOption).not.toBeAttached();
+
+              const changeEvents = await trackEvents(page, "Event", "change");
+              const inputEvents = await trackEvents(page, "InputEvent", "input");
+
+              /* ---------- Assertions ---------- */
+              // Manually dispatch a `beforeinput` event
+              await combobox.evaluate((node: ComboboxField) => {
+                const range = new StaticRange({
+                  startContainer: node.text,
+                  startOffset: 0,
+                  endContainer: node.text,
+                  endOffset: node.text.length,
+                });
+
+                node.dispatchEvent(
+                  new InputEvent("beforeinput", {
+                    bubbles: true,
+                    composed: true,
+                    cancelable: true,
+                    data: "Nope",
+                    dataTransfer: null,
+                    inputType: "insertText",
+                    targetRanges: [range],
+                  }),
+                );
+              });
+
+              // Nothing should have happened
+              expect(inputEvents).toHaveLength(0);
+              expect(changeEvents).toHaveLength(0);
+              await expect(combobox).toHaveText("");
+              await expect(combobox).toHaveComboboxValue("");
             });
           }
         });
