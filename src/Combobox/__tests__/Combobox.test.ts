@@ -4981,6 +4981,26 @@ for (const { mode } of testConfigs) {
                 await expect(combobox).not.toHaveSyncedComboboxValue({ label: seventh });
                 await expect(combobox).toHaveJSProperty("autoselectableOption", null);
               });
+
+              it("Becomes `null` if the `option` it points to is removed from the DOM", async ({ page }) => {
+                const first = testOptions[0];
+                await renderComponent(page, first);
+
+                // Enter a filter with an `autoselectableOption`
+                const seventh = testOptions[6];
+                const combobox = page.getByRole("combobox");
+                await combobox.pressSequentially(seventh);
+
+                await expect(combobox).toHaveJSProperty("autoselectableOption.value", seventh);
+                await expect(combobox).toHaveJSProperty("autoselectableOption.label", seventh);
+                await expect(combobox).toHaveJSProperty("autoselectableOption.tagName", "COMBOBOX-OPTION");
+                await expect(combobox).toHaveSyncedComboboxValue({ label: first });
+                await expect(combobox).not.toHaveSyncedComboboxValue({ label: seventh });
+
+                // Remove the `autoselectableOption`
+                await combobox.evaluate((node: ComboboxField) => node.autoselectableOption?.remove());
+                await expect(combobox).toHaveJSProperty("autoselectableOption", null);
+              });
             });
 
             it.describe("noMatchesMessage (Property)", () => {

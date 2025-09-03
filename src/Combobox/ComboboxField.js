@@ -175,6 +175,7 @@ class ComboboxField extends HTMLElement {
 
       mutation.removedNodes.forEach((node) => {
         if (!(node instanceof ComboboxOption)) return;
+        if (this.#autoselectableOption === node) this.#autoselectableOption = null;
         if (node.selected) {
           if (nullable) this.formResetCallback();
           else this.value = textNode.data;
