@@ -475,18 +475,48 @@ class ComboboxField extends HTMLElement {
     }
 
     // Filter `option`s
-    const { listbox } = combobox;
-    const search = text.data;
     setAttributeFor(combobox, attrs["aria-expanded"], String(true));
+    this.#filterOptions();
 
-    let matches = 0;
+    // Update `combobox` value if needed.
+    // NOTE: We MUST set the internal value DIRECTLY here to produce desirable behavior. See Development Notes for details.
+    if (!combobox.acceptsValue(text.data)) return;
+    const prevOption = this.#value == null ? null : this.getOptionByValue(this.#value);
+
+    this.#value = text.data;
+    this.#internals.setFormValue(this.#value);
+    if (prevOption?.selected) prevOption.selected = false;
+    this.#validateRequiredConstraint();
+
+    // TODO: We might want to document that this `InputEvent` is not cancelable (and why ... e.g., user always needs filter)
+    combobox[editingKey] = true;
+    combobox.dispatchEvent(
+      new InputEvent("input", {
+        bubbles: event.bubbles,
+        composed: event.composed,
+        cancelable: false,
+        view: event.view,
+        detail: event.detail,
+        inputType: event.inputType,
+        isComposing: event.isComposing,
+        data: event.data || event.dataTransfer ? data : null,
+        dataTransfer: null,
+      }),
+    );
+  };
+
+  #filterOptions() {
     this.#activeIndex = 0;
     this.#autoselectableOption = null;
 
+    let matches = 0;
+    const search = this.text.data;
+
+    // Iterate and Filter the `option`s
     // NOTE: This approach won't work with `group`ed `option`s, but it can be fairly easily modified to do so
-    // NOTE: The responsibility of setting `autoselectableOption` to a non-null `option` belongs to this handler ONLY.
-    // However, what is _done_ with said `option` is ultimately up to the developer, not this component.
-    for (let option = listbox.firstElementChild; option; option = /** @type {any} */ (option.nextElementSibling)) {
+    // NOTE: The responsibility of setting `autoselectableOption` to a non-null `option` belongs to this method ONLY.
+    //       However, what is _done_ with said `option` is ultimately up to the developer, not this component.
+    for (let option = this.listbox.firstElementChild; option; option = /** @type {any} */ (option.nextElementSibling)) {
       if (option === this.#noMatchesElement) continue;
 
       // NOTE: An "Empty String Option" cannot be `autoselectable` with this approach, and that's intentional
@@ -494,47 +524,19 @@ class ComboboxField extends HTMLElement {
       else if (search && !option.textContent.toLowerCase().startsWith(search.toLowerCase()))
         option.toggleAttribute("data-filtered-out", true);
       else {
-        // TODO: We can support case-insensitivity in the future here if we want.
         if (option.textContent === search) this.#autoselectableOption = option;
 
         option.removeAttribute("data-filtered-out");
         this.#matchingOptions[matches++] = option;
-        if (matches === 1) setAttributeFor(combobox, attrs["aria-activedescendant"], option.id);
       }
     }
 
     // Remove any `option`s that still exist from the previous filter
     this.#matchingOptions.splice(matches);
+    setAttributeFor(this, attrs["aria-activedescendant"], this.#matchingOptions[0]?.id ?? "");
 
-    // NOTE: We MUST set the internal value DIRECTLY here to produce desirable behavior. See Development Notes for details.
-    if (combobox.acceptsValue(search)) {
-      const prevOption = this.#value == null ? null : this.getOptionByValue(this.#value);
-      this.#value = search;
-      this.#internals.setFormValue(this.#value);
-      if (prevOption?.selected) prevOption.selected = false;
-      this.#validateRequiredConstraint();
-
-      // TODO: We might want to document that this `InputEvent` is not cancelable (and why ... e.g., user always needs filter)
-      combobox[editingKey] = true;
-      combobox.dispatchEvent(
-        new InputEvent("input", {
-          bubbles: event.bubbles,
-          composed: event.composed,
-          cancelable: false,
-          view: event.view,
-          detail: event.detail,
-          inputType: event.inputType,
-          isComposing: event.isComposing,
-          data: event.data || event.dataTransfer ? data : null,
-          dataTransfer: null,
-        }),
-      );
-
-      // NOTE/TODO: Depending on where we move the wrapping `if` block, we might need to move this line elsewhere.
-      return this.#noMatchesElement?.remove();
-    }
-
-    if (matches === 0) {
+    // Display the "No Matches Message" if needed
+    if (matches === 0 && !this.acceptsValue(search)) {
       if (!this.#noMatchesElement) {
         // TODO: Should we set a `data-nomatchesmessage` attribute for easy styling? Or maybe use #internals.states?
         // TODO: Do we really need to set fake `role`s for something that's totally hidden from the A11y Tree?
@@ -549,10 +551,9 @@ class ComboboxField extends HTMLElement {
         this.#noMatchesElement.inert = true;
       }
 
-      listbox.appendChild(this.#noMatchesElement);
-      setAttributeFor(combobox, attrs["aria-activedescendant"], "");
+      this.listbox.appendChild(this.#noMatchesElement);
     } else this.#noMatchesElement?.remove();
-  };
+  }
 
   /* ------------------------------ Exposed Form Properties ------------------------------ */
   /** Sets or retrieves the `value` of the `combobox` @returns {string | null} */
