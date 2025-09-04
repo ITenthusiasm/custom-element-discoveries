@@ -144,32 +144,36 @@ class ComboboxField extends HTMLElement {
   /** @readonly */ #optionNodesObserver = new MutationObserver((mutations) => {
     const textNode = this.text;
     const nullable = this.valueIs !== "anyvalue";
+    const updateFilterResults = this.filter && this.getAttribute(attrs["aria-expanded"]) === String(true);
+
     if (!this.listbox.children.length) {
       if (!nullable) this.value = textNode.data;
       else {
         this.#value = null;
         this.#internals.setFormValue(null);
         textNode.data = "";
+        this.#validateRequiredConstraint();
       }
 
+      if (updateFilterResults) this.#filterOptions();
       return;
     }
 
-    // TODO: This logic is still buggy for filterable `combobox`es. Gotta figure some things out...
-    const expanded = this.getAttribute(attrs["aria-expanded"]) === String(true);
     for (let i = 0; i < mutations.length; i++) {
       const mutation = mutations[i];
 
       // Handle added nodes first. This keeps us from running redundant Deselect Logic if a newly-added node is `selected`.
       mutation.addedNodes.forEach((node, j) => {
-        if (!(node instanceof ComboboxOption)) return;
-        if (node.defaultSelected) this.value = node.value;
-        else if (j === 0 && this.#value === null && nullable) this.value = node.value;
+        if (node === this.#noMatchesElement) return;
+        if (!(node instanceof ComboboxOption)) return node.parentNode?.removeChild(node);
 
-        // NOTE: This can produce a confusing UX if the `combobox` was expanded but a filter was NOT applied yet.
-        // However, such a scenario is unlikely and impractical. So we're keeping this logic to help with async loading.
-        if (this.filter && expanded) {
-          node.toggleAttribute("data-filtered-out", !node.label.toLowerCase().startsWith(textNode.data.toLowerCase()));
+        if (node.defaultSelected) this.value = node.value;
+        else if (this.#value === null && nullable && j === 0) {
+          if (this.valueIs !== "clearable") this.value = node.value;
+          else {
+            this.#value = "";
+            this.forceEmptyValue();
+          }
         }
       });
 
@@ -182,6 +186,10 @@ class ComboboxField extends HTMLElement {
         }
       });
     }
+
+    // NOTE: This can produce a confusing UX if the `combobox` is expanded but a filter was NOT applied yet.
+    // However, such a scenario is unlikely and impractical. So we're keeping this logic to help with async loading.
+    if (updateFilterResults) this.#filterOptions();
   });
 
   /**
@@ -506,6 +514,7 @@ class ComboboxField extends HTMLElement {
     );
   };
 
+  /** @returns {void} */
   #filterOptions() {
     this.#activeIndex = 0;
     this.#autoselectableOption = null;
@@ -539,20 +548,14 @@ class ComboboxField extends HTMLElement {
     // Display the "No Matches Message" if needed
     if (matches === 0 && !this.acceptsValue(search)) {
       if (!this.#noMatchesElement) {
-        // TODO: Should we set a `data-nomatchesmessage` attribute for easy styling? Or maybe use #internals.states?
-        // TODO: Do we really need to set fake `role`s for something that's totally hidden from the A11y Tree?
-        //       If we're unwilling to use `aria-disabled` (which would add more clarity), and we don't _need_
-        //       `aria-disabled`, then we should probably just remove the A11y Data that's just going to be suppressed.
-        //       If we really need CSS, maybe we can target `inert` in addition to `option`?
         this.#noMatchesElement = document.createElement("span");
         this.#noMatchesElement.textContent = this.noMatchesMessage;
-        this.#noMatchesElement.setAttribute("role", "option");
-        this.#noMatchesElement.setAttribute("aria-selected", String(false));
+        this.#noMatchesElement.setAttribute("data-no-matches-message", "");
         this.#noMatchesElement.setAttribute("aria-hidden", String(true));
         this.#noMatchesElement.inert = true;
       }
 
-      this.listbox.appendChild(this.#noMatchesElement);
+      if (!this.listbox.contains(this.#noMatchesElement)) this.listbox.appendChild(this.#noMatchesElement);
     } else this.#noMatchesElement?.remove();
   }
 
@@ -597,7 +600,7 @@ class ComboboxField extends HTMLElement {
     if (this.valueIs !== "anyvalue" && this.valueIs !== "clearable") {
       throw new TypeError('Method requires `filter` mode to be on and `valueis` to be "anyvalue" or "clearable"');
     }
-    if (this.#value == null && this.valueIs === "clearable") {
+    if (this.valueIs === "clearable" && this.#value === null) {
       throw new TypeError('Cannot coerce value to `""` for a `clearable` `combobox` that owns no `option`s');
     }
 

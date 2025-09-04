@@ -68,7 +68,7 @@ select-enhancer {
         clip-path: inset(50%);
       }
 
-      & > [role="option"] {
+      & > :is([role="option"], [data-no-matches-message]) {
         display: block;
         box-sizing: border-box;
         height: var(--option-height);
@@ -89,7 +89,7 @@ select-enhancer {
         }
 
         /* TODO: Add _full_ `disabled` styles. Should those match `inert` as well, or no? Maybe not? */
-        &:is([inert], [aria-disabled="true"]) {
+        &:is([data-no-matches-message], [aria-disabled="true"]) {
           cursor: auto;
         }
       }
