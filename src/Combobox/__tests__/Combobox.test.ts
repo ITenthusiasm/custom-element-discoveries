@@ -5835,7 +5835,7 @@ for (const { mode } of testConfigs) {
            * @param event
            * @param type
            * @returns An array containing the events that were dispatched. Each item in the array will include
-           * the `name` of the event's `constructor`.
+           * the event's data and the event's `constructor.name`.
            */
           async function trackEvents<
             C extends "Event" | "InputEvent",
@@ -6474,7 +6474,7 @@ for (const { mode } of testConfigs) {
           });
 
           createFilterTypeDescribeBlocks(["clearable", "unclearable"], "both", (valueis) => {
-            it("Updates its value if a new `option` is added and there are no pre-existing `option`s", async ({
+            it("Updates its value if a new `option` is added when there are no pre-existing `option`s", async ({
               page,
             }) => {
               /* ---------- Setup ---------- */
@@ -6572,7 +6572,7 @@ for (const { mode } of testConfigs) {
             });
           });
 
-          it("Rejects Nodes that are not valid `<combobox-option>`s", async ({ page }) => {
+          it("Rejects Nodes that are not valid `ComboboxOption`s", async ({ page }) => {
             /* ---------- Setup ---------- */
             const initialValue = testOptions[0];
             await renderComponent(page, initialValue);
