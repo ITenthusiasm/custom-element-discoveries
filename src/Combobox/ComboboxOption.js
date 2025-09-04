@@ -49,11 +49,12 @@ class ComboboxOption extends HTMLElement {
 
   /** The `option`'s label */
   get label() {
-    return /** @type {string} */ (this.textContent);
+    return this.textContent;
   }
 
+  /** The value of the `option`. Defaults to the `option`'s {@link label}. */
   get value() {
-    return this.getAttribute("value") ?? /** @type {string} */ (this.textContent);
+    return this.getAttribute("value") ?? this.label;
   }
 
   set value(v) {
@@ -78,8 +79,7 @@ class ComboboxOption extends HTMLElement {
   }
 
   set defaultSelected(value) {
-    if (value) this.setAttribute("selected", "");
-    else this.removeAttribute("selected");
+    this.toggleAttribute("selected", value);
   }
 
   get disabled() {
@@ -97,6 +97,7 @@ class ComboboxOption extends HTMLElement {
     return Array.prototype.indexOf.call(this.#listbox.children, this);
   }
 
+  /** The `HTMLFormElement` that owns the `combobox` associated with this element */
   get form() {
     return this.#combobox.form;
   }
@@ -117,9 +118,9 @@ class ComboboxOption extends HTMLElement {
 
     if (this.selected && combobox.value !== this.value) combobox.value = this.value;
     else if (!this.selected && combobox.value === this.value) {
-      if (combobox.textContent && combobox.acceptsValue(combobox.textContent)) return;
+      if (combobox.text.data && combobox.acceptsValue(combobox.text.data)) return;
       if (combobox.acceptsValue("")) return combobox.forceEmptyValue();
-      combobox.formResetCallback(); // TODO: This is a BREAKING change! Need to update tests BEFORE `commit`TING!
+      combobox.formResetCallback();
     }
   }
 }
