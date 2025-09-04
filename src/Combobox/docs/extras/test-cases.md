@@ -66,7 +66,7 @@ Each of these attribute states need to consider when the `combobox`'s value or t
        - [x] ✅ If the `combobox` **value** is an Empty String (`""`) **and** there is no corresponding `option` that is `selected`, the _text content_ should be reset to an Empty String.
          - This scenario can happen, for example, if A&rpar; The `combobox` was most recently emptied, **and** B&rpar; The user started searching immediately after emptying the `combobox`, **and** C&rpar; The user closed the `combobox` _without selecting a new value_.
        - [x] ✅ Otherwise, replicate the behavior of `unclearable`
-2. [x] ✅ When the `combobox` is `expand`ed by Keyboard Navigation (i.e., **NOT** by `#handleSearch`)
+2. [x] ✅ When the `combobox` is `expand`ed (but **NOT** by `#handleSearch`)
    - [x] ✅ Delete the `autoselectableOption`, if it exists.
      - Reasoning: By expanding the `combobox`, the user has expressed that they're interested in starting a **new** "searching session", but they have not yet started searching for anything. Therefore, conceptually, there is no value that "matches their current search" at this time.
 3. [x] ✅ When a **Developer** (or the component) sets the `combobox` value programmatically with **`combobox.value`**:
@@ -129,18 +129,18 @@ Each of these attribute states need to consider when the `combobox`'s value or t
        - [x] ✅ Replicate the behavior of `anyvalue`
      - If the `combobox`'s text content is **not** empty
        - [x] ✅ Replicate the behavior of `unclearable`
-7. [x] When the `combobox`'s owning `form` is **reset** (**non-User** action):
+7. [x] ✅ When the `combobox`'s owning `form` is **reset** (**non-User** action):
    - If the `combobox` has a `defaultSelected` option:
-     - [x] The _last_ `defaultSelected` option should become the `combobox`'s value. (This includes updates to the `combobox`'s text content and the `option.selected` state.)
+     - [x] ✅ The _last_ `defaultSelected` option should become the `combobox`'s value. (This includes updates to the `combobox`'s text content and the `option.selected` state.)
    - Otherwise (i.e., if the `combobox` **does not** have a `defaultSelected` option):
      - `anyvalue`
-       - [x] The `combobox` value should be reset to an empty string.
-       - [x] If an `option` exists whose value is an empty string, it should be programmatically marked as `selected`.
+       - [x] ✅ The `combobox` value should be reset to an empty string.
+       - [x] ✅ If an `option` exists whose value is an empty string, it should be programmatically marked as `selected`.
          - Reasoning: The reasoning for selecting the Empty String Option is kind of on a whim. If the developer is feeling that strongly that they want to add "Pick an Option" to the list of available `option`s, they must really want that default text in the `combobox` under certain circumstances (such as form resets).
      - `unclearable`
-       - [x] The first `option` that the `combobox` has should be programmatically marked as `selected`.
+       - [x] ✅ The first `option` that the `combobox` has should be programmatically marked as `selected`.
      - `clearable` (Default)
-       - [x] Replicate the behavior of `anyvalue`
+       - [x] ✅ Replicate the behavior of `anyvalue`
 8. [x] ✅ When a **Developer** modifies the `valueis` attribute:
    - [x] ✅ When the `combobox` is not in `filter` mode, act as if `valueis` is `unclearable`.
    - When the attribute is **added**/**updated**:
