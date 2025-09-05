@@ -7680,17 +7680,13 @@ for (const { mode } of testConfigs) {
         it("Transfers the provided <select>'s attributes to the `combobox` during initialization", async ({ page }) => {
           /* ---------- Setup ---------- */
           await page.goto(url);
-          await page.evaluate(() => {
-            const app = document.getElementById("app") as HTMLDivElement;
-
-            app.innerHTML = `
+          await renderHTMLToPage(page)`
             <select-enhancer>
-              <select id="combobox" name="my-name" required disabled>
+              <select id="combobox" name="my-name" required disabled ${getFilterAttrs("unclearable")}>
                 <option>Choose Me!!!</option>
               </select>
             </select-enhancer>
           `;
-          });
 
           /* ---------- Assertions ---------- */
           // The <select> and its corresponding attributes have been replaced altogether
@@ -7703,6 +7699,10 @@ for (const { mode } of testConfigs) {
           await expect(combobox).toHaveAttribute("name", "my-name");
           await expect(combobox).toHaveAttribute("required", "");
           await expect(combobox).toHaveAttribute("disabled", "");
+          if (mode === "Filterable") {
+            await expect(combobox).toHaveAttribute("filter", "");
+            await expect(combobox).toHaveAttribute("valueis", "unclearable");
+          }
         });
 
         it('Creates a "unique" (random) ID for the `combobox` if one did not exist on the <select>', async ({
@@ -7710,17 +7710,13 @@ for (const { mode } of testConfigs) {
         }) => {
           /* ---------- Setup ---------- */
           await page.goto(url);
-          await page.evaluate(() => {
-            const app = document.getElementById("app") as HTMLDivElement;
-
-            app.innerHTML = `
+          await renderHTMLToPage(page)`
             <select-enhancer>
-              <select>
+              <select ${getFilterAttrs("unclearable")}>
                 <option>Choose Me!!!</option>
               </select>
             </select-enhancer>
           `;
-          });
 
           /* ---------- Assertions ---------- */
           const id = await page.getByRole("combobox").getAttribute("id");
@@ -7731,16 +7727,16 @@ for (const { mode } of testConfigs) {
         it("Properly creates `option`s from the provided <option>s, preserving all relevant data", async ({ page }) => {
           /* ---------- Setup ---------- */
           await page.goto(url);
-          await page.evaluate(() => {
+          await page.evaluate((m) => {
             const app = document.getElementById("app") as HTMLDivElement;
 
             // NOTE: <option>s are created dynamically to account for preservation of the `Option.selected` _property_
             const optionsContainer = document.createElement("template");
             optionsContainer.innerHTML = `
-            <option label="1st" value="1" disabled selected>First</option>
-            <option>Second</option>
-            <option value="3" disabled>Third</option>
-          `;
+              <option label="1st" value="1" disabled selected>First</option>
+              <option>Second</option>
+              <option value="3" disabled>Third</option>
+            `;
 
             (optionsContainer.content.lastElementChild as HTMLOptionElement).selected = true;
 
@@ -7751,9 +7747,13 @@ for (const { mode } of testConfigs) {
             const select = selectEnhancer.appendChild(document.createElement("select"));
             select.replaceChildren(...optionsContainer.content.children);
             select.setAttribute("name", "my-combobox");
+            if (m === "Filterable") {
+              select.setAttribute("filter", "");
+              select.setAttribute("valueis", "unclearable");
+            }
 
             app.replaceChildren(form);
-          });
+          }, mode);
 
           /* ---------- Assertions ---------- */
           // Display options (for test-writing convenience)
@@ -7776,7 +7776,10 @@ for (const { mode } of testConfigs) {
           await expect(optionAllAttributes).toHaveJSProperty("defaultSelected", true);
 
           await expect(optionAllAttributes).toHaveJSProperty("selected", false);
-          await expectOptionToBeSelected(page, { label: "1st", value: "1" }, false);
+          await expect(combobox).not.toHaveSyncedComboboxValue(
+            { label: "1st", value: "1" },
+            { form: true, matchingLabel: true },
+          );
 
           // Option with No Attributes
           const optionWithoutAttributes = page.getByRole("option", { name: "Second" });
@@ -7794,7 +7797,10 @@ for (const { mode } of testConfigs) {
           await expect(optionWithoutAttributes).toHaveJSProperty("defaultSelected", false);
 
           await expect(optionWithoutAttributes).toHaveJSProperty("selected", false);
-          await expectOptionToBeSelected(page, { label: "Second" }, false);
+          await expect(combobox).not.toHaveSyncedComboboxValue(
+            { label: "Second" },
+            { form: true, matchingLabel: true },
+          );
 
           // Pre-Selected Option (via DOM manipulation _pre-mount_)
           const selectedOption = page.getByRole("option", { name: "Third", selected: true });
@@ -7812,65 +7818,102 @@ for (const { mode } of testConfigs) {
           await expect(selectedOption).toHaveJSProperty("defaultSelected", false);
 
           await expect(selectedOption).toHaveJSProperty("selected", true);
-          await expectOptionToBeSelected(page, { label: "Third", value: "3" });
-
-          // The pre-selected `option` is also recognized by the owning `<form>`
-          const form = page.getByRole("form");
-          expect(await form.evaluate((f: HTMLFormElement) => new FormData(f).get("my-combobox"))).toBe(
-            await selectedOption.getAttribute("value"),
+          await expect(combobox).toHaveSyncedComboboxValue(
+            { label: "Third", value: "3" },
+            { form: true, matchingLabel: true },
           );
         });
 
         // NOTE: This is important for developers to be able to add "Cancel Buttons" or "Caret Icons" seamlessly
         it("Replaces only the provided <select> element and ignores everything else", async ({ page }) => {
           // Setup
-          const className = "ignored";
-          await page.goto(url);
-          await page.evaluate((c) => {
-            const app = document.getElementById("app") as HTMLDivElement;
+          const dataIgnoredAttr = "data-ignored";
+          const dataRejectedAttr = "data-rejected";
 
-            app.innerHTML = `
+          await page.goto(url);
+          await renderHTMLToPage(page)`
             <select-enhancer>
-              <span class="${c}" role="option">I am ignored even though I have a "recognized" role</span>
-              <select>
+              <span role="option" ${dataIgnoredAttr}>I am ignored even though I have a "recognized" role</span>
+
+              <select ${getFilterAttrs("unclearable")}>
                 <option>Choose Me!!!</option>
+                <div ${dataRejectedAttr}>Rejected due to not being a valid option</div>
               </select>
-              <div class="${c}" role="listbox">I am ignored even though a \`listbox\` will be generated</div>
-              <button class="${c}">I am ignored</button>
+
+              <div role="listbox" ${dataIgnoredAttr}>I am ignored even though a \`listbox\` will be generated</div>
+              <button ${dataIgnoredAttr}>I am ignored</button>
             </select-enhancer>
           `;
-          }, className);
 
-          // The <select> field is replaced
+          // The <select> field is replaced. And invalid <select> options were removed.
           const container = page.locator("select-enhancer");
           await expect(container.locator("select, option")).toHaveCount(0);
           await expect(container.locator("combobox-field")).toHaveCount(1);
+          await expect(container.getByRole("listbox", { includeHidden: true }).locator("*")).toHaveCount(1);
           await expect(container.getByRole("listbox", { includeHidden: true }).locator("combobox-option")).toHaveCount(
             1,
           );
 
+          await expect(page.locator(`[${dataRejectedAttr}]`)).toHaveCount(0);
+
           // But the other elements are left alone
-          await expect(container.locator(`.${className}`)).toHaveCount(3);
+          await expect(container.locator(`[${dataIgnoredAttr}]`)).toHaveCount(3);
           await expect(container.getByRole("listbox", { includeHidden: true })).toHaveCount(2);
         });
 
         it("Has no accessible `role`", async ({ page }) => {
           // Setup
           await page.goto(url);
-          await page.evaluate(() => {
-            const app = document.getElementById("app") as HTMLDivElement;
-
-            app.innerHTML = `
+          await renderHTMLToPage(page)`
             <select-enhancer>
-              <select>
+              <select ${getFilterAttrs("unclearable")}>
                 <option>Choose Me!!!</option>
               </select>
             </select-enhancer>
           `;
-          });
 
           // Container should not have an accessible `role`
           await expect(page.locator("select-enhancer")).toHaveRole("none");
+        });
+
+        createFilterTypeDescribeBlocks(["anyvalue", "clearable", "unclearable"], "both", (valueis) => {
+          const Default = valueis === "anyvalue" || valueis === "clearable" ? "an empty string" : "the first `option`";
+          it(`Defaults the \`combobox\` value to ${Default} if there is no default \`option\``, async ({ page }) => {
+            // Setup
+            const name = "my-combobox";
+            await page.goto(url);
+            await renderHTMLToPage(page)`
+              <form aria-label="Test Form">
+                <select-enhancer>
+                  <select name="${name}" ${getFilterAttrs(valueis)}>
+                    <option value="">Choose Something</option>
+                    ${testOptions.map((o) => `<option>${o}</option>`).join("")}
+                  </select>
+                </select-enhancer>
+              </form>
+            `;
+
+            const combobox = page.getByRole("combobox");
+            await expect(combobox).toHaveJSProperty("valueIs", valueis ?? ("unclearable" satisfies ValueIs));
+
+            const options = page.getByRole("option", { includeHidden: true });
+            await expect(options.and(page.locator("[selected]"))).toHaveCount(0);
+
+            // Assertions
+            const selectedOption = page.getByRole("option", { selected: true, includeHidden: true });
+
+            if (valueis === "anyvalue" || valueis === "clearable") {
+              await expect(combobox).toHaveText("");
+              await expect(combobox).toHaveComboboxValue("", { form: true });
+              await expect(selectedOption).not.toBeAttached();
+            } else {
+              await expect(options.first().and(selectedOption)).toBeAttached();
+              await expect(combobox).toHaveSyncedComboboxValue(
+                { label: "Choose Something", value: "" },
+                { form: true, matchingLabel: true },
+              );
+            }
+          });
         });
       });
     });
