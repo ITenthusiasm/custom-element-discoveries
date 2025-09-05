@@ -4127,6 +4127,115 @@ for (const { mode } of testConfigs) {
             });
           });
 
+          if (mode === "Filterable") {
+            it.describe("filterMethod (Property)", () => {
+              it("Exposes the underlying `filtermethod` attribute", async ({ page }) => {
+                /* ---------- Setup ---------- */
+                const initialMethod = "startsWith" as const satisfies ComboboxField["filterMethod"];
+                await page.goto(url);
+                await renderHTMLToPage(page)`
+                  <select-enhancer>
+                    <select ${getFilterAttrs("unclearable")} filtermethod="${initialMethod}">
+                      ${testOptions.map((o) => `<option>${o}</option>`).join("")}
+                    </select>
+                  </select-enhancer>
+                `;
+
+                /* ---------- Assertions ---------- */
+                // `property` matches initial `attribute`
+                const combobox = page.getByRole("combobox");
+                await expect(combobox).toHaveJSProperty("filterMethod", initialMethod);
+
+                // `attribute` responds to `property` updates
+                const newProp = "includes" as const satisfies ComboboxField["filterMethod"];
+                await combobox.evaluate((node: ComboboxField, prop) => (node.filterMethod = prop), newProp);
+                await expect(combobox).toHaveAttribute("filtermethod", newProp);
+
+                // `property` responds to `attribute` updates
+                const newAttr = "startsWith" satisfies ComboboxField["filterMethod"];
+                await combobox.evaluate((n: ComboboxField, attr) => n.setAttribute("filtermethod", attr), newAttr);
+                await expect(combobox).toHaveJSProperty("filterMethod", newAttr);
+              });
+
+              it("Defaults to `startsWith` when the underlying attribute is omitted or invalid", async ({ page }) => {
+                await page.goto(url);
+                for (const attr of [null, String(Math.random())] as const) {
+                  await it.step(`Mounted with ${attr ? "invalid" : "omitted"} attribute`, async () => {
+                    await renderHTMLToPage(page)`
+                      <select-enhancer>
+                        <select ${getFilterAttrs("unclearable")} ${attr ? `filtermethod="${attr}"` : ""}>
+                          ${testOptions.map((o) => `<option>${o}</option>`).join("")}
+                        </select>
+                      </select-enhancer>
+                    `;
+
+                    const combobox = page.getByRole("combobox");
+                    if (attr) await expect(combobox).toHaveAttribute("filtermethod", attr);
+                    else await expect(combobox).not.toHaveAttribute("filtermethod");
+                    await expect(combobox).toHaveJSProperty("filterMethod", "startsWith");
+
+                    // Imperatively set to another invalid value afterwards
+                    await combobox.evaluate(
+                      (node: ComboboxField) => (node.filterMethod = null as unknown as ComboboxField["filterMethod"]),
+                    );
+                    await expect(combobox).toHaveAttribute("filtermethod", String(null));
+                    await expect(combobox).toHaveJSProperty("filterMethod", "startsWith");
+                  });
+                }
+              });
+
+              it("Determines the method used for filtering `option`s", async ({ page }) => {
+                /* ---------- Setup ---------- */
+                // Useful constants
+                const second = testOptions[1];
+                const seventh = testOptions[6];
+                const eigth = testOptions[7];
+                const tenth = testOptions[9];
+                const E = eigth.charAt(0) as "E";
+
+                // Render component
+                const initialMethod = "startsWith" satisfies ComboboxField["filterMethod"];
+                await page.goto(url);
+                await renderHTMLToPage(page)`
+                  <select-enhancer>
+                    <select ${getFilterAttrs("unclearable")} filtermethod="${initialMethod}">
+                      ${testOptions.map((o) => `<option>${o}</option>`).join("")}
+                    </select>
+                  </select-enhancer>
+                `;
+
+                /* ---------- Assertions ---------- */
+                // `String.prototype.startsWith` is used when the `filterMethod` is `startsWith`
+                const combobox = page.getByRole("combobox");
+                await expect(combobox).toHaveJSProperty("filterMethod", initialMethod);
+
+                await combobox.press(E);
+                const options = page.getByRole("option");
+                await expect(options).toHaveCount(1);
+                await expect(options).toHaveAccessibleName(eigth);
+
+                // `String.prototype.includes` is used when the `filterMethod` is `includes`
+                await combobox.evaluate((node: ComboboxField) => (node.filterMethod = "includes"));
+                await combobox.press("ControlOrMeta+A");
+                await combobox.press(E);
+
+                await expect(options).toHaveCount(4);
+                await expect(options.first()).toHaveAccessibleName(second);
+                await expect(options.nth(1)).toHaveAccessibleName(seventh);
+                await expect(options.nth(2)).toHaveAccessibleName(eigth);
+                await expect(options.last()).toHaveAccessibleName(tenth);
+
+                // `String.prototype.startsWith` is used by default when no valid configuration is supplied
+                await combobox.evaluate((node) => node.removeAttribute("filtermethod"));
+                await combobox.press("ControlOrMeta+A");
+                await combobox.press(E);
+
+                await expect(options).toHaveCount(1);
+                await expect(options).toHaveAccessibleName(eigth);
+              });
+            });
+          }
+
           it.describe("valueIs (Property)", () => {
             it("Controls the underlying `valueis` attribute", async ({ page }) => {
               await page.goto(url);
@@ -4207,7 +4316,7 @@ for (const { mode } of testConfigs) {
                 await page.goto(url);
                 await renderHTMLToPage(page)`
                   <select-enhancer>
-                    <select name="${initialState}" filter valueis="${initialState}">
+                    <select filter valueis="${initialState}">
                       ${testOptions.map((o) => `<option>${o}</option>`).join("")}
                     </select>
                   </select-enhancer>

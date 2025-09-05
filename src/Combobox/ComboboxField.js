@@ -567,7 +567,7 @@ class ComboboxField extends HTMLElement {
     if (!search) return true;
     if (!option.value) return false;
 
-    return option.textContent.toLowerCase().startsWith(search.toLowerCase());
+    return option.textContent.toLowerCase()[this.filterMethod](search.toLowerCase());
   }
 
   /* ------------------------------ Exposed Form Properties ------------------------------ */
@@ -692,6 +692,24 @@ class ComboboxField extends HTMLElement {
 
   set filter(value) {
     this.toggleAttribute("filter", Boolean(value));
+  }
+
+  /**
+   * Determines the method used to filter the `option`s as the user types.
+   * - `startsWith`: {@link String.startsWith} will be used to filter the `option`s.
+   * - `includes`: {@link String.includes} will be used to filter the `option`s.
+   *
+   * **Note**: This property does nothing if {@link optionMatchesFilter} is overridden.
+   *
+   * @returns {Extract<keyof String, "startsWith" | "includes">}
+   */
+  get filterMethod() {
+    const value = this.getAttribute("filtermethod");
+    return value === "includes" ? value : "startsWith";
+  }
+
+  set filterMethod(value) {
+    this.setAttribute("filtermethod", value);
   }
 
   /**
