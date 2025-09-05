@@ -26,6 +26,9 @@ const testConfigs = Object.freeze([{ mode: "Regular" }, { mode: "Filterable" }] 
 
 for (const { mode } of testConfigs) {
   it.describe(`Combobox Web Component (${mode})`, () => {
+    /** Retrieves the type of the last item in an array */
+    type GetLast<T> = T extends readonly [...unknown[], infer U] ? U : never;
+
     interface OptionInfo {
       /** The _accessible_ label of an `option`. */
       label: string;
@@ -6373,9 +6376,11 @@ for (const { mode } of testConfigs) {
 
               if (valueis === "anyvalue") {
                 await expect(selectedOption).toHaveCount(0);
+                await expect(combobox).toHaveText("Four");
                 await expect(combobox).toHaveComboboxValue("Four", { form: true });
               } else if (valueis === "clearable") {
                 await expect(selectedOption).toHaveCount(0);
+                await expect(combobox).toHaveText("");
                 await expect(combobox).toHaveComboboxValue("", { form: true });
               } else {
                 await expect(firstOption.and(selectedOption)).toBeAttached();
@@ -6444,12 +6449,20 @@ for (const { mode } of testConfigs) {
                 to.forEach((o) => e.listbox.insertAdjacentHTML("beforeend", `<combobox-option>${o}</combobox-option>`));
               }, testOptions);
 
-              if (valueis === "clearable") await expect(combobox).toHaveComboboxValue("", { form: true });
+              if (valueis === "clearable") {
+                const selectedOption = page.getByRole("option", { selected: true, includeHidden: true });
+                await expect(selectedOption).toHaveCount(0);
+
+                await expect(combobox).toHaveText("");
+                await expect(combobox).toHaveComboboxValue("", { form: true });
+              }
               // No changes should've happened in `anyvalue` mode
               else if (valueis === "anyvalue") {
                 const selectedOption = page.getByRole("option", { selected: true, includeHidden: true });
-                await expect(combobox).toHaveComboboxValue(first, { form: true });
                 await expect(selectedOption).toHaveCount(0);
+
+                await expect(combobox).toHaveComboboxValue(first, { form: true });
+                await expect(combobox).toHaveText(first);
               } else {
                 await expect(combobox).toHaveSyncedComboboxValue({ label: first }, { form: true, matchingLabel: true });
               }
@@ -6503,6 +6516,7 @@ for (const { mode } of testConfigs) {
 
               if (valueis === "clearable") {
                 await expect(selectedOption).toHaveCount(0);
+                await expect(combobox).toHaveText("");
                 await expect(combobox).toHaveComboboxValue("", { form: true });
               } else {
                 // The first _inserted_ `option` should be the selected one (not necessarily the first `option` itself)
@@ -6529,6 +6543,7 @@ for (const { mode } of testConfigs) {
 
               if (valueis === "clearable") {
                 await expect(selectedOption).toHaveCount(0);
+                await expect(combobox).toHaveText("");
                 await expect(combobox).toHaveComboboxValue("", { form: true });
               } else {
                 // The first _inserted_ `option` should again be selected. (Due to batching, first `option` is selected.)
@@ -6560,6 +6575,7 @@ for (const { mode } of testConfigs) {
 
               if (valueis === "clearable") {
                 await expect(selectedOption).toHaveCount(0);
+                await expect(combobox).toHaveText("");
                 await expect(combobox).toHaveComboboxValue("", { form: true });
               } else {
                 // The first _inserted_ `option` should again be selected. (Due to batching, first `option` is selected.)
@@ -7086,17 +7102,13 @@ for (const { mode } of testConfigs) {
             it("Returns the text content of the `option`", async ({ page }) => {
               /* ---------- Setup ---------- */
               await page.goto(url);
-              await page.evaluate((options) => {
-                const app = document.getElementById("app") as HTMLDivElement;
-
-                app.innerHTML = `
+              await renderHTMLToPage(page)`
                 <select-enhancer>
-                  <select>
-                    ${options.map((o, i) => `<option value="${i + 1}">${o}</option>`).join("")}
+                  <select ${getFilterAttrs("unclearable")}>
+                    ${testOptions.map((o, i) => `<option value="${i + 1}">${o}</option>`).join("")}
                   </select>
                 </select-enhancer>
               `;
-              }, testOptions);
 
               /* ---------- Assertions ---------- */
               // Display `option`s
@@ -7122,358 +7134,420 @@ for (const { mode } of testConfigs) {
 
           it.describe("value (Attribute)", () => {
             it("Updates the value of the owning `combobox` when changed on a selected `option`", async ({ page }) => {
-              // Setup
+              /* ---------- Setup ---------- */
               const value = "1st";
-              expect(value).not.toBe(testOptions[0]);
-              await renderComponent(page);
+              const first = testOptions[0];
+              expect(value).not.toBe(first);
+              await renderComponent(page, first);
 
               const name = "my-combobox";
               const combobox = page.getByRole("combobox");
               await associateComboboxWithForm(combobox, { name });
-
-              const form = page.getByRole("form");
               await combobox.click();
+
+              /* ---------- Assertions ---------- */
+              // Without the attribute
+              await expect(combobox).toHaveSyncedComboboxValue({ label: first }, { form: true, matchingLabel: true });
 
               // Adding the attribute
               const firstOption = page.getByRole("option").first();
               await firstOption.evaluate((node, v) => node.setAttribute("value", v), value);
-              await expectOptionToBeSelected(page, { label: testOptions[0], value });
-              expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(value);
+              await expect(combobox).toHaveSyncedComboboxValue(
+                { label: first, value },
+                { form: true, matchingLabel: true },
+              );
 
               // Removing the attribute
               await firstOption.evaluate((node) => node.removeAttribute("value"));
-              await expectOptionToBeSelected(page, { label: testOptions[0] });
-              expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(testOptions[0]);
+              await expect(combobox).toHaveSyncedComboboxValue({ label: first }, { form: true, matchingLabel: true });
 
               // Updating an unselected `option`'s value does nothing to the `combobox` value
               const lastOption = page.getByRole("option").last();
               await lastOption.evaluate((node) => node.setAttribute("value", "ignored"));
-              await expectOptionToBeSelected(page, { label: testOptions.at(-1) as string, value: "ignored" }, false);
-              expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).not.toBe(
-                testOptions.at(-1),
+              await expect(combobox).not.toHaveSyncedComboboxValue(
+                { label: testOptions.at(-1) as string, value: "ignored" },
+                { form: true },
               );
 
-              await expectOptionToBeSelected(page, { label: testOptions[0] });
-              expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(testOptions[0]);
+              await expect(combobox).toHaveSyncedComboboxValue({ label: first }, { form: true, matchingLabel: true });
+            });
+
+            it("Synchronizes its own `id` when changed", async ({ page }) => {
+              /* ---------- Setup ---------- */
+              const value = "1st";
+              const first = testOptions[0];
+              expect(value).not.toBe(first);
+              await renderComponent(page, first);
+
+              /* ---------- Assertions ---------- */
+              // Without a `value` attribute
+              const comboboxId = await page.getByRole("combobox").getAttribute("id");
+              const firstOption = page.getByRole("option", { name: first, includeHidden: true });
+
+              await expect(firstOption).not.toHaveAttribute("value");
+              await expect(firstOption).toHaveId(`${comboboxId}-option-${first}`);
+
+              // Adding the attribute
+              await firstOption.evaluate((node, v) => node.setAttribute("value", v), value);
+              await expect(firstOption).toHaveId(`${comboboxId}-option-${value}`);
+
+              // Removing the attribute
+              await firstOption.evaluate((node) => node.removeAttribute("value"));
+              await expect(firstOption).toHaveId(`${comboboxId}-option-${first}`);
             });
           });
 
           it.describe("value (Property)", () => {
-            it("Exposes the underlying `value` attribute (defaults to `option`'s text content)", async ({ page }) => {
+            it("Exposes the underlying `value` attribute (defaults to `option`'s `label`)", async ({ page }) => {
               /* ---------- Setup ---------- */
               const name = "my-combobox";
               const option = Object.freeze({ label: "My Value", value: "my-value" });
               await page.goto(url);
-              await page.evaluate(
-                ([o, fieldName]) => {
-                  const app = document.getElementById("app") as HTMLDivElement;
-
-                  app.innerHTML = `
-                  <form aria-label="Test Form">
-                    <select-enhancer>
-                      <select name="${fieldName}">
-                        <option value="${o.value}">${o.label}</option>
-                      </select>
-                    </select-enhancer>
-                  </form>
-                `;
-                },
-                [option, name] as const,
-              );
-
-              const form = page.getByRole("form");
+              await renderHTMLToPage(page)`
+                <form aria-label="Test Form">
+                  <select-enhancer>
+                    <select name="${name}" ${getFilterAttrs("unclearable")}>
+                      <option value="${option.value}" selected>${option.label}</option>
+                    </select>
+                  </select-enhancer>
+                </form>
+              `;
 
               /* ---------- Assertions ---------- */
               // Display Options
-              await page.getByRole("combobox").click();
+              const combobox = page.getByRole("combobox");
+              await combobox.click();
 
               // `property` matches initial `attribute`
               const optionElement = page.getByRole("option");
               await expect(optionElement).toHaveJSProperty("value", option.value);
-              await expectOptionToBeSelected(page, option);
-              expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(option.value);
+              await expect(combobox).toHaveSyncedComboboxValue(option, { form: true, matchingLabel: true });
 
               // `attribute` responds to `property` updates
-              const newValueProperty = "my-property";
-              await optionElement.evaluate((node: ComboboxOption, v) => (node.value = v), newValueProperty);
-              await expect(optionElement).toHaveAttribute("value", newValueProperty);
-              await expectOptionToBeSelected(page, { label: option.label, value: newValueProperty });
-              expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(
-                newValueProperty,
+              const newProp = "my-property";
+              await optionElement.evaluate((node: ComboboxOption, v) => (node.value = v), newProp);
+              await expect(optionElement).toHaveAttribute("value", newProp);
+
+              await expect(combobox).toHaveSyncedComboboxValue(
+                { ...option, value: newProp },
+                { form: true, matchingLabel: true },
               );
 
               // `property` responds to `attribute` updates
-              const newValueAttribute = "my-attribute";
-              await optionElement.evaluate(
-                (node: ComboboxField, v) => node.setAttribute("value", v),
-                newValueAttribute,
-              );
-              await expect(optionElement).toHaveJSProperty("value", newValueAttribute);
-              await expectOptionToBeSelected(page, { label: option.label, value: newValueAttribute });
-              expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(
-                newValueAttribute,
+              const newAttr = "my-attribute";
+              await optionElement.evaluate((node, v) => node.setAttribute("value", v), newAttr);
+              await expect(optionElement).toHaveJSProperty("value", newAttr);
+
+              await expect(combobox).toHaveSyncedComboboxValue(
+                { ...option, value: newAttr },
+                { form: true, matchingLabel: true },
               );
 
-              // `property` defaults to text content in lieu of an `attribute`
-              await optionElement.evaluate((node: ComboboxField) => node.removeAttribute("value"));
+              // `property` defaults to `label` in lieu of an `attribute`
+              await optionElement.evaluate((node) => node.removeAttribute("value"));
+              await expect(optionElement).toHaveJSProperty("label", option.label);
               await expect(optionElement).toHaveJSProperty("value", option.label);
-              await expectOptionToBeSelected(page, { label: option.label, value: option.label });
-              expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(option.label);
+
+              await expect(combobox).toHaveSyncedComboboxValue(
+                { ...option, value: option.label },
+                { form: true, matchingLabel: true },
+              );
             });
           });
 
           it.describe("selected (Property)", () => {
-            it("Indicates whether or not the `option` is currently selected", async ({ page }) => {
-              // Setup
-              const firstOption = testOptions[0];
-              const lastOption = testOptions.at(-1) as string;
-              await renderComponent(page);
+            createFilterTypeDescribeBlocks(["anyvalue", "clearable", "unclearable"], "both", (valueis) => {
+              it("Indicates whether or not the `option` is currently selected", async ({ page }) => {
+                // Setup
+                const first = testOptions[0];
+                const tenth = testOptions.at(-1) as GetLast<typeof testOptions>;
+                await renderComponent(page, { initialValue: first, valueis });
 
-              // Display Options
-              const combobox = page.getByRole("combobox");
-              await combobox.click();
+                // Display Options
+                const combobox = page.getByRole("combobox");
+                await combobox.click();
 
-              // Initially, the first `option` is selected
-              await expectOptionToBeSelected(page, { label: firstOption });
-              await expect(page.getByRole("option").first()).toHaveJSProperty("selected", true);
+                // Initially, the first `option` is selected
+                const options = page.getByRole("option");
+                await expect(options.first()).toHaveJSProperty("selected", true);
+                await expect(combobox).toHaveSyncedComboboxValue({ label: first }, { matchingLabel: true });
 
-              // After changing the `combobox` value...
-              await combobox.evaluate((node: ComboboxField, o) => (node.value = o), lastOption);
-              await expect(page.getByRole("option").first()).toHaveJSProperty("selected", false);
-              await expect(page.getByRole("option").last()).toHaveJSProperty("selected", true);
-            });
+                // After changing the `combobox` value...
+                await combobox.evaluate((node: ComboboxField, v) => (node.value = v), tenth);
+                await expect(page.getByRole("option").first()).toHaveJSProperty("selected", false);
+                await expect(page.getByRole("option").last()).toHaveJSProperty("selected", true);
+              });
 
-            it("Updates the value of the `combobox` when changed", async ({ page }) => {
-              // Setup
-              const firstOption = testOptions[0];
-              const lastOption = testOptions.at(-1) as string;
-              await renderComponent(page);
+              it("Updates the value of the `combobox` when changed", async ({ page }) => {
+                // Setup
+                const first = testOptions[0];
+                const tenth = testOptions.at(-1) as GetLast<typeof testOptions>;
+                await renderComponent(page, { initialValue: first, valueis });
 
-              const name = "my-combobox";
-              const combobox = page.getByRole("combobox");
-              await associateComboboxWithForm(combobox, { name });
-              const form = page.getByRole("form");
+                const name = "my-combobox";
+                const combobox = page.getByRole("combobox");
+                await associateComboboxWithForm(combobox, { name });
 
-              // Display Options
-              await combobox.click();
+                // Display Options
+                await combobox.click();
 
-              // Initially, the first `option` is selected
-              await expectOptionToBeSelected(page, { label: firstOption });
-              await expect(page.getByRole("option").first()).toHaveJSProperty("selected", true);
-              expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(firstOption);
+                // Initially, the first `option` is selected
+                const options = page.getByRole("option");
+                await expect(options.first()).toHaveJSProperty("selected", true);
+                await expect(combobox).toHaveSyncedComboboxValue({ label: first }, { form: true, matchingLabel: true });
 
-              // The `selected` PROPERTY changes the `combobox` value
-              const lastOptionElement = page.getByRole("option", { name: lastOption });
-              await lastOptionElement.evaluate((node: ComboboxOption) => (node.selected = true));
+                // The `selected` PROPERTY changes the `combobox` value
+                await options.last().evaluate((node: ComboboxOption) => (node.selected = true));
+                await expect(options.last()).toHaveJSProperty("selected", true);
+                await expect(combobox).toHaveSyncedComboboxValue({ label: tenth }, { form: true, matchingLabel: true });
 
-              await expectOptionToBeSelected(page, { label: lastOption });
-              await expect(lastOptionElement).toHaveJSProperty("selected", true);
-              expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(lastOption);
+                await expect(options.first()).toHaveJSProperty("selected", false);
+                await expect(combobox).not.toHaveSyncedComboboxValue(
+                  { label: first },
+                  { form: true, matchingLabel: true },
+                );
+              });
 
-              await expectOptionToBeSelected(page, { label: firstOption }, false);
-              await expect(page.getByRole("option").first()).toHaveJSProperty("selected", false);
-              expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).not.toBe(
-                firstOption,
-              );
-            });
+              let ActionOnDeselect = "Resets the value of the `combobox`";
+              if (valueis === "anyvalue") ActionOnDeselect = "Sets the `combobox`'s value to its text content";
+              else if (valueis === "clearable") ActionOnDeselect = "Empties the `combobox`'s value and text";
 
-            it("Resets the value of the `combobox` when changed from `true` to `false`", async ({ page }) => {
-              // Setup
-              const firstOption = testOptions[0];
-              const lastOption = testOptions.at(-1) as string;
-              const defaultOption = getRandomOption(testOptions.slice(1, -1));
-              await renderComponent(page, defaultOption);
+              it(`${ActionOnDeselect} when changed from \`true\` to \`false\``, async ({ page }) => {
+                /* ---------- Setup ---------- */
+                const name = "my-combobox";
+                const first = testOptions[0];
+                const tenth = testOptions.at(-1) as GetLast<typeof testOptions>;
+                const defaultValue = getRandomOption(testOptions.slice(1, -1));
 
-              const name = "my-combobox";
-              const combobox = page.getByRole("combobox");
-              await associateComboboxWithForm(combobox, { name });
-              const form = page.getByRole("form");
-
-              // Enable Observability of `ComboboxField.formResetCallback()`
-              const resetCountAttribute = "data-reset-count";
-              await combobox.evaluate((node: ComboboxField, attr) => {
-                const { formResetCallback } = node;
-                node.formResetCallback = function () {
-                  formResetCallback.call(this);
-                  const count = Number(this.getAttribute(attr) ?? 0);
-                  this.setAttribute(attr, String(count + 1));
-                };
-              }, resetCountAttribute);
-
-              await expect(combobox).not.toHaveAttribute(resetCountAttribute);
-
-              // Display Options
-              await combobox.click();
-              await expectOptionToBeSelected(page, { label: firstOption }, false);
-              expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).not.toBe(
-                firstOption,
-              );
-
-              await expectOptionToBeSelected(page, { label: lastOption }, false);
-              expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).not.toBe(lastOption);
-
-              // Select last `option`, then deselect it
-              const lastOptionElement = page.getByRole("option", { name: lastOption });
-              await lastOptionElement.evaluate((node: ComboboxOption) => (node.selected = true));
-              await lastOptionElement.evaluate((node: ComboboxOption) => (node.selected = false));
-
-              // `combobox` value should have been reset
-              await expect(combobox).toHaveAttribute(resetCountAttribute, String(1));
-
-              const defaultOptionElement = page.getByRole("option", { name: defaultOption });
-              await expectOptionToBeSelected(page, { label: defaultOption }, true);
-              await expect(defaultOptionElement).toHaveJSProperty("selected", true);
-              expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(defaultOption);
-
-              await expectOptionToBeSelected(page, { label: lastOption }, false);
-              await expect(lastOptionElement).toHaveJSProperty("selected", false);
-              expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).not.toBe(lastOption);
-
-              // Resets still function properly if the `defaultOption` is de-selected
-              await defaultOptionElement.evaluate((node: ComboboxOption) => (node.selected = false));
-              await expect(combobox).toHaveAttribute(resetCountAttribute, String(2));
-
-              await expectOptionToBeSelected(page, { label: defaultOption }, true);
-              await expect(defaultOptionElement).toHaveJSProperty("selected", true);
-              expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(defaultOption);
-            });
-          });
-
-          // NOTE: This attribute represents the `option` that should be selected by default
-          it.describe("selected (Attribute)", () => {
-            // Note: This is the behavior of the native <select> element (for :not([multiple])).
-            it("Initializes the `combobox` value to the last `selected` `option` that was rendered", async ({
-              page,
-            }) => {
-              /* ---------- Setup ---------- */
-              const localOptions = testOptions.slice(0, 3);
-              const name = "my-combobox";
-              await page.goto(url);
-              await page.evaluate(
-                ([options, fieldName]) => {
-                  const app = document.getElementById("app") as HTMLDivElement;
-
-                  app.innerHTML = `
+                await page.goto(url);
+                await renderHTMLToPage(page)`
                   <form aria-label="Test Form">
                     <select-enhancer>
-                      <select name="${fieldName}">
-                        <option>${options[0]}</option>
-                        <option selected>${options[1]}</option>
-                        <option selected>${options[2]}</option>
+                      <select name="${name}" ${getFilterAttrs(valueis)}>
+                        <option value="">Select Something</option>
+                        ${testOptions.map((o) => `<option ${o === defaultValue ? "selected" : ""}>${o}</option>`).join("")}
                       </select>
                     </select-enhancer>
                   </form>
                 `;
-                },
-                [localOptions, name] as const,
-              );
 
-              /* ---------- Assertions ---------- */
-              // Display `option`s
-              await page.getByRole("combobox").click();
-              const form = page.getByRole("form");
+                const combobox = page.getByRole("combobox");
+                await expect(combobox).toHaveJSProperty("valueIs", valueis ?? ("unclearable" satisfies ValueIs));
 
-              // Only the last `selected` option is marked as chosen
-              await expect(page.getByRole("option").nth(-2)).toHaveAttribute("selected");
-              await expectOptionToBeSelected(page, { label: localOptions.at(-2) as string }, false);
-              expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).not.toBe(
-                localOptions.at(-2),
-              );
+                // Enable Observability of `ComboboxField.formResetCallback()`
+                const getResetCount = observeResetCount(combobox);
+                expect(await getResetCount()).toBe(0);
 
-              await expect(page.getByRole("option").last()).toHaveAttribute("selected");
-              await expectOptionToBeSelected(page, { label: localOptions.at(-1) as string });
-              expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(
-                localOptions.at(-1),
-              );
+                // Verify correct default value
+                await expect(combobox).not.toHaveSyncedComboboxValue({ label: first }, { form: true });
+                await expect(combobox).not.toHaveSyncedComboboxValue({ label: tenth }, { form: true });
+                await expect(combobox).toHaveSyncedComboboxValue(
+                  { label: defaultValue },
+                  { form: true, matchingLabel: true },
+                );
+
+                // Display `option`s
+                await combobox.click();
+
+                /* ---------- Assertions ---------- */
+                // Select last `option`, then deselect it
+                const lastOption = page.getByRole("option", { name: tenth });
+                await lastOption.evaluate((node: ComboboxOption) => (node.selected = true));
+                await lastOption.evaluate((node: ComboboxOption) => (node.selected = false));
+                const selectedOption = page.getByRole("option", { selected: true, includeHidden: true });
+
+                if (valueis === "anyvalue") {
+                  await expect(combobox).toHaveText(tenth);
+                  await expect(combobox).toHaveComboboxValue(tenth, { form: true });
+                  await expect(selectedOption).not.toBeAttached();
+                } else if (valueis === "clearable") {
+                  await expect(combobox).toHaveText("");
+                  await expect(combobox).toHaveComboboxValue("", { form: true });
+                  await expect(selectedOption).not.toBeAttached();
+                } else {
+                  // `combobox` value should have been reset
+                  expect(await getResetCount()).toBe(1);
+
+                  const defaultOption = page.getByRole("option", { name: defaultValue });
+                  await expect(defaultOption).toHaveJSProperty("selected", true);
+                  await expect(combobox).toHaveSyncedComboboxValue(
+                    { label: defaultValue },
+                    { form: true, matchingLabel: true },
+                  );
+
+                  await expect(lastOption).toHaveJSProperty("selected", false);
+                  await expect(combobox).not.toHaveSyncedComboboxValue({ label: tenth }, { form: true });
+
+                  // Resets still function properly if the `defaultOption` is de-selected
+                  await defaultOption.evaluate((node: ComboboxOption) => (node.selected = false));
+
+                  expect(await getResetCount()).toBe(2);
+                  await expect(defaultOption).toHaveJSProperty("selected", true);
+                  await expect(combobox).toHaveSyncedComboboxValue(
+                    { label: defaultValue },
+                    { form: true, matchingLabel: true },
+                  );
+                }
+              });
             });
+          });
 
-            // NOTE: The native <select> element (somewhat) disables this functionality once it is modified.
-            // We don't currently have a way to support that behavior without leaking implementation details.
-            it("Updates the `option`'s `selected` PROPERTY when its value changes", async ({ page }) => {
-              /* ---------- Setup ---------- */
-              const firstOption = testOptions[0];
-              const lastOption = testOptions.at(-1) as string;
+          // NOTE: This attribute represents the `option` that should be selected by default, NOT the `selected` Property
+          it.describe("selected (Attribute)", () => {
+            createFilterTypeDescribeBlocks(["anyvalue", "clearable", "unclearable"], "both", (valueis) => {
+              // Note: This is the behavior of the native <select> element (for :not([multiple])).
+              it("Initializes the `combobox` value to the last `selected` `option` that was rendered", async ({
+                page,
+              }) => {
+                /* ---------- Setup ---------- */
+                const name = "my-combobox";
+                const localOptions = testOptions.slice(0, 3);
 
-              await renderComponent(page);
-              await expectOptionToBeSelected(page, { label: firstOption });
-              await expectOptionToBeSelected(page, { label: lastOption }, false);
+                await page.goto(url);
+                await renderHTMLToPage(page)`
+                  <form aria-label="Test Form">
+                    <select-enhancer>
+                      <select name="${name}" ${getFilterAttrs(valueis)}>
+                        <option>${localOptions[0]}</option>
+                        <option selected>${localOptions[1]}</option>
+                        <option selected>${localOptions[2]}</option>
+                      </select>
+                    </select-enhancer>
+                  </form>
+                `;
 
-              const name = "my-combobox";
-              const combobox = page.getByRole("combobox");
-              await associateComboboxWithForm(combobox, { name });
-              const form = page.getByRole("form");
+                const combobox = page.getByRole("combobox");
+                await expect(combobox).toHaveJSProperty("valueIs", valueis ?? ("unclearable" satisfies ValueIs));
 
-              /* ---------- Assertions ---------- */
-              // Display `option`s
-              await page.getByRole("combobox").click();
+                /* ---------- Assertions ---------- */
+                // Display `option`s
+                await combobox.click();
+                await expect(page.getByRole("option").and(page.locator("[selected]"))).toHaveCount(2);
 
-              // Making a new `option` selected by default
-              const lastOptionElement = page.getByRole("option").last();
-              await lastOptionElement.evaluate((node: ComboboxOption) => node.setAttribute("selected", ""));
-              await expectOptionToBeSelected(page, { label: firstOption }, false);
-              expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).not.toBe(
-                firstOption,
-              );
+                // Only the last `selected` option is marked as chosen
+                await expect(page.getByRole("option").nth(-2)).toHaveAttribute("selected");
+                await expect(page.getByRole("option").nth(-2)).toHaveJSProperty("selected", false);
+                await expect(combobox).not.toHaveSyncedComboboxValue(
+                  { label: localOptions.at(-2) as string },
+                  { form: true, matchingLabel: true },
+                );
 
-              await expectOptionToBeSelected(page, { label: lastOption });
-              expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(lastOption);
+                await expect(page.getByRole("option").last()).toHaveAttribute("selected");
+                await expect(page.getByRole("option").last()).toHaveJSProperty("selected", true);
+                await expect(combobox).toHaveSyncedComboboxValue(
+                  { label: localOptions.at(-1) as string },
+                  { form: true, matchingLabel: true },
+                );
+              });
 
-              // Making a _selected_ + _defaultSelected_ `option` unselected by default
-              await lastOptionElement.evaluate((node: ComboboxOption) => node.removeAttribute("selected"));
-              await expectOptionToBeSelected(page, { label: lastOption }, false);
-              expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).not.toBe(lastOption);
+              // NOTE: The native <select> element (somewhat) disables this functionality once it is modified.
+              // We don't currently have a way to support that behavior without leaking implementation details.
+              it("Updates the `option`'s `selected` PROPERTY when its value changes", async ({ page }) => {
+                /* ---------- Setup ---------- */
+                const first = testOptions[0];
+                const tenth = testOptions.at(-1) as GetLast<typeof testOptions>;
+                await renderComponent(page, { initialValue: first, valueis });
 
-              await expectOptionToBeSelected(page, { label: firstOption });
-              expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(firstOption);
+                const name = "my-combobox";
+                const combobox = page.getByRole("combobox");
+                await associateComboboxWithForm(combobox, { name });
+
+                await expect(combobox).toHaveSyncedComboboxValue({ label: first }, { form: true, matchingLabel: true });
+                await expect(combobox).not.toHaveSyncedComboboxValue(
+                  { label: tenth },
+                  { form: true, matchingLabel: true },
+                );
+
+                /* ---------- Assertions ---------- */
+                // Display `option`s
+                await page.getByRole("combobox").click();
+
+                // Making a new `option` selected by default
+                const options = page.getByRole("option");
+                await options.last().evaluate((node: ComboboxOption) => node.setAttribute("selected", ""));
+
+                await expect(options.last()).toHaveJSProperty("selected", true);
+                await expect(combobox).toHaveSyncedComboboxValue({ label: tenth }, { form: true, matchingLabel: true });
+                await expect(combobox).not.toHaveSyncedComboboxValue(
+                  { label: first },
+                  { form: true, matchingLabel: true },
+                );
+
+                // Making a _selected_ + _defaultSelected_ `option` unselected by default
+                await options.last().evaluate((node: ComboboxOption) => node.removeAttribute("selected"));
+                await expect(options.last()).toHaveJSProperty("selected", false);
+                await expect(combobox).not.toHaveSelectedOption({ label: tenth });
+
+                const selectedOption = page.getByRole("option", { selected: true, includeHidden: true });
+
+                // Because the `selected` PROPERTY changed, the `combobox` value also should have been updated
+                if (valueis === "anyvalue") {
+                  await expect(selectedOption).not.toBeAttached();
+                  await expect(combobox).toHaveText(tenth);
+                  await expect(combobox).toHaveComboboxValue(tenth, { form: true });
+                } else if (valueis === "clearable") {
+                  await expect(selectedOption).not.toBeAttached();
+                  await expect(combobox).toHaveText("");
+                  await expect(combobox).toHaveComboboxValue("", { form: true });
+                } else {
+                  await expect(options.first()).toHaveJSProperty("selected", true);
+                  await expect(combobox).toHaveSyncedComboboxValue(
+                    { label: first },
+                    { form: true, matchingLabel: true },
+                  );
+                }
+              });
             });
           });
 
           it.describe("defaultSelected (Property)", () => {
-            it("Exposes the underlying `selected` attribute", async ({ page }) => {
+            it("Exposes the underlying `selected` ATTRIBUTE", async ({ page }) => {
               /* ---------- Setup ---------- */
               const name = "my-combobox";
               await page.goto(url);
-              await page.evaluate(
-                ([options, fieldName]) => {
-                  const app = document.getElementById("app") as HTMLDivElement;
-
-                  app.innerHTML = `
-                  <form aria-label="Test Form">
-                    <select-enhancer>
-                      <select name="${fieldName}">
-                        ${options.map((o) => `<option selected>${o}<option>`).join("")}
-                      </select>
-                    </select-enhancer>
-                  </form>
-                `;
-                },
-                [testOptions, name] as const,
-              );
+              await renderHTMLToPage(page)`
+                <form aria-label="Test Form">
+                  <select-enhancer>
+                    <select name="${name}" ${getFilterAttrs("unclearable")}>
+                      ${testOptions.map((o) => `<option selected>${o}<option>`).join("")}
+                    </select>
+                  </select-enhancer>
+                </form>
+              `;
 
               /* ---------- Assertions ---------- */
               // Display `option`s
-              await page.getByRole("combobox").click();
-              const form = page.getByRole("form");
+              const combobox = page.getByRole("combobox");
+              await combobox.click();
 
               // `property` matches initial `attribute`
-              const lastOption = testOptions.at(-1) as string;
-              const option = page.getByRole("option", { name: lastOption });
-              await expect(option).toHaveJSProperty("defaultSelected", true);
-              expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(lastOption);
+              const tenth = testOptions.at(-1) as GetLast<typeof testOptions>;
+              const lastOption = page.getByRole("option", { name: tenth });
+              await expect(lastOption).toHaveJSProperty("defaultSelected", true);
+              await expect(lastOption).toHaveJSProperty("selected", true);
+              await expect(combobox).toHaveSyncedComboboxValue({ label: tenth }, { form: true, matchingLabel: true });
 
               // `attribute` responds to `property` updates
-              await option.evaluate((node: ComboboxOption) => (node.defaultSelected = false));
-              await expect(option).not.toHaveAttribute("selected");
-              expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).not.toBe(lastOption);
+              await lastOption.evaluate((node: ComboboxOption) => (node.defaultSelected = false));
+              await expect(lastOption).not.toHaveAttribute("selected");
+              await expect(lastOption).toHaveJSProperty("selected", false);
+              await expect(combobox).not.toHaveSyncedComboboxValue(
+                { label: tenth },
+                { form: true, matchingLabel: true },
+              );
 
-              await option.evaluate((node: ComboboxOption) => (node.defaultSelected = true));
-              await expect(option).toHaveAttribute("selected");
-              expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).toBe(lastOption);
+              await lastOption.evaluate((node: ComboboxOption) => (node.defaultSelected = true));
+              await expect(lastOption).toHaveAttribute("selected");
+              await expect(lastOption).toHaveJSProperty("selected", true);
+              await expect(combobox).toHaveSyncedComboboxValue({ label: tenth }, { form: true, matchingLabel: true });
 
               // `property` also responds to `attribute` updates
-              await option.evaluate((node) => node.removeAttribute("selected"));
-              await expect(option).toHaveJSProperty("defaultSelected", false);
-              expect(await form.evaluate((f: HTMLFormElement, n) => new FormData(f).get(n), name)).not.toBe(lastOption);
+              await lastOption.evaluate((node) => node.removeAttribute("selected"));
+              await expect(lastOption).toHaveJSProperty("defaultSelected", false);
+              await expect(combobox).not.toHaveSyncedComboboxValue(
+                { label: tenth },
+                { form: true, matchingLabel: true },
+              );
             });
           });
 
@@ -7482,17 +7556,13 @@ for (const { mode } of testConfigs) {
               /* ---------- Setup ---------- */
               const option = "Choose Me!!!";
               await page.goto(url);
-              await page.evaluate((o) => {
-                const app = document.getElementById("app") as HTMLDivElement;
-
-                app.innerHTML = `
+              await renderHTMLToPage(page)`
                 <select-enhancer>
-                  <select>
-                    <option disabled>${o}</option>
+                  <select ${getFilterAttrs("unclearable")}>
+                    <option disabled>${option}</option>
                   </select>
                 </select-enhancer>
               `;
-              }, option);
 
               /* ---------- Assertions ---------- */
               // Display `option`s
@@ -7516,36 +7586,42 @@ for (const { mode } of testConfigs) {
 
             it("Prevents the `option` from being selected by the user", async ({ page }) => {
               /* ---------- Setup ---------- */
-              const lastOption = testOptions.at(-1) as string;
+              const first = testOptions[0];
+              const tenth = testOptions.at(-1) as GetLast<typeof testOptions>;
               await renderComponent(page);
 
-              /* ---------- Assertions ---------- */
-              // Display `option`s
               const combobox = page.getByRole("combobox");
+              await expect(combobox).toHaveSyncedComboboxValue({ label: first }, { matchingLabel: true });
+              await expect(combobox).not.toHaveSyncedComboboxValue({ label: tenth }, { matchingLabel: true });
+
+              // Display `option`s
               await combobox.click();
 
+              /* ---------- Assertions ---------- */
               // Disable last `option`
-              const lastOptionElement = page.getByRole("option").last();
-              await lastOptionElement.evaluate((node: ComboboxOption) => (node.disabled = true));
+              const lastOption = page.getByRole("option").last();
+              await lastOption.evaluate((node: ComboboxOption) => (node.disabled = true));
 
               // Try to choose last `option` with mouse (fails)
-              await lastOptionElement.click({ force: true }); // Force is necessary because `option` is `aria-disabled`
-              await expectOptionToBeSelected(page, { label: lastOption }, false);
+              await lastOption.click({ force: true }); // Force is necessary because `option` is `aria-disabled`
+              await expect(combobox).toHaveSyncedComboboxValue({ label: first }, { matchingLabel: true });
+              await expect(combobox).not.toHaveSyncedComboboxValue({ label: tenth }, { matchingLabel: true });
 
               // Try to choose last `option` with keyboard (fails)
-              await combobox.focus();
-              await page.keyboard.press("End");
-              await page.keyboard.press("Enter");
-              await expectOptionToBeSelected(page, { label: lastOption }, false);
+              await combobox.press("End");
+              await combobox.press("Enter");
+              await expect(combobox).toHaveSyncedComboboxValue({ label: first }, { matchingLabel: true });
+              await expect(combobox).not.toHaveSyncedComboboxValue({ label: tenth }, { matchingLabel: true });
 
               // Disabled values can still be selected _programmatically_
-              await lastOptionElement.evaluate((node: ComboboxOption) => (node.selected = true));
-              await expectOptionToBeSelected(page, { label: lastOption });
+              await lastOption.evaluate((node: ComboboxOption) => (node.selected = true));
+              await expect(combobox).toHaveSyncedComboboxValue({ label: tenth }, { matchingLabel: true });
+              await expect(combobox).not.toHaveSyncedComboboxValue({ label: first }, { matchingLabel: true });
             });
           });
 
           it.describe("index (Property)", () => {
-            it("Indicates the position of the `option`", async ({ page }) => {
+            it("Indicates the 0-indexed position of the `option`", async ({ page }) => {
               // Display `option`s
               await renderComponent(page);
               await page.getByRole("combobox").click();
@@ -7560,46 +7636,39 @@ for (const { mode } of testConfigs) {
           });
 
           it.describe("form (Property)", () => {
-            it("Exposes the `form` with which the `option` is associated", async ({ page }) => {
+            it("Exposes the `form` with which the `option`'s owning `combobox` is associated", async ({ page }) => {
               /* ---------- Setup ---------- */
               await page.goto(url);
-              await page.evaluate((options) => {
-                const app = document.getElementById("app") as HTMLDivElement;
-
-                app.innerHTML = `
+              await renderHTMLToPage(page)`
                 <form>
                   <select-enhancer>
-                    <select>
-                      ${options.map((o) => `<option>${o}</option>`).join("")}
+                    <select ${getFilterAttrs("unclearable")}>
+                      ${testOptions.map((o) => `<option>${o}</option>`).join("")}
                     </select>
                   </select-enhancer>
                 </form>
               `;
-              }, testOptions);
 
               /* ---------- Assertions ---------- */
               // Display options
               const combobox = page.getByRole("combobox");
               await combobox.click();
 
-              // `option` has a semantic form
+              // `option` has a semantic, IMPLICIT form
               const option = page.getByRole("option").first();
               expect(await option.evaluate((n: ComboboxOption) => n.form?.id)).toBe("");
               expect(await option.evaluate((n: ComboboxOption) => n.form instanceof HTMLFormElement)).toBe(true);
 
               // The `option`'s `form` property updates in response to attribute changes on the owning `combobox`
-              const form2Id = "final-form";
-              await combobox.evaluate(
-                (n: ComboboxField, secondFormId) => n.setAttribute("form", secondFormId),
-                form2Id,
-              );
+              const secondFormId = "final-form";
+              await combobox.evaluate((n: ComboboxField, id) => n.setAttribute("form", id), secondFormId);
               expect(await option.evaluate((n: ComboboxOption) => n.form)).toBe(null);
 
-              // The `option`'s `form` attribute updates in response to DOM changes
-              await page.evaluate((secondFormId) => {
-                document.body.insertAdjacentHTML("beforeend", `<form id="${secondFormId}"></form>`);
-              }, form2Id);
-              expect(await option.evaluate((n: ComboboxOption) => n.form?.id)).toBe(form2Id);
+              // The `option`'s `form` property updates in response to DOM changes
+              await page.evaluate((id) => {
+                document.body.insertAdjacentHTML("beforeend", `<form id="${id}"></form>`);
+              }, secondFormId);
+              expect(await option.evaluate((n: ComboboxOption) => n.form?.id)).toBe(secondFormId);
               expect(await option.evaluate((n: ComboboxOption) => n.form instanceof HTMLFormElement)).toBe(true);
             });
           });
