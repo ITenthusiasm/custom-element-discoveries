@@ -2,6 +2,14 @@
 
 A collection of questions/concerns that I thought through while designing some of the Web Components in this repository.
 
+## Leaving Spellcheck Alone (2025-09-05)
+
+In the past, we considered the possibility of disabling spellcheck (via the [`spellcheck` attribute](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Global_attributes/spellcheck)) when the `combobox` was in filter mode. Disabling spellcheck made sense when the `combobox` only supported `unclearable` mode since the user could only supply recognized values anyway. However, now that `anyvalue` mode is supported, the user can potentially enter whatever string they want as a value. This makes spellcheck more relevant.
+
+So, we've decided to leave the `spellcheck` attribute alone. Technically speaking, we could choose to enable `spellcheck` when the `combobox` is in `anyvalue` mode, then disable it in the other modes. However, this adds extra logic/complexity for something that people probably don't care about. Moreover, if a developer decides to use _both_ `anyvalue` and `(un)clearable` mode `combobox`es in their application, it would be a confusing UX for the component to sometimes raise spelling errors and other times raise none. The circumstances would be too nuanced for most users to recognize, and it would probably be annoying/bewildering.
+
+The spellchecking is reasonable and harmless, and it's valid in `anyvalue` mode. So we're choosing to leave it on. (Or rather, we're leaving it up to browsers to decide what they want to do.)
+
 <!-- TODO: We might have to update this comment/note now, since we'll be starting with regular `<select>` elements from now on. -->
 
 ## Why Does `SelectEnhancer` Sketchily Transfer Its Attributes to `ComboboxField`?
