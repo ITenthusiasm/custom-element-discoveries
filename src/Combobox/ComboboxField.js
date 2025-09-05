@@ -529,10 +529,7 @@ class ComboboxField extends HTMLElement {
     for (let option = this.listbox.firstElementChild; option; option = /** @type {any} */ (option.nextElementSibling)) {
       if (option === this.#noMatchesElement) continue;
 
-      // NOTE: An "Empty String Option" cannot be `autoselectable` with this approach, and that's intentional
-      if (search && !option.value) option.toggleAttribute("data-filtered-out", true);
-      else if (search && !option.textContent.toLowerCase().startsWith(search.toLowerCase()))
-        option.toggleAttribute("data-filtered-out", true);
+      if (!this.optionMatchesFilter(option)) option.toggleAttribute("data-filtered-out", true);
       else {
         if (option.textContent === search) this.#autoselectableOption = option;
 
@@ -557,6 +554,20 @@ class ComboboxField extends HTMLElement {
 
       if (!this.listbox.contains(this.#noMatchesElement)) this.listbox.appendChild(this.#noMatchesElement);
     } else this.#noMatchesElement?.remove();
+  }
+
+  /**
+   * The logic used by {@link filter filterable} `combobox`es to determine if an `option` matches the user's filter.
+   * @param {ComboboxOption} option
+   * @returns {boolean}
+   */
+  optionMatchesFilter(option) {
+    // NOTE: An "Empty String Option" won't be `autoselectable` with the approach here, and that's intentional
+    const search = this.text.data;
+    if (!search) return true;
+    if (!option.value) return false;
+
+    return option.textContent.toLowerCase().startsWith(search.toLowerCase());
   }
 
   /* ------------------------------ Exposed Form Properties ------------------------------ */

@@ -5640,6 +5640,75 @@ for (const { mode } of testConfigs) {
               });
             }
           });
+
+          if (mode === "Filterable") {
+            it.describe("optionMatchesFilter()", () => {
+              it("Can be overridden to customize the filtering logic", async ({ page }) => {
+                // Setup
+                const third = testOptions[2];
+                await renderComponent(page, { valueis: "unclearable" });
+
+                /*
+                 * Replace the original `combobox` with a customized one
+                 *
+                 * NOTE: In the real world, people would just register `CustomizedComboboxField` as `<combobox-field>`
+                 * and never register `ComboboxField` to begin with. However, the page that we're working with already
+                 * has `<combobox-field>` registered, so we have to do some unorthodox things to get the test working
+                 * _without writing extra code/components_.
+                 */
+                const combobox = page.getByRole("combobox");
+                await combobox.evaluate((node: ComboboxField) => {
+                  // Define a customized `combobox`
+                  const ComboboxFieldConstructor = customElements.get("combobox-field") as typeof ComboboxField;
+                  class CustomizedComboboxField extends ComboboxFieldConstructor {
+                    /** @override */
+                    optionMatchesFilter(option: ComboboxOption): boolean {
+                      if (!this.text.data) return false;
+                      return option.label.startsWith("F");
+                    }
+                  }
+
+                  // Create a customized `combobox` element
+                  customElements.define("customized-combobox-field", CustomizedComboboxField);
+                  const field = document.createElement("customized-combobox-field");
+
+                  // Replace original `combobox` with the customized one, WITHOUT losing access to the `listbox`
+                  const container = node.closest("select-enhancer") as SelectEnhancer;
+                  const fragment = document.createDocumentFragment();
+
+                  fragment.appendChild(node.listbox).insertAdjacentElement("beforebegin", node);
+                  node.replaceWith(field);
+                  container.prepend(fragment);
+
+                  // Copy old `combobox`'s attributes to the new one
+                  node.getAttributeNames().forEach((a) => field.setAttribute(a, node.getAttribute(a) as string));
+                });
+
+                // Set the value of the newly-created and mounted `combobox`
+                await combobox.evaluate((node: ComboboxField, v) => (node.value = v), third);
+                await expect(combobox).toHaveSyncedComboboxValue({ label: third }, { matchingLabel: true });
+
+                // With the customized filtering logic, no `option`s are shown without a filter
+                await combobox.press("Backspace");
+                await expect(combobox).toHaveText("");
+
+                const noMatchesMessage = await combobox.evaluate((node: ComboboxField) => node.noMatchesMessage);
+                const noMatchesElement = page.getByText(noMatchesMessage);
+                await expect(noMatchesElement).toBeVisible();
+
+                // With the customized filtering logic, only `option`s starting with "F" are shown (unrealistic)
+                await combobox.press("A");
+                await expect(noMatchesElement).not.toBeVisible();
+
+                const optionsStartingWithF = testOptions.filter((o) => o.startsWith("F"));
+                expect(optionsStartingWithF.length).toBeGreaterThan(1);
+                await expect(page.getByRole("option")).toHaveCount(optionsStartingWithF.length);
+                await Promise.all(
+                  optionsStartingWithF.map((o) => expect(page.getByRole("option", { name: o })).toBeVisible()),
+                );
+              });
+            });
+          }
         });
 
         it.describe("Validation Methods", () => {
