@@ -516,34 +516,14 @@ class ComboboxField extends HTMLElement {
 
   /** @returns {void} */
   #filterOptions() {
+    ({ matchingOptions: this.#matchingOptions, autoselectableOption: this.#autoselectableOption = null } =
+      this.getFilteredOptions());
+
     this.#activeIndex = 0;
-    this.#autoselectableOption = null;
-
-    let matches = 0;
-    const search = this.text.data;
-
-    // Iterate and Filter the `option`s
-    // NOTE: This approach won't work with `group`ed `option`s, but it can be fairly easily modified to do so
-    // NOTE: The responsibility of setting `autoselectableOption` to a non-null `option` belongs to this method ONLY.
-    //       However, what is _done_ with said `option` is ultimately up to the developer, not this component.
-    for (let option = this.listbox.firstElementChild; option; option = /** @type {any} */ (option.nextElementSibling)) {
-      if (option === this.#noMatchesElement) continue;
-
-      if (!this.optionMatchesFilter(option)) option.toggleAttribute("data-filtered-out", true);
-      else {
-        if (option.textContent === search) this.#autoselectableOption = option;
-
-        option.removeAttribute("data-filtered-out");
-        this.#matchingOptions[matches++] = option;
-      }
-    }
-
-    // Remove any `option`s that still exist from the previous filter
-    this.#matchingOptions.splice(matches);
     setAttributeFor(this, attrs["aria-activedescendant"], this.#matchingOptions[0]?.id ?? "");
 
     // Display the "No Matches Message" if needed
-    if (matches === 0 && !this.acceptsValue(search)) {
+    if (this.#matchingOptions.length === 0 && !this.acceptsValue(this.text.data)) {
       if (!this.#noMatchesElement) {
         this.#noMatchesElement = document.createElement("span");
         this.#noMatchesElement.textContent = this.noMatchesMessage;
@@ -557,7 +537,50 @@ class ComboboxField extends HTMLElement {
   }
 
   /**
+   * Updates the `[data-filtered-out]` attribute for all of the `option`s,
+   * then returns the `option`s that match the user's current filter.
+   *
+   * @returns {GetFilteredOptionsReturnType}
+   */
+  getFilteredOptions() {
+    let matches = 0;
+    const search = this.text.data;
+    /** @type {GetFilteredOptionsReturnType["autoselectableOption"]} */ let autoselectableOption;
+
+    // NOTE: This approach won't work with `group`ed `option`s, but it can be fairly easily modified to do so.
+    // NOTE: The responsibility of setting `autoselectableOption` to a non-null `option` belongs to this method ONLY.
+    //       However, what is _done_ with said `option` is ultimately up to the developer, not this component.
+    for (let option = this.listbox.firstElementChild; option; option = /** @type {any} */ (option.nextElementSibling)) {
+      if (option === this.#noMatchesElement) continue;
+
+      if (!this.optionMatchesFilter(option)) option.toggleAttribute("data-filtered-out", true);
+      else {
+        if (option.textContent === search) autoselectableOption = option;
+
+        option.removeAttribute("data-filtered-out");
+        this.#matchingOptions[matches++] = option;
+      }
+    }
+
+    // Remove any remaining `option`s that belonged to the previous filter
+    this.#matchingOptions.splice(matches);
+
+    return { matchingOptions: this.#matchingOptions, autoselectableOption };
+  }
+
+  /**
+   * @typedef GetFilteredOptionsReturnType
+   * @property {ComboboxOption[]} matchingOptions The `option`s which match the user's current filter
+   * @property {ComboboxOption} [autoselectableOption] (Optional): The `option` which is a candidate for
+   * automatic selection. See: {@link ComboboxField.autoselectableOption}.
+   */
+
+  /**
    * The logic used by {@link filter filterable} `combobox`es to determine if an `option` matches the user's filter.
+   *
+   * **Note**: If {@link getFilteredOptions} is overridden, this method will do nothing unless it is
+   * used directly within the new implementation.
+   *
    * @param {ComboboxOption} option
    * @returns {boolean}
    */
@@ -699,7 +722,7 @@ class ComboboxField extends HTMLElement {
    * - `startsWith`: {@link String.startsWith} will be used to filter the `option`s.
    * - `includes`: {@link String.includes} will be used to filter the `option`s.
    *
-   * **Note**: This property does nothing if {@link optionMatchesFilter} is overridden.
+   * **Note**: This property does nothing if {@link optionMatchesFilter} or {@link getFilteredOptions} is overridden.
    *
    * @returns {Extract<keyof String, "startsWith" | "includes">}
    */

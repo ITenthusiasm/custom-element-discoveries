@@ -1,3 +1,4 @@
+/* eslint-disable max-classes-per-file */
 /* eslint-disable no-inner-declarations */
 /* eslint-disable no-void */
 /* eslint-disable prefer-template */
@@ -5751,10 +5752,112 @@ for (const { mode } of testConfigs) {
           });
 
           if (mode === "Filterable") {
+            it.describe("getFilteredOptions()", () => {
+              it("Can be overridden to COMPLETELY customize the filtering logic and performance", async ({ page }) => {
+                // Setup
+                const fourth = testOptions[3];
+                const fifth = testOptions[4];
+                const sixth = testOptions[5];
+                const seventh = testOptions[6];
+                const eighth = testOptions[7];
+                const ninth = testOptions[8];
+                const tenth = testOptions[9];
+                const th = fourth.slice(-2) as "th";
+
+                await renderComponent(page, { valueis: "unclearable" });
+
+                /*
+                 * Replace the original `combobox` with a customized one
+                 *
+                 * NOTE: In the real world, people would just register `CustomizedComboboxField` as `<combobox-field>`
+                 * and never register `ComboboxField` to begin with. However, the page that we're working with already
+                 * has `<combobox-field>` registered, so we have to do some unorthodox things to get the test working
+                 * _without writing extra code/components_.
+                 */
+                const combobox = page.getByRole("combobox");
+                await combobox.evaluate((node: ComboboxField) => {
+                  // Define a customized `combobox`
+                  const ComboboxFieldConstructor = customElements.get("combobox-field") as typeof ComboboxField;
+                  class CustomizedComboboxField extends ComboboxFieldConstructor {
+                    /** @override */
+                    getFilteredOptions() {
+                      const search = this.text.data;
+                      const opts = Array.from(this.listbox.children).filter((el) => el.matches("combobox-option"));
+
+                      const matchingOptions: ComboboxOption[] = [];
+                      let autoselectableOption: ComboboxOption | undefined;
+
+                      opts.forEach((o, i) => {
+                        const match = o.textContent.toLowerCase().endsWith(search.toLowerCase()) && i < 5;
+                        o.toggleAttribute("data-filtered-out", !match);
+                        if (!match) return;
+
+                        matchingOptions.push(o);
+                        if (matchingOptions.length === 2) autoselectableOption = o;
+                      });
+
+                      return { matchingOptions, autoselectableOption };
+                    }
+                  }
+
+                  // Create a customized `combobox` element
+                  customElements.define("customized-combobox-field", CustomizedComboboxField);
+                  const field = document.createElement("customized-combobox-field");
+
+                  // Replace original `combobox` with the customized one, WITHOUT losing access to the `listbox`
+                  const container = node.closest("select-enhancer") as SelectEnhancer;
+                  const fragment = document.createDocumentFragment();
+
+                  fragment.appendChild(node.listbox).insertAdjacentElement("beforebegin", node);
+                  node.replaceWith(field);
+                  container.prepend(fragment);
+
+                  // Copy old `combobox`'s attributes to the new one
+                  node.getAttributeNames().forEach((a) => field.setAttribute(a, node.getAttribute(a) as string));
+                });
+
+                // Set the value of the newly-created and mounted `combobox`
+                const third = testOptions[2];
+                await combobox.evaluate((node: ComboboxField, v) => (node.value = v), third);
+                await expect(combobox).toHaveSyncedComboboxValue({ label: third }, { matchingLabel: true });
+
+                // With the customized filtering logic, `option`s are filtered with `String.endsWith()`
+                await combobox.pressSequentially(th);
+                await expect(page.getByRole("option", { name: fourth })).toBeVisible();
+                await expect(page.getByRole("option", { name: fifth })).toBeVisible();
+
+                // But anything after the 5th `option` is always hidden, even if it matches the filter
+                const options = page.getByRole("option", { includeHidden: true });
+                await expect(options.nth(5)).toHaveText(new RegExp(`${await combobox.textContent()}$`));
+                await expect(options.nth(5)).toHaveText(sixth);
+                await expect(options.nth(5)).not.toBeVisible();
+
+                await expect(page.getByRole("option", { name: seventh })).not.toBeVisible();
+                await expect(page.getByRole("option", { name: eighth })).not.toBeVisible();
+                await expect(page.getByRole("option", { name: ninth })).not.toBeVisible();
+                await expect(page.getByRole("option", { name: tenth })).not.toBeVisible();
+
+                // Additionally, the `autoselectableOption` is UNCONDITIONALLY set to the 2nd matching `option`
+                const visibleOptions = page.getByRole("option");
+                await expect(visibleOptions.nth(1)).toBeVisible();
+                await expect(visibleOptions.nth(1)).toHaveAccessibleName(fifth);
+                await expect(combobox).toHaveJSProperty("autoselectableOption.value", "Fifth");
+                await expect(combobox).toHaveJSProperty("autoselectableOption.label", "Fifth");
+                await expect(combobox).toHaveJSProperty("autoselectableOption.tagName", "COMBOBOX-OPTION");
+
+                // So there is no `autoselectableOption` if there is only 1 match, even if the match is EXACT
+                await combobox.press("ControlOrMeta+A");
+                await combobox.pressSequentially(fourth);
+
+                await expect(visibleOptions).toHaveCount(1);
+                await expect(visibleOptions.nth(0)).toHaveAccessibleName(fourth);
+                await expect(combobox).toHaveJSProperty("autoselectableOption", null);
+              });
+            });
+
             it.describe("optionMatchesFilter()", () => {
               it("Can be overridden to customize the filtering logic", async ({ page }) => {
                 // Setup
-                const third = testOptions[2];
                 await renderComponent(page, { valueis: "unclearable" });
 
                 /*
@@ -5794,6 +5897,7 @@ for (const { mode } of testConfigs) {
                 });
 
                 // Set the value of the newly-created and mounted `combobox`
+                const third = testOptions[2];
                 await combobox.evaluate((node: ComboboxField, v) => (node.value = v), third);
                 await expect(combobox).toHaveSyncedComboboxValue({ label: third }, { matchingLabel: true });
 
