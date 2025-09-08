@@ -13,7 +13,7 @@ import ComboboxOption from "./ComboboxOption.js";
 
 /** Internally used to retrieve the value that the `combobox` had when it was focused. */
 const valueOnFocusKey = Symbol("value-on-focus-key");
-/** Internally used to determine if the `combobox`'s value is actively being modified through user filter changes. */
+/** Internally used to determine if the `combobox`'s value is actively being modified through user's filter changes. */
 const editingKey = Symbol("editing-key");
 
 /** The attributes _commonly_ used by the `ComboboxField` component. (These are declared to help avoid typos.) */
@@ -36,7 +36,6 @@ const attrs = Object.freeze({
  * TODO: Some of our functionality requires (or recommends) CSS to be properly implemented (e.g., hiding `listbox`,
  * properly showing white spaces, etc.). We should probably explain all such things to developers.
  */
-// NOTE: We expect that `ComboboxField`s will always have only one child: a single Text Node. (IMPORTANT ASSUMPTION!)
 /** @implements {ExposedInternals} @implements {FieldPropertiesAndMethods} */
 class ComboboxField extends HTMLElement {
   /* ------------------------------ Custom Element Settings ------------------------------ */
@@ -51,7 +50,7 @@ class ComboboxField extends HTMLElement {
 
   /* ------------------------------ Internals ------------------------------ */
   #mounted = false;
-  /** Internally used to indicate when the `combobox` is transitioning out of {@link filter} mode. */
+  /** Internally used to indicate when the `combobox` is actively transitioning out of {@link filter} mode. */
   static #filterDisabedKey = Symbol("filter-disabled");
   /** @readonly */ #internals = this.attachInternals();
 
@@ -97,6 +96,7 @@ class ComboboxField extends HTMLElement {
         const activeOption =
           listbox.querySelector(":scope [role='option'][aria-selected='true']:not([data-filtered-out])") ??
           listbox.querySelector(":scope [role='option']:not([data-filtered-out])");
+        // TODO: We don't need `activeOptionExists` anymore because it's not a `[role="option"]` now.
         const activeOptionExists = activeOption && activeOption !== this.#noMatchesElement;
 
         if (combobox.filter) {
@@ -112,15 +112,7 @@ class ComboboxField extends HTMLElement {
 
         // See if logic _exclusive_ to `filter`ed `combobox`es needs to be run
         if (!combobox.filter || combobox.value == null) return;
-
-        // Reset filtered `option`s. (NOTE: Approach is incompatible with `group`ed `option`s)
-        this.#noMatchesElement?.remove();
-        if (this.#matchingOptions.length !== listbox.children.length) {
-          this.#matchingOptions = Array.from(listbox.children, (option) => {
-            option.removeAttribute("data-filtered-out");
-            return option;
-          });
-        }
+        this.#resetOptions();
 
         // Reset `combobox` display if needed
         // NOTE: `option` CAN be `null` or unselected if `combobox` is `clearable`, empty, and `collapsed` with a non-empty filter
@@ -142,9 +134,18 @@ class ComboboxField extends HTMLElement {
   });
 
   /** @readonly */ #optionNodesObserver = new MutationObserver((mutations) => {
+    // Avoid infinite loops if we're only adding/removing the "No Matches" Message.
+    // TODO: Life might be easier if we just make this message exist OUTSIDE the `listbox`...
+    if (mutations.length === 1) {
+      const [{ addedNodes, removedNodes }] = mutations;
+
+      if (addedNodes.length + removedNodes.length === 1) {
+        if ((addedNodes.item(0) || removedNodes.item(0)) === this.#noMatchesElement) return;
+      }
+    }
+
     const textNode = this.text;
     const nullable = this.valueIs !== "anyvalue";
-    const updateFilterResults = this.filter && this.getAttribute(attrs["aria-expanded"]) === String(true);
 
     if (!this.listbox.children.length) {
       if (!nullable) this.value = textNode.data;
@@ -155,7 +156,7 @@ class ComboboxField extends HTMLElement {
         this.#validateRequiredConstraint();
       }
 
-      if (updateFilterResults) this.#filterOptions();
+      if (this.filter) this.#filterOptions(); // Clean up internal data and show "No Matches" Message
       return;
     }
 
@@ -187,9 +188,12 @@ class ComboboxField extends HTMLElement {
       });
     }
 
+    if (!this.filter) return;
+
     // NOTE: This can produce a confusing UX if the `combobox` is expanded but a filter was NOT applied yet.
     // However, such a scenario is unlikely and impractical. So we're keeping this logic to help with async loading.
-    if (updateFilterResults) this.#filterOptions();
+    if (this.getAttribute(attrs["aria-expanded"]) === String(true)) this.#filterOptions();
+    else this.#resetOptions();
   });
 
   /**
@@ -286,15 +290,7 @@ class ComboboxField extends HTMLElement {
         const oldValueIs = rawValueIs === "anyvalue" || rawValueIs === "unclearable" ? rawValueIs : "clearable";
         this.attributeChangedCallback("valueis", oldValueIs, /** @type {any} */ (ComboboxField.#filterDisabedKey));
 
-        // TODO: This is also used in the `expand` logic. We should consider making this a re-usable method.
-        // Also, should we only run this logic if the `combobox` is already expanded?
-        this.#noMatchesElement?.remove();
-        if (this.#matchingOptions.length !== this.listbox.children.length) {
-          this.#matchingOptions = Array.from(this.listbox.children, (option) => {
-            option.removeAttribute("data-filtered-out");
-            return option;
-          });
-        }
+        if (this.getAttribute(attrs["aria-expanded"]) === String(true)) this.#resetOptions();
 
         if (this.isConnected) {
           this.removeEventListener("mousedown", ComboboxField.#handleMousedown);
@@ -303,6 +299,7 @@ class ComboboxField extends HTMLElement {
           this.addEventListener("keydown", this.#handleTypeahead, { passive: true });
         }
       } else {
+        // TODO: We should only do this cursor update if we're connected to the DOM
         const root = /** @type {Document | ShadowRoot} */ (this.getRootNode());
         if (root.activeElement === this) {
           this.ownerDocument.getSelection()?.setBaseAndExtent(this.text, 0, this.text, this.text.length);
@@ -310,8 +307,6 @@ class ComboboxField extends HTMLElement {
 
         this.setAttribute("aria-autocomplete", "list");
         this.setAttribute("contenteditable", String(!this.disabled));
-        // TODO: We should consider updating `#matchingOptions` on `expand` instead of `collapse`.
-        //       Maybe not, though? That may complicate the `option`-filtering logic...
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- This is due to our own TS Types. :\
         this.#matchingOptions ??= Array.from(this.listbox.children);
 
@@ -591,6 +586,24 @@ class ComboboxField extends HTMLElement {
     if (!option.value) return false;
 
     return option.textContent.toLowerCase()[this.filterMethod](search.toLowerCase());
+  }
+
+  /**
+   * Resets all of the `option`s in the {@link listbox} so that none of them are marked as filtered out.
+   * Also re-initializes the stored `#matchingOptions`.
+   * @returns {void}
+   */
+  #resetOptions() {
+    if (this.listbox.contains(this.#noMatchesElement ?? null)) this.#noMatchesElement?.remove();
+
+    let i = 0;
+    for (let option = this.listbox.firstElementChild; option; option = /** @type {any} */ (option.nextElementSibling)) {
+      option.removeAttribute("data-filtered-out");
+      this.#matchingOptions[i++] = option;
+    }
+
+    // Remove any remaining `option`s that no longer belong to the `listbox`
+    this.#matchingOptions.splice(i);
   }
 
   /* ------------------------------ Exposed Form Properties ------------------------------ */

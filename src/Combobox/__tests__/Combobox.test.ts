@@ -5523,7 +5523,7 @@ for (const { mode } of testConfigs) {
          * callbacks that should be tested _through User Interaction only_. They should not be tested directly with
          * unit tests. We only guarantee User Interaction behavior, not unsupported calls to these methods.
          */
-        it.describe("Supported Method", () => {
+        it.describe("Supported Methods", () => {
           it.describe("forceEmptyValue()", () => {
             if (mode === "Filterable") {
               it("Coerces the `combobox` value to an empty string and deselects the current `option`", async ({
@@ -7086,6 +7086,128 @@ for (const { mode } of testConfigs) {
                 // We can check this by expanding the `combobox` too
                 await combobox.press("Alt+ArrowDown");
                 await expect(visibleOptions).toHaveCount(testOptions.length);
+              });
+            });
+
+            it("Maintains proper keyboard navigation if the `option`s change while the `combobox` is collapsed", async ({
+              page,
+            }) => {
+              /* ---------- Setup ---------- */
+              await page.goto(url);
+              await renderHTMLToPage(page)`
+                <select-enhancer>
+                  <select ${getFilterAttrs("unclearable")}>
+                    ${testOptions.map((o, i) => (i < 3 ? "" : `<option>${o}</option>`)).join("")}
+                  </select>
+                </select-enhancer>
+              `;
+
+              const [first, second, third] = testOptions;
+              await expect(page.getByRole("option", { name: first })).not.toBeVisible();
+              await expect(page.getByRole("option", { name: second })).not.toBeVisible();
+              await expect(page.getByRole("option", { name: third })).not.toBeVisible();
+
+              /* ---------- Assertions ---------- */
+              const combobox = page.getByRole("combobox");
+              const options = page.getByRole("option");
+
+              await it.step("Keyboard navigation BEFORE `option`s update", async () => {
+                await combobox.press("Alt+ArrowDown");
+                const visibleOptionsCount = 7;
+                await expect(options).toHaveCount(visibleOptionsCount);
+
+                // Verify that the filtered `option`s are properly navigable
+                const fourth = testOptions[3];
+                const ninth = testOptions[8];
+                const tenth = testOptions.at(-1) as GetLast<typeof testOptions>;
+                await expect(combobox).toHaveActiveOption(fourth);
+
+                for (let i = 0; i < visibleOptionsCount; i++) await page.keyboard.press("ArrowDown");
+                await expect(combobox).toHaveActiveOption(tenth);
+                await expect(combobox).not.toHaveActiveOption(fourth);
+
+                await page.keyboard.press("ArrowUp");
+                await expect(combobox).toHaveActiveOption(ninth);
+                await expect(combobox).not.toHaveActiveOption(tenth);
+
+                await page.keyboard.press("End");
+                await expect(combobox).toHaveActiveOption(tenth);
+
+                await page.keyboard.press("Home");
+                await expect(combobox).toHaveActiveOption(fourth);
+              });
+
+              await it.step("Keyboard navigation AFTER `option`s CHANGE in `collapsed` state", async () => {
+                // Close `combobox`
+                await combobox.press("Escape");
+                await expect(combobox).not.toBeExpanded();
+
+                // Replace `option`s with NEW values of LESSER QUANTITY
+                const newOptions = [first, second, third];
+                await combobox.evaluate((node: ComboboxField, list) => {
+                  const elements = list.map((label) => {
+                    const option = document.createElement("combobox-option");
+                    option.textContent = label;
+                    return option;
+                  });
+
+                  node.listbox.replaceChildren(...elements);
+                }, newOptions);
+
+                // Re-expand combobox
+                await combobox.press("Alt+ArrowDown");
+                const newVisibleOptionsCount = 3;
+                await expect(options).toHaveCount(newVisibleOptionsCount);
+
+                // Verify that the filtered `option`s are properly navigable
+                await expect(combobox).toHaveActiveOption(first);
+
+                for (let i = 0; i < newVisibleOptionsCount; i++) await page.keyboard.press("ArrowDown");
+                await expect(combobox).toHaveActiveOption(third);
+                await expect(combobox).not.toHaveActiveOption(first);
+
+                await page.keyboard.press("ArrowUp");
+                await expect(combobox).toHaveActiveOption(second);
+                await expect(combobox).not.toHaveActiveOption(third);
+
+                await page.keyboard.press("ArrowUp");
+                await expect(combobox).toHaveActiveOption(first);
+                await expect(combobox).not.toHaveActiveOption(second);
+
+                await page.keyboard.press("End");
+                await expect(combobox).toHaveActiveOption(third);
+
+                await page.keyboard.press("Home");
+                await expect(combobox).toHaveActiveOption(first);
+              });
+
+              await it.step("Keyboard navigation AFTER all `option`s are REMOVED in `collapsed` state", async () => {
+                // Close `combobox`, then remove all `option`s
+                await combobox.press("Escape");
+                await expect(combobox).not.toBeExpanded();
+                await combobox.evaluate((node: ComboboxField) => node.listbox.replaceChildren());
+
+                // Re-expand combobox
+                await combobox.press("Alt+ArrowDown");
+                await expect(page.getByRole("option", { includeHidden: true })).toHaveCount(0);
+
+                // "No Matches Message" should be shown
+                const noMatchesMessage = await combobox.evaluate((node: ComboboxField) => node.noMatchesMessage);
+                const noMatchesElement = page.getByText(noMatchesMessage);
+                await expect(noMatchesElement).toBeVisible();
+
+                // The navigation keys don't cause errors even though there are no available `option`s
+                let error: Error | undefined;
+                const trackEmittedError = (e: Error) => (error = e);
+                page.once("pageerror", trackEmittedError);
+
+                await combobox.press("ArrowDown");
+                await combobox.press("ArrowUp");
+                await combobox.press("End");
+                await combobox.press("Home");
+
+                expect(error).toBe(undefined);
+                page.off("pageerror", trackEmittedError);
               });
             });
           }
