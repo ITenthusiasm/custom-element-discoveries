@@ -122,8 +122,7 @@ class ComboboxField extends HTMLElement {
         }
 
         // Reset cursor if `combobox` is still `:focus`ed
-        const root = /** @type {Document | ShadowRoot} */ (combobox.getRootNode());
-        if (root.activeElement !== combobox) return;
+        if (/** @type {Document | ShadowRoot} */ (combobox.getRootNode()).activeElement !== combobox) return;
 
         const selection = /** @type {Selection} */ (combobox.ownerDocument.getSelection());
         selection.setBaseAndExtent(textNode, textNode.length, textNode, textNode.length);
@@ -303,8 +302,7 @@ class ComboboxField extends HTMLElement {
         this.#matchingOptions ??= Array.from(this.listbox.children);
 
         if (this.isConnected) {
-          const root = /** @type {Document | ShadowRoot} */ (this.getRootNode());
-          if (root.activeElement === this) {
+          if (/** @type {Document | ShadowRoot} */ (this.getRootNode()).activeElement === this) {
             this.ownerDocument.getSelection()?.setBaseAndExtent(this.text, 0, this.text, this.text.length);
           }
 
@@ -928,8 +926,7 @@ class ComboboxField extends HTMLElement {
    */
   static #handleMousedown(event) {
     const combobox = /** @type {ComboboxField} */ (event.currentTarget);
-    const root = /** @type {Document | ShadowRoot} */ (combobox.getRootNode());
-    if (root.activeElement === combobox) return;
+    if (/** @type {Document | ShadowRoot} */ (combobox.getRootNode()).activeElement === combobox) return;
 
     combobox.setAttribute("data-mousedown", "");
     combobox.addEventListener("mouseup", () => combobox.removeAttribute("data-mousedown"), { once: true });
