@@ -475,7 +475,9 @@ class ComboboxField extends HTMLElement {
 
     // Filter `option`s
     setAttributeFor(combobox, attrs["aria-expanded"], String(true));
-    this.#filterOptions();
+    if (this.dispatchEvent(new Event("filterchange", { bubbles: true, cancelable: true }))) {
+      this.#filterOptions();
+    }
 
     // Update `combobox` value if needed.
     // NOTE: We MUST set the internal value DIRECTLY here to produce desirable behavior. See Development Notes for details.

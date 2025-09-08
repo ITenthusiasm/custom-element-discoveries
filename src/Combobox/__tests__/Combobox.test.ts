@@ -6125,7 +6125,7 @@ for (const { mode } of testConfigs) {
           async function trackEvents<
             C extends "Event" | "InputEvent",
             E extends C extends "InputEvent" ? InputEvent : Event,
-            T extends "input" | "change",
+            T extends "input" | "change" | "filterchange",
           >(page: Page, event: C, type: T): Promise<(E & { constructor: C })[]> {
             const events: (E & { constructor: C })[] = [];
             const funcName = `${type.charAt(0).toUpperCase()}${type.slice(1)}` as Capitalize<T>;
@@ -6560,6 +6560,68 @@ for (const { mode } of testConfigs) {
               expect(changeEvents).toHaveLength(0);
               await expect(combobox).toHaveText("");
               await expect(combobox).toHaveComboboxValue("");
+            });
+
+            it("Dispatches a custom `filterchange` event when the user changes the filter", async ({ page }) => {
+              // Setup
+              await renderComponent(page);
+              const filterchangeEvents = await trackEvents(page, "Event", "filterchange");
+
+              const [, second, , , , sixth, seventh] = testOptions;
+              const S = second.charAt(0) as "S";
+              await expect(page.getByRole("option", { includeHidden: true }).first()).not.toHaveText(
+                new RegExp(`^${S}`, "i"),
+              );
+
+              // Expand the `combobox`, showing all of the `option`s
+              const combobox = page.getByRole("combobox");
+              await combobox.press("Alt+ArrowDown");
+              await expect(combobox).toBeExpanded({ options: testOptions });
+
+              // Update the filter
+              await combobox.press(S);
+              await expect(combobox).toHaveText(S);
+              expect(filterchangeEvents).toHaveLength(1);
+
+              const visibleOptionsCount = 3;
+              const options = page.getByRole("option");
+              await expect(options).toHaveCount(visibleOptionsCount);
+              await expect(options.nth(0)).toHaveAccessibleName(second);
+              await expect(options.nth(1)).toHaveAccessibleName(sixth);
+              await expect(options.nth(2)).toHaveAccessibleName(seventh);
+
+              // Update the filter again, but cancel the event
+              await page.evaluate(() => document.addEventListener("filterchange", (e) => e.preventDefault()));
+              await combobox.press("Backspace");
+              await expect(combobox).toHaveText("");
+              expect(filterchangeEvents).toHaveLength(2);
+
+              // Filtered `option`s should not have changed this time
+              await expect(options).toHaveCount(visibleOptionsCount);
+              await expect(options.nth(0)).toHaveAccessibleName(second);
+              await expect(options.nth(1)).toHaveAccessibleName(sixth);
+              await expect(options.nth(2)).toHaveAccessibleName(seventh);
+
+              // Keyboard Navigation is still correct too
+              await expect(combobox).toHaveActiveOption(second);
+
+              for (let i = 0; i < visibleOptionsCount; i++) await page.keyboard.press("ArrowDown");
+              await expect(combobox).toHaveActiveOption(seventh);
+              await expect(combobox).not.toHaveActiveOption(second);
+
+              await page.keyboard.press("ArrowUp");
+              await expect(combobox).toHaveActiveOption(sixth);
+              await expect(combobox).not.toHaveActiveOption(seventh);
+
+              await page.keyboard.press("ArrowUp");
+              await expect(combobox).toHaveActiveOption(second);
+              await expect(combobox).not.toHaveActiveOption(sixth);
+
+              await page.keyboard.press("End");
+              await expect(combobox).toHaveActiveOption(seventh);
+
+              await page.keyboard.press("Home");
+              await expect(combobox).toHaveActiveOption(second);
             });
           }
         });
