@@ -96,15 +96,13 @@ class ComboboxField extends HTMLElement {
         const activeOption =
           listbox.querySelector(":scope [role='option'][aria-selected='true']:not([data-filtered-out])") ??
           listbox.querySelector(":scope [role='option']:not([data-filtered-out])");
-        // TODO: We don't need `activeOptionExists` anymore because it's not a `[role="option"]` now.
-        const activeOptionExists = activeOption && activeOption !== this.#noMatchesElement;
 
         if (combobox.filter) {
           this.#autoselectableOption = null;
-          this.#activeIndex = activeOptionExists ? this.#matchingOptions.indexOf(activeOption) : -1;
+          this.#activeIndex = activeOption ? this.#matchingOptions.indexOf(activeOption) : -1;
         }
 
-        if (activeOptionExists) combobox.setAttribute(attrs["aria-activedescendant"], activeOption.id);
+        if (activeOption) combobox.setAttribute(attrs["aria-activedescendant"], activeOption.id);
       }
       // Close Combobox
       else {
