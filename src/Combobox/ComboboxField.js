@@ -297,18 +297,17 @@ class ComboboxField extends HTMLElement {
           this.addEventListener("keydown", this.#handleTypeahead, { passive: true });
         }
       } else {
-        // TODO: We should only do this cursor update if we're connected to the DOM
-        const root = /** @type {Document | ShadowRoot} */ (this.getRootNode());
-        if (root.activeElement === this) {
-          this.ownerDocument.getSelection()?.setBaseAndExtent(this.text, 0, this.text, this.text.length);
-        }
-
         this.setAttribute("aria-autocomplete", "list");
         this.setAttribute("contenteditable", String(!this.disabled));
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- This is due to our own TS Types. :\
         this.#matchingOptions ??= Array.from(this.listbox.children);
 
         if (this.isConnected) {
+          const root = /** @type {Document | ShadowRoot} */ (this.getRootNode());
+          if (root.activeElement === this) {
+            this.ownerDocument.getSelection()?.setBaseAndExtent(this.text, 0, this.text, this.text.length);
+          }
+
           this.removeEventListener("keydown", this.#handleTypeahead);
           this.addEventListener("mousedown", ComboboxField.#handleMousedown, { passive: true });
           this.addEventListener("focus", ComboboxField.#handleFocus, { passive: true });
