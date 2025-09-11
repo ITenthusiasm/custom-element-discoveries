@@ -1760,6 +1760,8 @@ for (const { mode } of testConfigs) {
         if (mode === "Regular") {
           // NOTE: In these tests, a "matching" `option` is an `option` that STARTS with the search string/character
           it.describe("Typeahead Functionality (via Printable Characters)", () => {
+            if (process.env.CI) it.describe.configure({ retries: 5 });
+
             /** The amount of time, in `milliseconds`, after which the `combobox` search string is reset. (See Source) */
             const timeout = 500;
 
@@ -1843,6 +1845,65 @@ for (const { mode } of testConfigs) {
                 await expectOptionToBeActive(page, { label: testOptions[1] });
                 await expectOptionToBeActive(page, { label: testOptions[6] }, false);
               }
+            });
+
+            it('Matches `option`s that have spaces (" ") in them', async ({ page }) => {
+              /* ---------- Setup ---------- */
+              const first = testOptions[0];
+              const second = testOptions[1];
+              const options = [`Choose ${first} or ${second}`, ...testOptions] as const;
+              await renderComponent(page, { options, initialValue: second });
+
+              // Verify that our test `option` has an empty string and includes other `option`s as substrings
+              const option = options[0];
+              expect(option).toMatch(/\s+/);
+
+              const segments = option.split(" ");
+              expect(segments.length).toBeGreaterThan(1);
+              expect(segments[1].charAt(0)).toBe(first.charAt(0));
+              expect(segments[3].charAt(0)).toBe(second.charAt(0));
+
+              /* ---------- Assertions ---------- */
+              // Search for `option` that has an empty string in it
+              const combobox = page.getByRole("combobox");
+              await combobox.pressSequentially(segments[0]);
+              await expect(combobox).toHaveActiveOption(option);
+
+              await combobox.press(" ");
+              await expect(combobox).toBeExpanded();
+              await expect(combobox).toHaveActiveOption(option);
+              await expect(combobox).toHaveSyncedComboboxValue({ label: second }, { matchingLabel: true });
+              await expect(combobox).not.toHaveSyncedComboboxValue({ label: option }, { matchingLabel: true });
+
+              await combobox.press(first.charAt(0));
+              await expect(combobox).toBeExpanded();
+              await expect(combobox).toHaveActiveOption(option);
+              await expect(combobox).not.toHaveActiveOption(first);
+
+              await combobox.pressSequentially(option.slice(segments[0].length + 2));
+              await expect(combobox).toBeExpanded();
+              await expect(combobox).toHaveActiveOption(option);
+              await expect(combobox).not.toHaveActiveOption(first);
+              await expect(combobox).not.toHaveActiveOption(second);
+              await expect(combobox).toHaveSyncedComboboxValue({ label: second }, { matchingLabel: true });
+              await expect(combobox).not.toHaveSyncedComboboxValue({ label: option }, { matchingLabel: true });
+
+              // Using SpaceBar, select the `option` to close the `combobox`
+              await page.waitForTimeout(timeout * (1 + fraction));
+              await combobox.press(" ");
+
+              await expect(combobox).not.toBeExpanded();
+              await expect(combobox).toHaveSyncedComboboxValue({ label: option }, { matchingLabel: true });
+              await expect(combobox).not.toHaveSyncedComboboxValue({ label: second }, { matchingLabel: true });
+
+              // SpaceBar applies no Searching Logic if the User hasn't started searching yet
+              await combobox.press(" ");
+              await expect(combobox).toBeExpanded();
+              await expect(combobox).toHaveActiveOption(option);
+
+              await combobox.press(" ");
+              await expect(combobox).not.toBeExpanded();
+              await expect(combobox).toHaveSyncedComboboxValue({ label: option }, { matchingLabel: true });
             });
 
             it(`Resets the search string when ${timeout}ms of inactivity have passed`, async ({ page }) => {

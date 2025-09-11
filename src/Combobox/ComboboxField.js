@@ -385,11 +385,8 @@ class ComboboxField extends HTMLElement {
     // TODO: This will probably be faster with getElementById?
     const activeOption = listbox.querySelector(":scope [role='option'][data-active='true']");
 
-    // TODO: Should we allow matching multi-word `option`s by removing empty spaces during a search comparison?
-    //       (NOTE: The native `<select>` element does not support such functionality, I don't think.)
-    // TODO: UPDATE. Select allows searching for words that have spaces in them if there's a search string.
-    //       So we should do the same.
-    if (event.key.length === 1 && event.key !== " " && !event.altKey && !event.ctrlKey && !event.metaKey) {
+    if (event.key.length === 1 && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      if (event.key === " " && !this.#searchString) return;
       setAttributeFor(combobox, attrs["aria-expanded"], String(true));
       this.#searchString += event.key;
 
@@ -1025,8 +1022,12 @@ class ComboboxField extends HTMLElement {
       if (combobox.filter) return; // Defer to `#handleSearch` instead
       event.preventDefault(); // Don't scroll
 
-      if (combobox.getAttribute(attrs["aria-expanded"]) === String(true)) return activeOption?.click();
-      return combobox.setAttribute(attrs["aria-expanded"], String(true));
+      if (combobox.getAttribute(attrs["aria-expanded"]) !== String(true)) {
+        return combobox.setAttribute(attrs["aria-expanded"], String(true));
+      }
+
+      // Defer to `#handleTypeahead` instead of selecting the active `option` if there's an active Search String
+      return this.#searchString ? undefined : activeOption?.click();
     }
 
     if (event.key === "Enter") {
