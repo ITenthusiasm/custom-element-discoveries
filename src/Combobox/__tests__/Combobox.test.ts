@@ -5054,7 +5054,7 @@ for (const { mode } of testConfigs) {
 
               it("Becomes `null` when a value update changes the `combobox` text", async ({ page }) => {
                 const first = testOptions[0];
-                await renderComponent(page, first);
+                await renderComponent(page, { initialValue: first, valueis: "clearable" });
 
                 // Enter a filter with an `autoselectableOption`
                 const seventh = testOptions[6];
@@ -5086,6 +5086,22 @@ for (const { mode } of testConfigs) {
                 await combobox.evaluate((node: ComboboxField, v) => (node.value = v), first);
                 await expect(combobox).toHaveSyncedComboboxValue({ label: first }, { matchingLabel: true });
                 await expect(combobox).not.toHaveSyncedComboboxValue({ label: seventh });
+                await expect(combobox).toHaveJSProperty("autoselectableOption", null);
+
+                // Enter a filter with an `autoselectableOption` again
+                await combobox.press("ControlOrMeta+A");
+                await combobox.pressSequentially(seventh);
+                await expect(combobox).toHaveJSProperty("autoselectableOption.value", seventh);
+                await expect(combobox).toHaveJSProperty("autoselectableOption.label", seventh);
+                await expect(combobox).toHaveJSProperty("autoselectableOption.tagName", "COMBOBOX-OPTION");
+                await expect(combobox).toHaveSyncedComboboxValue({ label: first });
+                await expect(combobox).not.toHaveSyncedComboboxValue({ label: seventh });
+
+                // Verify that `forceEmptyValue()` also resets the `autoselectableOption`
+                await combobox.evaluate((node: ComboboxField) => node.forceEmptyValue());
+                await expect(combobox).toHaveText("");
+                await expect(combobox).toHaveComboboxValue("");
+                await expect(page.getByRole("option", { selected: true, includeHidden: true })).toHaveCount(0);
                 await expect(combobox).toHaveJSProperty("autoselectableOption", null);
               });
 
