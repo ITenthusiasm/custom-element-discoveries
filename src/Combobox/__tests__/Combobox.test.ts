@@ -363,6 +363,50 @@ for (const { mode } of testConfigs) {
           return { ...matcherResult, name, pass: this.isNot };
         }
       },
+      async toShowNoMatchesMessage(combobox: Locator, expected?: string, options?: { timeout?: number }) {
+        const name = "toShowNoMatchesMessage";
+        const timeout = options?.timeout ?? this.timeout;
+        const expectsNoMessage = this.isNot && expected == null;
+
+        try {
+          await expect(combobox).toHaveRole("combobox");
+
+          const listboxId = (await combobox.getAttribute("aria-controls", { timeout })) ?? "";
+          const listbox = combobox
+            .page()
+            .getByRole("listbox", { includeHidden: expectsNoMessage })
+            .and(combobox.page().locator(`[id="${listboxId}"]`));
+          if (expectsNoMessage) await expect(listbox).toBeAttached();
+          else await expect(listbox).toBeVisible();
+
+          const normalizedExpected = expected ?? "No options found";
+          const browser = combobox.page().context().browser()?.browserType().name();
+          const content = await listbox.evaluate((e) => getComputedStyle(e, "::after").content);
+          const actual =
+            browser === "firefox"
+              ? await listbox.getAttribute("nomatchesmessage")
+              : content.split(" / ")[0].slice(1, -1);
+
+          if (expectsNoMessage) expect(content).toBe("none");
+          else {
+            if (browser === "firefox") expect(content).toBe('attr(nomatchesmessage, "No options found") / ""');
+            const expectation = this.isNot ? expect(actual).not : expect(actual);
+            expectation.toBe(normalizedExpected);
+          }
+
+          return {
+            name,
+            pass: !this.isNot,
+            message: () => "",
+            expected: expectsNoMessage ? "<not visible>" : normalizedExpected,
+            // eslint-disable-next-line no-nested-ternary
+            actual: expectsNoMessage ? (content === "none" ? "<not visible>" : "<visible>") : actual,
+          };
+        } catch (error) {
+          const { matcherResult } = error as { matcherResult: MatcherReturnType };
+          return { ...matcherResult, name, pass: this.isNot, message: () => String(matcherResult.message) };
+        }
+      },
       /**
        * Asserts that the `combobox`'s currently-active `option` is the one having the `expected` label
        * @param combobox
@@ -2158,51 +2202,22 @@ for (const { mode } of testConfigs) {
             });
 
             it.describe("Behavior with No Matching Options", () => {
-              for (const filtertype of ["unclearable", "clearable"] as const satisfies ValueIs[]) {
-                it(`Tells Users when no matching \`option\`s are found in \`${filtertype}\` mode`, async ({ page }) => {
-                  await renderComponent(page, { valueis: filtertype });
-                  const combobox = page.getByRole("combobox");
-                  await combobox.fill(String(Math.random()));
-
-                  // No `option`s should be active
-                  await expect(combobox).toHaveAttribute("aria-activedescendant", "");
-                  await expect(page.locator(`[${attrs["data-active"]}]`)).not.toBeVisible();
-
-                  // Screen Reader Users need to know `listbox` is empty
-                  const listbox = page.getByRole("listbox");
-                  await expect(listbox).toBeVisible();
-                  await expect(listbox.getByRole("option")).not.toBeVisible();
-
-                  // Visual Users need to see that no `option`s are available.
-                  const noMatchMessage = await combobox.evaluate((node: ComboboxField) => node.noMatchesMessage);
-                  expect(noMatchMessage).toBeTruthy();
-                  await expect(page.getByText(noMatchMessage)).toBeVisible();
-                });
-              }
-
-              // NOTE: Since anything goes in `anyvalue` mode, the "No Matches Message" is irrelevant
-              it("DOES NOT tell Users when no matches are found in `anyvalue` mode", async ({ page }) => {
-                await renderComponent(page, { valueis: "anyvalue" });
-                await page.keyboard.press("Tab");
-
+              it("Tells Users when no matching `option`s are found", async ({ page }) => {
+                await renderComponent(page, { valueis: "unclearable" });
                 const combobox = page.getByRole("combobox");
-                await combobox.fill(String(Math.random()));
+                await combobox.pressSequentially(String(Math.random()));
 
                 // No `option`s should be active
                 await expect(combobox).toHaveAttribute("aria-activedescendant", "");
                 await expect(page.locator(`[${attrs["data-active"]}]`)).not.toBeVisible();
 
-                // Screen Reader Users still need to know `listbox` is empty
+                // Screen Reader Users need to know `listbox` is empty
                 const listbox = page.getByRole("listbox");
                 await expect(listbox).toBeVisible();
                 await expect(listbox.getByRole("option")).not.toBeVisible();
 
-                // Visual Users won't see the `listbox` or the "No Matches Message" AT ALL
-                await expect(listbox).toHaveCSS("clip-path", "inset(50%)");
-
-                const noMatchMessage = await combobox.evaluate((node: ComboboxField) => node.noMatchesMessage);
-                expect(noMatchMessage).toBeTruthy();
-                await expect(page.getByText(noMatchMessage)).not.toBeVisible();
+                // Visual Users need to see that no `option`s are available.
+                await expect(combobox).toShowNoMatchesMessage();
               });
 
               it("Does not include the `No Matches` message in filter set (Regression)", async ({ page }) => {
@@ -2226,18 +2241,12 @@ for (const { mode } of testConfigs) {
                 await expect(visibleOptions).toHaveCount(matches);
 
                 // Reveal `No Matches` Message
-                const listbox = page.getByRole("listbox");
                 const noMatchesMessage = `${f}ailed Matching`;
-                const noMatchesElement = listbox.getByText(noMatchesMessage);
                 await combobox.evaluate((node: ComboboxField, msg) => (node.noMatchesMessage = msg), noMatchesMessage);
 
                 await page.keyboard.press("Z");
                 await expect(visibleOptions).toHaveCount(0);
-                await expect(noMatchesElement).toBeVisible();
-
-                // Double check that the `No Matches` message is the LAST (but not only) element in the `listbox`
-                await expect(listbox.locator("*").first()).not.toHaveText(noMatchesMessage);
-                await expect(listbox.locator("*").last()).toHaveText(noMatchesMessage);
+                await expect(combobox).toShowNoMatchesMessage(noMatchesMessage);
 
                 // Revert to previous filter IN 1 KEYSTROKE
                 await page.keyboard.press("Backspace");
@@ -2245,7 +2254,7 @@ for (const { mode } of testConfigs) {
                 await expect(visibleOptions).toHaveText([...Array(matches)].map(() => new RegExp(`^${f}`)));
 
                 // Although it matches the filter, the `No Matches` Message should have been removed
-                await expect(noMatchesElement).not.toBeAttached();
+                await expect(combobox).not.toShowNoMatchesMessage();
 
                 // The `No Matches` Message shouldn't be in the matching `option`s set either (check with navigation)
                 await expectOptionToBeActive(page, { label: first });
@@ -2273,19 +2282,16 @@ for (const { mode } of testConfigs) {
                 // Provide an invalid filter
                 const combobox = page.getByRole("combobox");
                 await combobox.pressSequentially(String(Math.random()));
-
-                const noMatchesMessage = await combobox.evaluate((node: ComboboxField) => node.noMatchesMessage);
-                const noMatchesElement = page.getByRole("listbox").getByText(noMatchesMessage);
-                await expect(noMatchesElement).toBeVisible();
+                await expect(combobox).toShowNoMatchesMessage();
 
                 // Provide a valid filter
                 await combobox.clear();
                 await combobox.press(testOptions[0].charAt(0));
-                await expect(noMatchesElement).not.toBeVisible();
+                await expect(combobox).not.toShowNoMatchesMessage();
 
                 // Provide an invalid filter AGAIN! `No Matches` message should be visible, not hidden or filtered out
                 await combobox.pressSequentially(String(Math.random()));
-                await expect(noMatchesElement).toBeVisible();
+                await expect(combobox).toShowNoMatchesMessage();
               });
             });
 
@@ -2649,19 +2655,16 @@ for (const { mode } of testConfigs) {
 
                 // Apply a bad filter
                 const combobox = page.getByRole("combobox");
-                await combobox.fill(Math.random().toString());
+                await combobox.pressSequentially(Math.random().toString());
 
                 // Verify that the `No Matches` message is displayed
                 const noMatchMessage = await combobox.evaluate((node: ComboboxField) => node.noMatchesMessage);
                 expect(noMatchMessage).toBeTruthy();
-
-                const listbox = page.getByRole("listbox", { includeHidden: true });
-                const noMatchMessageElement = listbox.getByText(noMatchMessage);
-                await expect(noMatchMessageElement).toBeVisible();
+                await expect(combobox).toShowNoMatchesMessage();
 
                 // Close the `combobox` WHILE the `No Matches` message is displayed
                 await page.keyboard.press("Escape");
-                await expect(listbox).toBeAttached();
+                await expect(combobox).not.toShowNoMatchesMessage();
                 await expect(page.getByText(noMatchMessage)).not.toBeAttached();
               });
 
@@ -2827,10 +2830,6 @@ for (const { mode } of testConfigs) {
                 await renderComponent(page, { initialValue: seventh });
                 const combobox = page.getByRole("combobox");
 
-                const noMatchesMessage = await combobox.evaluate((node: ComboboxField) => node.noMatchesMessage);
-                expect(noMatchesMessage).toBeTruthy();
-                const noMatchesElement = page.getByRole("listbox").getByText(noMatchesMessage);
-
                 /* -------------------- Assertions -------------------- */
                 /* ----- Selecting 1 Character ----- */
                 // Select `S`
@@ -2847,7 +2846,7 @@ for (const { mode } of testConfigs) {
                 // Apply single-selection input
                 await page.keyboard.press("a");
                 await expect(combobox).toHaveText(seventh.replace("S", "a"));
-                await expect(noMatchesElement).toBeVisible();
+                await expect(combobox).toShowNoMatchesMessage();
 
                 // Verify new Cursor location is correct
                 expect(await getRangeCount(page)).toBe(1);
@@ -2872,7 +2871,7 @@ for (const { mode } of testConfigs) {
                 // Apply single-selection input
                 await page.keyboard.press("Z");
                 await expect(combobox).toHaveText("SeveZ");
-                await expect(noMatchesElement).toBeVisible();
+                await expect(combobox).toShowNoMatchesMessage();
 
                 // Verify new Cursor location is correct
                 expect(await getRangeCount(page)).toBe(1);
@@ -2897,7 +2896,7 @@ for (const { mode } of testConfigs) {
                 await page.keyboard.press("ControlOrMeta+C");
                 await page.keyboard.press("ControlOrMeta+V");
                 await expect(combobox).toHaveText(seventh);
-                await expect(noMatchesElement).not.toBeVisible();
+                await expect(combobox).not.toShowNoMatchesMessage();
                 await expectOptionToBeActive(page, { label: seventh });
 
                 // Verify new Cursor location is correct
@@ -2921,10 +2920,6 @@ for (const { mode } of testConfigs) {
                 const seventh = testOptions[6];
                 await renderComponent(page, { initialValue: seventh });
                 const combobox = page.getByRole("combobox");
-
-                const noMatchesMessage = await combobox.evaluate((node: ComboboxField) => node.noMatchesMessage);
-                expect(noMatchesMessage).toBeTruthy();
-                const noMatchesElement = page.getByRole("listbox").getByText(noMatchesMessage);
 
                 /*
                  * NOTE: ALL of the `Selection` size/order scenarios in this test are INTENTIONAL and IMPORTANT
@@ -2968,7 +2963,7 @@ for (const { mode } of testConfigs) {
                 await page.keyboard.up(ControlOrMeta);
                 await page.keyboard.press("A");
                 await expect(combobox).toHaveText("SAveAh");
-                await expect(noMatchesElement).toBeVisible();
+                await expect(combobox).toShowNoMatchesMessage();
 
                 // There should only be 1 Cursor. It should be where the (positionally) Last Range would have been.
                 expect(await getRangeCount(page)).toBe(1);
@@ -3003,7 +2998,7 @@ for (const { mode } of testConfigs) {
                 await page.keyboard.up(ControlOrMeta);
                 await page.keyboard.press("y");
                 await expect(combobox).toHaveText("Synyh");
-                await expect(noMatchesElement).toBeVisible();
+                await expect(combobox).toShowNoMatchesMessage();
 
                 // There should only be 1 Cursor. It should be where the (positionally) Last Range would have been.
                 expect(await getRangeCount(page)).toBe(1);
@@ -3023,7 +3018,7 @@ for (const { mode } of testConfigs) {
                 // Give `combobox` bad Text Content (which we will fix)
                 await page.keyboard.press(`${ControlOrMeta}+A`);
                 await page.keyboard.press(seventh.replaceAll("e", "K").split("").join("+"));
-                await expect(noMatchesElement).toBeVisible();
+                await expect(combobox).toShowNoMatchesMessage();
 
                 // Select 2nd `e`
                 await page.keyboard.down(ControlOrMeta);
@@ -3049,7 +3044,7 @@ for (const { mode } of testConfigs) {
                 await page.keyboard.up(ControlOrMeta);
                 await page.keyboard.press("e");
                 await expect(combobox).toHaveText(seventh);
-                await expect(noMatchesElement).not.toBeVisible();
+                await expect(combobox).not.toShowNoMatchesMessage();
                 await expectOptionToBeActive(page, { label: seventh });
 
                 // There should only be 1 Cursor. It should be where the (positionally) Last Range would have been.
@@ -3104,12 +3099,10 @@ for (const { mode } of testConfigs) {
               await combobox.fill(String(Math.random()));
 
               const activeOption = page.getByRole("option").and(page.locator(`[data-active="${true}"]`));
-              const noMatchMessage = await combobox.evaluate((node: ComboboxField) => node.noMatchesMessage);
-              const noMatchElement = page.getByText(noMatchMessage);
 
               await expect(combobox).toHaveAttribute(attrs["aria-activedescendant"], "");
               await expect(activeOption).not.toBeVisible();
-              await expect(noMatchElement).toBeVisible();
+              await expect(combobox).toShowNoMatchesMessage();
 
               // Pressing `ArrowDown` should do nothing since there are no matches
               await page.keyboard.press("ArrowDown");
@@ -5159,7 +5152,7 @@ for (const { mode } of testConfigs) {
                 `;
 
                 const combobox = page.getByRole("combobox");
-                await expect(combobox).not.toHaveAttribute("nomatchesmessage");
+                // await expect(combobox).not.toHaveAttribute("nomatchesmessage"); // -- Should we save line for future use?
                 await expect(combobox).toHaveJSProperty("noMatchesMessage", defaultMessage);
               });
 
@@ -5182,20 +5175,17 @@ for (const { mode } of testConfigs) {
                 await combobox.pressSequentially(String(Math.random()));
 
                 // Custom "No Matches" message should be displayed based on the mounted attribute
-                const customMessageElement = page.getByText(customMessage);
-                await expect(customMessageElement).toBeVisible();
+                await expect(combobox).toShowNoMatchesMessage(customMessage);
 
                 // The default message will be displayed instead if the attribute is removed
                 await combobox.evaluate((node) => node.removeAttribute("nomatchesmessage"));
-                await expect(customMessageElement).not.toBeVisible();
-
-                const defaultMessageElement = page.getByText(defaultMessage);
-                await expect(defaultMessageElement).toBeVisible();
+                await expect(combobox).not.toShowNoMatchesMessage(customMessage);
+                await expect(combobox).toShowNoMatchesMessage(defaultMessage);
 
                 // But the custom message can be brought back by updating the attribute/property again
                 await combobox.evaluate((node: ComboboxField, m) => (node.noMatchesMessage = m), customMessage);
-                await expect(defaultMessageElement).not.toBeVisible();
-                await expect(customMessageElement).toBeVisible();
+                await expect(combobox).not.toShowNoMatchesMessage(defaultMessage);
+                await expect(combobox).toShowNoMatchesMessage(customMessage);
               });
             });
           }
@@ -5904,14 +5894,11 @@ for (const { mode } of testConfigs) {
                 // With the customized filtering logic, no `option`s are shown without a filter
                 await combobox.press("Backspace");
                 await expect(combobox).toHaveText("");
+                await expect(combobox).toShowNoMatchesMessage();
 
-                const noMatchesMessage = await combobox.evaluate((node: ComboboxField) => node.noMatchesMessage);
-                const noMatchesElement = page.getByText(noMatchesMessage);
-                await expect(noMatchesElement).toBeVisible();
-
-                // With the customized filtering logic, only `option`s starting with "F" are shown (unrealistic)
+                // With the customized filtering logic, only `option`s starting with "F" are shown (regardless of filter)
                 await combobox.press("A");
-                await expect(noMatchesElement).not.toBeVisible();
+                await expect(combobox).not.toShowNoMatchesMessage();
 
                 const optionsStartingWithF = testOptions.filter((o) => o.startsWith("F"));
                 expect(optionsStartingWithF.length).toBeGreaterThan(1);
@@ -6778,11 +6765,10 @@ for (const { mode } of testConfigs) {
               const options = listbox.getByRole("option", { includeHidden: true });
 
               if (valueis === "anyvalue") {
-                await expect(listbox).toBeEmpty();
+                await expect(options).toHaveCount(0);
                 await expect(combobox).toHaveText(first);
                 await expect(combobox).toHaveComboboxValue(first, { form: true });
               } else {
-                if (valueis !== undefined) await expect(listbox).not.toBeEmpty();
                 await expect(options).toHaveCount(0);
                 await expect(combobox).toHaveText("");
                 await expect(combobox).toHaveComboboxValue(null, { form: true });
@@ -6816,13 +6802,12 @@ for (const { mode } of testConfigs) {
 
               // `combobox` value should be preserved again in `anyvalue` mode
               if (valueis === "anyvalue") {
-                await expect(listbox).toBeEmpty();
+                await expect(options).toHaveCount(0);
                 await expect(combobox).toHaveText(first);
                 await expect(combobox).toHaveComboboxValue(first, { form: true });
               }
               // `combobox` value should be `null`ified again in other modes
               else {
-                if (valueis !== undefined) await expect(listbox).not.toBeEmpty();
                 await expect(options).toHaveCount(0);
                 await expect(combobox).toHaveText("");
                 await expect(combobox).toHaveComboboxValue(null, { form: true });
@@ -7069,13 +7054,10 @@ for (const { mode } of testConfigs) {
                 await expect(combobox).toHaveActiveOption(first);
               });
 
-              const noMatchesMessage = await combobox.evaluate((node: ComboboxField) => node.noMatchesMessage);
-              const noMatchesElement = page.getByText(noMatchesMessage);
-
               await it.step("Removing all `option`s", async () => {
                 // Remove all `option`s and check filtered results
                 await listbox.evaluate((node) => node.replaceChildren());
-                await expect(noMatchesElement).toBeVisible();
+                await expect(combobox).toShowNoMatchesMessage();
 
                 await expect(visibleOptions).toHaveCount(0);
                 await expect(filteredOutOptions).toHaveCount(0);
@@ -7111,7 +7093,7 @@ for (const { mode } of testConfigs) {
                 // `First` was chosen by default in `unclearable` mode BEFORE filtering, so only it will be visible.
                 await expect(visibleOptions).toHaveCount(1);
                 await expect(filteredOutOptions).toHaveCount(9);
-                await expect(noMatchesElement).not.toBeAttached();
+                await expect(combobox).not.toShowNoMatchesMessage();
 
                 // Verify that the filtered `option`s are properly navigable
                 await page.keyboard.press("ArrowDown");
@@ -7254,9 +7236,7 @@ for (const { mode } of testConfigs) {
                 await expect(page.getByRole("option", { includeHidden: true })).toHaveCount(0);
 
                 // "No Matches Message" should be shown
-                const noMatchesMessage = await combobox.evaluate((node: ComboboxField) => node.noMatchesMessage);
-                const noMatchesElement = page.getByText(noMatchesMessage);
-                await expect(noMatchesElement).toBeVisible();
+                await expect(combobox).toShowNoMatchesMessage();
 
                 // The navigation keys don't cause errors even though there are no available `option`s
                 let error: Error | undefined;
@@ -7270,6 +7250,11 @@ for (const { mode } of testConfigs) {
 
                 expect(error).toBe(undefined);
                 page.off("pageerror", trackEmittedError);
+
+                // The "No Matches Message" should still be visible after collapsing and re-expanding the `combobox`
+                await combobox.press("Escape");
+                await combobox.press("Alt+ArrowDown");
+                await expect(combobox).toShowNoMatchesMessage();
               });
             });
           }

@@ -22,6 +22,7 @@ select-enhancer {
     border: var(--border-width) solid #cecece;
     border-radius: 4px;
     outline: none;
+    overflow-x: auto;
 
     cursor: pointer;
     white-space: pre;
@@ -62,13 +63,8 @@ select-enhancer {
         display: none;
       }
 
-      /* TODO: Should this be a custom `ElementInternals` state? */
-      &:is([role="combobox"][valueis="anyvalue"] + [role="listbox"]:not(:has(:not([data-filtered-out])))) {
-        /* Hide `listbox` without making it inaccessible */
-        clip-path: inset(50%);
-      }
-
-      & > :is([role="option"], [data-no-matches-message]) {
+      & > [role="option"],
+      &:where([role="combobox"][data-bad-filter] + [role="listbox"])::after {
         display: block;
         box-sizing: border-box;
         height: var(--option-height);
@@ -86,12 +82,18 @@ select-enhancer {
 
         &[data-filtered-out] {
           display: none;
+          visibility: hidden; /* Needed to hide filtered-out `option`s in Safari + VoiceOver (Bug in Browser) */
         }
 
-        /* TODO: Add _full_ `disabled` styles. Should those match `inert` as well, or no? Maybe not? */
-        &:is([data-no-matches-message], [aria-disabled="true"]) {
+        /* TODO: Add clearer `disabled` styles. */
+        &[aria-disabled="true"] {
           cursor: auto;
         }
+      }
+
+      &:where([role="combobox"][data-bad-filter] + [role="listbox"])::after {
+        content: attr(nomatchesmessage, "No options found") / "";
+        cursor: auto;
       }
     }
   }

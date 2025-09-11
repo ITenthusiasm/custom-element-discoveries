@@ -1,14 +1,13 @@
-/** @import {HTMLElementWithChildren} from "./Combobox.js" */
+/** @import {ListboxWithChildren} from "./Combobox.js" */
 import { setAttributeFor } from "../utils/dom.js";
 import ComboboxOption from "./ComboboxOption.js";
+import ComboboxListbox from "./ComboboxListbox.js";
 
 /*
  * "TypeScript Lies" to Be Aware of:
  * (Probably should move this comment to a markdown file)
  *
  * 1) `#matchingOptions` could technically be `null` but is `ComboboxOption[]` (never a practical problem)
- * 2) `listbox` could technically have `#noMatchesElement` if mis-handled, but is typed as only having `ComboboxOption`s.
- *    (This should never be a practical problem as long as `#noMatchesElement` is handled correctly).
  */
 
 /** Internally used to retrieve the value that the `combobox` had when it was focused. */
@@ -131,16 +130,6 @@ class ComboboxField extends HTMLElement {
   });
 
   /** @readonly */ #optionNodesObserver = new MutationObserver((mutations) => {
-    // Avoid infinite loops if we're only adding/removing the "No Matches" Message.
-    // TODO: Life might be easier if we just make this message exist OUTSIDE the `listbox`...
-    if (mutations.length === 1) {
-      const [{ addedNodes, removedNodes }] = mutations;
-
-      if (addedNodes.length + removedNodes.length === 1) {
-        if ((addedNodes.item(0) || removedNodes.item(0)) === this.#noMatchesElement) return;
-      }
-    }
-
     const textNode = this.text;
     const nullable = this.valueIs !== "anyvalue";
 
@@ -162,11 +151,10 @@ class ComboboxField extends HTMLElement {
 
       // Handle added nodes first. This keeps us from running redundant Deselect Logic if a newly-added node is `selected`.
       mutation.addedNodes.forEach((node, j) => {
-        if (node === this.#noMatchesElement) return;
         if (!(node instanceof ComboboxOption)) return node.parentNode?.removeChild(node);
 
         if (node.defaultSelected) this.value = node.value;
-        else if (this.#value === null && nullable && j === 0) {
+        else if (nullable && this.#value === null && j === 0) {
           if (this.valueIs !== "clearable") this.value = node.value;
           else {
             this.#value = "";
@@ -204,12 +192,6 @@ class ComboboxField extends HTMLElement {
   /** @private @type {string | null} */ [valueOnFocusKey] = null;
   /** @private @type {boolean} */ [editingKey] = false;
 
-  /**
-   * @type {HTMLSpanElement | undefined}
-   * The element which contains and displays the {@link noMatchesMessage}. ({@link filter filterable} `combobox`es only)
-   */
-  #noMatchesElement;
-
   /* ------------------------------ Lifecycle Callbacks ------------------------------ */
   /**
    * @param {typeof ComboboxField.observedAttributes[number]} name
@@ -219,9 +201,8 @@ class ComboboxField extends HTMLElement {
    */
   attributeChangedCallback(name, oldValue, newValue) {
     if (name === "required") return this.#validateRequiredConstraint();
-    if (name === "nomatchesmessage" && this.#noMatchesElement && newValue !== oldValue) {
-      this.#noMatchesElement.textContent = this.noMatchesMessage;
-      return;
+    if (name === "nomatchesmessage" && newValue !== oldValue) {
+      return this.listbox.setAttribute(name, newValue ?? ComboboxField.defaultNoMatchesMessage);
     }
     if (name === "valuemissingerror" && newValue !== oldValue) {
       const { valueMissing, customError } = this.validity;
@@ -328,6 +309,7 @@ class ComboboxField extends HTMLElement {
       this.setAttribute("aria-haspopup", "listbox");
       this.setAttribute(attrs["aria-expanded"], String(false));
       this.setAttribute(attrs["aria-activedescendant"], "");
+      if (!this.noMatchesMessage) this.noMatchesMessage = ComboboxField.defaultNoMatchesMessage;
 
       // NOTE: This initialization of `#matchingOptions` is incompatible with `group`ed `option`s
       if (this.filter) this.#matchingOptions = Array.from(this.listbox.children);
@@ -336,13 +318,14 @@ class ComboboxField extends HTMLElement {
     }
 
     // Require a Corresponding `listbox`
-    if (!(this.listbox instanceof HTMLElement) || this.listbox.getAttribute("role") !== "listbox") {
-      throw new Error(`The ${this.constructor.name} must be placed before a valid \`[role="listbox"]\` element.`);
+    if (!(this.listbox instanceof ComboboxListbox) || this.listbox.getAttribute("role") !== "listbox") {
+      throw new Error(`The ${this.constructor.name} must point to a valid \`[role="listbox"]\` with \`aria-controls\``);
     }
 
     // Setup Mutation Observers
     this.#optionNodesObserver.observe(this.listbox, { childList: true });
     this.#textNodeObserver.observe(this, { childList: true });
+    // TODO: Change these 2 MutationObservers to `attributeChangedCallback` implementations instead
     this.#expansionObserver.observe(this, { attributes: true, attributeFilter: [attrs["aria-expanded"]] });
     this.#activeDescendantObserver.observe(this, {
       attributes: true,
@@ -399,10 +382,13 @@ class ComboboxField extends HTMLElement {
   #handleTypeahead = (event) => {
     const combobox = /** @type {ComboboxField} */ (event.currentTarget);
     const { listbox } = combobox;
+    // TODO: This will probably be faster with getElementById?
     const activeOption = listbox.querySelector(":scope [role='option'][data-active='true']");
 
     // TODO: Should we allow matching multi-word `option`s by removing empty spaces during a search comparison?
     //       (NOTE: The native `<select>` element does not support such functionality, I don't think.)
+    // TODO: UPDATE. Select allows searching for words that have spaces in them if there's a search string.
+    //       So we should do the same.
     if (event.key.length === 1 && event.key !== " " && !event.altKey && !event.ctrlKey && !event.metaKey) {
       setAttributeFor(combobox, attrs["aria-expanded"], String(true));
       this.#searchString += event.key;
@@ -489,7 +475,7 @@ class ComboboxField extends HTMLElement {
     if (prevOption?.selected) prevOption.selected = false;
     this.#validateRequiredConstraint();
 
-    // TODO: We might want to document that this `InputEvent` is not cancelable (and why ... e.g., user always needs filter)
+    // TODO: We might want to document that this `InputEvent` is not cancelable (and why)
     combobox[editingKey] = true;
     combobox.dispatchEvent(
       new InputEvent("input", {
@@ -512,20 +498,9 @@ class ComboboxField extends HTMLElement {
       this.getFilteredOptions());
 
     this.#activeIndex = 0;
+    this.toggleAttribute("data-bad-filter", !this.#matchingOptions.length); // TODO: Remove Legacy Implementation
+    this.#internals.states[this.#matchingOptions.length ? "delete" : "add"]("--bad-filter");
     setAttributeFor(this, attrs["aria-activedescendant"], this.#matchingOptions[0]?.id ?? "");
-
-    // Display the "No Matches Message" if needed
-    if (this.#matchingOptions.length === 0 && !this.acceptsValue(this.text.data)) {
-      if (!this.#noMatchesElement) {
-        this.#noMatchesElement = document.createElement("span");
-        this.#noMatchesElement.textContent = this.noMatchesMessage;
-        this.#noMatchesElement.setAttribute("data-no-matches-message", "");
-        this.#noMatchesElement.setAttribute("aria-hidden", String(true));
-        this.#noMatchesElement.inert = true;
-      }
-
-      if (!this.listbox.contains(this.#noMatchesElement)) this.listbox.appendChild(this.#noMatchesElement);
-    } else this.#noMatchesElement?.remove();
   }
 
   /**
@@ -543,8 +518,6 @@ class ComboboxField extends HTMLElement {
     // NOTE: The responsibility of setting `autoselectableOption` to a non-null `option` belongs to this method ONLY.
     //       However, what is _done_ with said `option` is ultimately up to the developer, not this component.
     for (let option = this.listbox.firstElementChild; option; option = /** @type {any} */ (option.nextElementSibling)) {
-      if (option === this.#noMatchesElement) continue;
-
       if (!this.optionMatchesFilter(option)) option.toggleAttribute("data-filtered-out", true);
       else {
         if (option.textContent === search) autoselectableOption = option;
@@ -591,8 +564,6 @@ class ComboboxField extends HTMLElement {
    * @returns {void}
    */
   #resetOptions() {
-    if (this.listbox.contains(this.#noMatchesElement ?? null)) this.#noMatchesElement?.remove();
-
     let i = 0;
     for (let option = this.listbox.firstElementChild; option; option = /** @type {any} */ (option.nextElementSibling)) {
       option.removeAttribute("data-filtered-out");
@@ -601,6 +572,10 @@ class ComboboxField extends HTMLElement {
 
     // Remove any remaining `option`s that no longer belong to the `listbox`
     this.#matchingOptions.splice(i);
+    if (this.#matchingOptions.length) {
+      this.removeAttribute("data-bad-filter"); // TODO: Remove Legacy Implementation
+      this.#internals.states.delete("--bad-filter");
+    }
   }
 
   /* ------------------------------ Exposed Form Properties ------------------------------ */
@@ -698,7 +673,7 @@ class ComboboxField extends HTMLElement {
 
   /**
    * The `listbox` that this `combobox` controls.
-   * @returns {HTMLElementWithChildren<ComboboxOption>}
+   * @returns {ListboxWithChildren<ComboboxOption>}
    */
   get listbox() {
     return /** @type {typeof this.listbox} */ (this.nextElementSibling);
@@ -750,17 +725,16 @@ class ComboboxField extends HTMLElement {
    * - `unclearable`: The field's {@link value `value`} must be a string matching one of the `option`s,
    * and it cannot be cleared. (Default when {@link filter `filter`} mode is off.)
    * - `clearable`: The field's `value` must be a string matching one of the `option`s,
-   * but it can be cleared. (Default in `filter` mode. Requires enabling `filter`.)
+   * but it can be cleared. (Default in `filter` mode. Requires enabling `filter` mode.)
    * - `anyvalue`: The field's `value` can be any string, and it will automatically be set to
-   * whatever value the user types. (Requires enabling `filter`.)
+   * whatever value the user types. (Requires enabling `filter` mode.)
    *
    * <!--
    * TODO: Link to Documentation for More Details (like TS does for MDN). The deeper details of the behavior
    * are too sophisticated to place them all in a JSDoc, which should be [sufficiently] clear and succinct
    * -->
    *
-   * @returns {"unclearable" | "clearable" | "anyvalue"} One of the above values if the `combobox` is
-   * {@link filter filterable}. Otherwise, returns `null`.
+   * @returns {"unclearable" | "clearable" | "anyvalue"}
    */
   get valueIs() {
     if (!this.filter) return "unclearable";
@@ -800,9 +774,14 @@ class ComboboxField extends HTMLElement {
     return this.#autoselectableOption;
   }
 
-  /** The message displayed to users when none of the `combobox`'s `option`s match their filter. @returns {string} */
+  static defaultNoMatchesMessage = "No options found";
+
+  /**
+   * The message displayed to users when none of the `combobox`'s `option`s match their filter.
+   * @returns {string}
+   */
   get noMatchesMessage() {
-    return this.getAttribute("nomatchesmessage") ?? "No options found";
+    return /** @type {string} Note: Logic forces attribute to always exist */ (this.getAttribute("nomatchesmessage"));
   }
 
   set noMatchesMessage(value) {

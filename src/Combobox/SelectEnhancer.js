@@ -4,7 +4,7 @@ class SelectEnhancer extends HTMLElement {
 
   // Important Elements
   /** @readonly */ #combobox = document.createElement("combobox-field");
-  /** @readonly */ #listbox = document.createElement("div");
+  /** @readonly */ #listbox = document.createElement("combobox-listbox");
 
   /** "On Mount" for Custom Elements @returns {void} */
   connectedCallback() {
@@ -13,7 +13,7 @@ class SelectEnhancer extends HTMLElement {
     if (!this.#mounted) {
       /** @type {HTMLSelectElement | null} */
       const select = this.querySelector(":scope > select:only-of-type");
-      if (!select) throw new TypeError(`<${this.constructor.name}> must contain one (and only one) <select> element`);
+      if (!select) throw new TypeError(`${this.constructor.name} must contain one (and only one) <select> element`);
 
       /* -------------------- Setup Elements -------------------- */
       const fragment = document.createDocumentFragment();
@@ -31,13 +31,10 @@ class SelectEnhancer extends HTMLElement {
 
       // Listbox
       // TODO: Maybe use `crypto.getRandomValues()` instead?
-      if (!this.#combobox.id) this.#combobox.id = Math.random().toString(36).slice(2);
-      const comboboxId = this.#combobox.id;
-
-      this.#listbox.setAttribute("id", `${comboboxId}-listbox`);
+      this.#combobox.id ||= Math.random().toString(36).slice(2);
+      this.#listbox.setAttribute("id", `${this.#combobox.id}-listbox`);
       this.#listbox.setAttribute("role", "listbox");
-      this.#listbox.setAttribute("tabindex", String(-1));
-      this.#combobox.setAttribute("aria-controls", `${comboboxId}-listbox`);
+      this.#combobox.setAttribute("aria-controls", `${this.#combobox.id}-listbox`);
 
       // Listbox Options
       let defaultOptionExists = false;
@@ -60,8 +57,7 @@ class SelectEnhancer extends HTMLElement {
       if (!defaultOptionExists && this.#combobox.acceptsValue("")) this.#combobox.forceEmptyValue();
 
       /* -------------------- Render Elements -------------------- */
-      select.replaceWith(this.#listbox);
-      this.#listbox.insertAdjacentElement("beforebegin", this.#combobox);
+      select.replaceWith(this.#combobox, this.#listbox);
       this.#mounted = true;
     }
   }
