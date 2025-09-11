@@ -106,6 +106,7 @@ class ComboboxField extends HTMLElement {
       // Close Combobox
       else {
         combobox.setAttribute(attrs["aria-activedescendant"], "");
+        this.#searchString = "";
 
         // See if logic _exclusive_ to `filter`ed `combobox`es needs to be run
         if (!combobox.filter || combobox.value == null) return;
