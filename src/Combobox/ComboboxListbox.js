@@ -27,8 +27,7 @@ class ComboboxListbox extends HTMLElement {
 
   /** Retrives the `combobox` that this `listbox` belongs to @returns {ComboboxField} */
   get #combobox() {
-    const comboboxId = this.id.slice(0, -8); // Note: ID should be `${comboboxId}-listbox`
-    return /** @type { ComboboxField} */ (document.getElementById(comboboxId));
+    return /** @type {ComboboxField} */ (this.previousElementSibling);
   }
 }
 

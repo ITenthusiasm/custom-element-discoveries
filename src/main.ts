@@ -9,8 +9,8 @@ import "./Combobox/Combobox.css";
 import "./app.css";
 
 /* -------------------- "App Logic" -------------------- */
-customElements.define("combobox-field", ComboboxField);
 customElements.define("combobox-listbox", ComboboxListbox);
+customElements.define("combobox-field", ComboboxField);
 customElements.define("combobox-option", ComboboxOption);
 customElements.define("select-enhancer", SelectEnhancer);
 

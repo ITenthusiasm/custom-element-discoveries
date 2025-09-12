@@ -503,7 +503,7 @@ for (const { mode } of testConfigs) {
           await valueExpectation.toHaveJSProperty("value", expected, { timeout });
         } catch (error) {
           const { matcherResult } = error as { matcherResult: MatcherReturnType };
-          return { ...matcherResult, name, pass: this.isNot };
+          return { ...matcherResult, name, pass: this.isNot, message: () => String(matcherResult.message) };
         }
 
         const formInfo = !options?.form
@@ -8205,189 +8205,7 @@ for (const { mode } of testConfigs) {
 
       // NOTE: This is the necessary wrapper for the entire component
       it.describe("Select Enhancer (Web Component Part)", () => {
-        it("Transfers the provided <select>'s attributes to the `combobox` during initialization", async ({ page }) => {
-          /* ---------- Setup ---------- */
-          await page.goto(url);
-          await renderHTMLToPage(page)`
-            <select-enhancer>
-              <select id="combobox" name="my-name" required disabled ${getFilterAttrs("unclearable")}>
-                <option>Choose Me!!!</option>
-              </select>
-            </select-enhancer>
-          `;
-
-          /* ---------- Assertions ---------- */
-          // The <select> and its corresponding attributes have been replaced altogether
-          const select = page.locator("select");
-          await expect(select).toHaveCount(0);
-
-          // The `combobox` has inherited the <select>'s attributes
-          const combobox = page.getByRole("combobox");
-          await expect(combobox).toHaveAttribute("id", "combobox");
-          await expect(combobox).toHaveAttribute("name", "my-name");
-          await expect(combobox).toHaveAttribute("required", "");
-          await expect(combobox).toHaveAttribute("disabled", "");
-          if (mode === "Filterable") {
-            await expect(combobox).toHaveAttribute("filter", "");
-            await expect(combobox).toHaveAttribute("valueis", "unclearable");
-          }
-        });
-
-        it('Creates a "unique" (random) ID for the `combobox` if one did not exist on the <select>', async ({
-          page,
-        }) => {
-          /* ---------- Setup ---------- */
-          await page.goto(url);
-          await renderHTMLToPage(page)`
-            <select-enhancer>
-              <select ${getFilterAttrs("unclearable")}>
-                <option>Choose Me!!!</option>
-              </select>
-            </select-enhancer>
-          `;
-
-          /* ---------- Assertions ---------- */
-          const id = await page.getByRole("combobox").getAttribute("id");
-          expect(id).toEqual(expect.any(String));
-          expect(id?.length).toBeGreaterThan(1);
-        });
-
-        it("Properly creates `option`s from the provided <option>s, preserving all relevant data", async ({ page }) => {
-          /* ---------- Setup ---------- */
-          await page.goto(url);
-          await page.evaluate((m) => {
-            const app = document.getElementById("app") as HTMLDivElement;
-
-            // NOTE: <option>s are created dynamically to account for preservation of the `Option.selected` _property_
-            const optionsContainer = document.createElement("template");
-            optionsContainer.innerHTML = `
-              <option label="1st" value="1" disabled selected>First</option>
-              <option>Second</option>
-              <option value="3" disabled>Third</option>
-            `;
-
-            (optionsContainer.content.lastElementChild as HTMLOptionElement).selected = true;
-
-            const form = document.createElement("form");
-            form.setAttribute("aria-label", "Test Form");
-
-            const selectEnhancer = form.appendChild(document.createElement("select-enhancer"));
-            const select = selectEnhancer.appendChild(document.createElement("select"));
-            select.replaceChildren(...optionsContainer.content.children);
-            select.setAttribute("name", "my-combobox");
-            if (m === "Filterable") {
-              select.setAttribute("filter", "");
-              select.setAttribute("valueis", "unclearable");
-            }
-
-            app.replaceChildren(form);
-          }, mode);
-
-          /* ---------- Assertions ---------- */
-          // Display options (for test-writing convenience)
-          const combobox = page.getByRole("combobox");
-          await combobox.click();
-
-          // Option with All Attributes
-          const optionAllAttributes = page.getByRole("option", { name: "1st" });
-          await expect(optionAllAttributes).toHaveText("1st");
-          await expect(optionAllAttributes).toHaveJSProperty("label", "1st");
-
-          await expect(optionAllAttributes).toHaveAttribute("value", "1");
-          await expect(optionAllAttributes).toHaveJSProperty("value", "1");
-
-          await expect(optionAllAttributes).toHaveAttribute("aria-disabled", String(true));
-          await expect(optionAllAttributes).not.toHaveAttribute("disabled");
-          await expect(optionAllAttributes).toHaveJSProperty("disabled", true);
-
-          await expect(optionAllAttributes).toHaveAttribute("selected", "");
-          await expect(optionAllAttributes).toHaveJSProperty("defaultSelected", true);
-
-          await expect(optionAllAttributes).toHaveJSProperty("selected", false);
-          await expect(combobox).not.toHaveSyncedComboboxValue(
-            { label: "1st", value: "1" },
-            { form: true, matchingLabel: true },
-          );
-
-          // Option with No Attributes
-          const optionWithoutAttributes = page.getByRole("option", { name: "Second" });
-          await expect(optionWithoutAttributes).toHaveText("Second");
-          await expect(optionWithoutAttributes).toHaveJSProperty("label", "Second");
-
-          await expect(optionWithoutAttributes).not.toHaveAttribute("value");
-          await expect(optionWithoutAttributes).toHaveJSProperty("value", "Second");
-
-          await expect(optionWithoutAttributes).not.toHaveAttribute("aria-disabled");
-          await expect(optionWithoutAttributes).not.toHaveAttribute("disabled");
-          await expect(optionWithoutAttributes).toHaveJSProperty("disabled", false);
-
-          await expect(optionWithoutAttributes).not.toHaveAttribute("selected", "");
-          await expect(optionWithoutAttributes).toHaveJSProperty("defaultSelected", false);
-
-          await expect(optionWithoutAttributes).toHaveJSProperty("selected", false);
-          await expect(combobox).not.toHaveSyncedComboboxValue(
-            { label: "Second" },
-            { form: true, matchingLabel: true },
-          );
-
-          // Pre-Selected Option (via DOM manipulation _pre-mount_)
-          const selectedOption = page.getByRole("option", { name: "Third", selected: true });
-          await expect(selectedOption).toHaveText("Third");
-          await expect(selectedOption).toHaveJSProperty("label", "Third");
-
-          await expect(selectedOption).toHaveAttribute("value", "3");
-          await expect(selectedOption).toHaveJSProperty("value", "3");
-
-          await expect(selectedOption).toHaveAttribute("aria-disabled", String(true));
-          await expect(selectedOption).not.toHaveAttribute("disabled");
-          await expect(selectedOption).toHaveJSProperty("disabled", true);
-
-          await expect(selectedOption).not.toHaveAttribute("selected");
-          await expect(selectedOption).toHaveJSProperty("defaultSelected", false);
-
-          await expect(selectedOption).toHaveJSProperty("selected", true);
-          await expect(combobox).toHaveSyncedComboboxValue(
-            { label: "Third", value: "3" },
-            { form: true, matchingLabel: true },
-          );
-        });
-
-        // NOTE: This is important for developers to be able to add "Cancel Buttons" or "Caret Icons" seamlessly
-        it("Replaces only the provided <select> element and ignores everything else", async ({ page }) => {
-          // Setup
-          const dataIgnoredAttr = "data-ignored";
-          const dataRejectedAttr = "data-rejected";
-
-          await page.goto(url);
-          await renderHTMLToPage(page)`
-            <select-enhancer>
-              <span role="option" ${dataIgnoredAttr}>I am ignored even though I have a "recognized" role</span>
-
-              <select ${getFilterAttrs("unclearable")}>
-                <option>Choose Me!!!</option>
-                <div ${dataRejectedAttr}>Rejected due to not being a valid option</div>
-              </select>
-
-              <div role="listbox" ${dataIgnoredAttr}>I am ignored even though a \`listbox\` will be generated</div>
-              <button ${dataIgnoredAttr}>I am ignored</button>
-            </select-enhancer>
-          `;
-
-          // The <select> field is replaced. And invalid <select> options were removed.
-          const container = page.locator("select-enhancer");
-          await expect(container.locator("select, option")).toHaveCount(0);
-          await expect(container.locator("combobox-field")).toHaveCount(1);
-          await expect(container.getByRole("listbox", { includeHidden: true }).locator("*")).toHaveCount(1);
-          await expect(container.getByRole("listbox", { includeHidden: true }).locator("combobox-option")).toHaveCount(
-            1,
-          );
-
-          await expect(page.locator(`[${dataRejectedAttr}]`)).toHaveCount(0);
-
-          // But the other elements are left alone
-          await expect(container.locator(`[${dataIgnoredAttr}]`)).toHaveCount(3);
-          await expect(container.getByRole("listbox", { includeHidden: true })).toHaveCount(2);
-        });
+        const selectEnhancerModes = Object.freeze({ select: "Select Enhancing Mode", manual: "Manual Setup Mode" });
 
         it("Has no accessible `role`", async ({ page }) => {
           // Setup
@@ -8404,43 +8222,407 @@ for (const { mode } of testConfigs) {
           await expect(page.locator("select-enhancer")).toHaveRole("none");
         });
 
-        createFilterTypeDescribeBlocks(["anyvalue", "clearable", "unclearable"], "both", (valueis) => {
-          const Default = valueis === "anyvalue" || valueis === "clearable" ? "an empty string" : "the first `option`";
-          it(`Defaults the \`combobox\` value to ${Default} if there is no default \`option\``, async ({ page }) => {
-            // Setup
-            const name = "my-combobox";
+        /*
+         * NOTE: An uncertain discrepancy between browsers (and/or perhaps Playwright's use of browsers) makes us have to write
+         * this test in an unusual way (e.g., switching the ways that we render content to the DOM between scenario tests).
+         * If this test starts getting flaky in CI, then you might have to start adding conditional logic based on the browser
+         * that you're in, and/or you might have to loosen the test expectations as minimally as possible, and/or you might
+         * have to do more switching between "rendering and waiting" approaches.
+         */
+        it("Requires a valid setup", async ({ page }) => {
+          await page.goto(url);
+          const errors: Error[] = [];
+          const trackErrors = (error: Error) => errors.push(error);
+          page.on("pageerror", trackErrors);
+
+          /** Some browsers need some extra time to detect our mounting errors. That's what this timeout is for. */
+          const timeout = 100;
+          const filterAttrs = getFilterAttrs("unclearable");
+          const selectEnhancerSetupError =
+            "SelectEnhancer must contain one (and only one) <select> element." +
+            "\n" +
+            "Alternatively, you may supply one ComboboxField and one ComboboxListbox.";
+
+          // No `<select>` OR `combobox`+`listbox` Combination
+          await renderHTMLToPage(page)`<select-enhancer></select-enhancer>`;
+          await page.waitForTimeout(timeout);
+          expect(errors).toHaveLength(1);
+
+          // BOTH `<select>` AND `combobox`+`listbox` Combination
+          await page.evaluate(() => {
+            const container = document.createElement("select-enhancer");
+            container.append(
+              document.createElement("select"),
+              document.createElement("combobox-field"),
+              document.createElement("combobox-listbox"),
+            );
+            document.body.replaceChildren(container);
+          });
+          await page.waitForTimeout(timeout);
+          expect(errors).toHaveLength(2);
+
+          // More than 1 `<select>`
+          await renderHTMLToPage(page)`
+            <select-enhancer>
+              ${`<select ${filterAttrs}></select>`.repeat(2)}
+            </select-enhancer>
+          `;
+          await page.waitForTimeout(timeout);
+          expect(errors).toHaveLength(3);
+
+          // More than 1 `<combobox-listbox>`
+          await page.evaluate(() => {
+            const container = document.createElement("select-enhancer");
+            const listbox = document.createElement("combobox-listbox");
+            const combobox = document.createElement("combobox-combobox");
+            container.append(combobox, listbox, listbox.cloneNode(true));
+            document.body.replaceChildren(container);
+          });
+          await page.waitForTimeout(timeout);
+          expect(errors).toHaveLength(4);
+
+          // More than 1 `<combobox-field>`
+          await renderHTMLToPage(page)`
+            <select-enhancer>
+              <combobox-field ${filterAttrs}></combobox-field>
+              <combobox-field ${filterAttrs}></combobox-field>
+              <combobox-listbox></combobox-listbox>
+            </select-enhancer>
+          `;
+
+          await page.waitForTimeout(timeout);
+          expect(errors).toHaveLength(6);
+          expect(errors.map((e) => e.message).filter((e) => e === selectEnhancerSetupError)).toHaveLength(5);
+
+          // Good: Only 1 <select>
+          await renderHTMLToPage(page)`
+            <select-enhancer>
+              <select ${filterAttrs}></select>
+            </select-enhancer>
+          `;
+          expect(errors).toHaveLength(6); // No additional Errors occurred
+
+          // Good: Only 1 `combobox` and 1 `listbox`
+          await renderHTMLToPage(page)`
+            <select-enhancer>
+              <combobox-field ${filterAttrs}></combobox-field>
+              <combobox-listbox></combobox-listbox>
+            </select-enhancer>
+          `;
+          expect(errors).toHaveLength(6); // No additional Errors occurred
+          page.off("pageerror", trackErrors);
+        });
+
+        Object.values(selectEnhancerModes).forEach((selectEnhancerMode) => {
+          it.describe(selectEnhancerMode, () => {
+            const tag = selectEnhancerMode === "Manual Setup Mode" ? "combobox-field" : "select";
+
+            it(`Creates a "unique" (random) ID for the \`combobox\` if one did not exist on the <${tag}>`, async ({
+              page,
+            }) => {
+              /* ---------- Setup ---------- */
+              await page.goto(url);
+              if (tag === "select") {
+                await renderHTMLToPage(page)`
+                  <select-enhancer>
+                    <${tag} ${getFilterAttrs("unclearable")}>
+                      <option>Choose Me!!!</option>
+                    </${tag}>
+                  </select-enhancer>
+                `;
+              } else {
+                await renderHTMLToPage(page)`
+                  <select-enhancer>
+                    <${tag} ${getFilterAttrs("unclearable")}></${tag}>
+                    <combobox-listbox>
+                      <combobox-option>Choose Me!!!</combobox-option>
+                    </combobox-listbox>
+                  </select-enhancer>
+                `;
+              }
+
+              /* ---------- Assertions ---------- */
+              const id = await page.getByRole("combobox").getAttribute("id");
+              expect(id).toEqual(expect.any(String));
+              expect(id?.length).toBeGreaterThan(1);
+            });
+          });
+        });
+
+        it.describe(selectEnhancerModes.select, () => {
+          it("Transfers the provided <select>'s attributes to the `combobox` during initialization", async ({
+            page,
+          }) => {
+            /* ---------- Setup ---------- */
             await page.goto(url);
             await renderHTMLToPage(page)`
-              <form aria-label="Test Form">
-                <select-enhancer>
-                  <select name="${name}" ${getFilterAttrs(valueis)}>
-                    <option value="">Choose Something</option>
-                    ${testOptions.map((o) => `<option>${o}</option>`).join("")}
-                  </select>
-                </select-enhancer>
-              </form>
+              <select-enhancer>
+                <select id="combobox" name="my-name" required disabled ${getFilterAttrs("unclearable")}>
+                  <option>Choose Me!!!</option>
+                </select>
+              </select-enhancer>
             `;
 
+            /* ---------- Assertions ---------- */
+            // The <select> and its corresponding attributes have been replaced altogether
+            const select = page.locator("select");
+            await expect(select).toHaveCount(0);
+
+            // The `combobox` has inherited the <select>'s attributes
             const combobox = page.getByRole("combobox");
-            await expect(combobox).toHaveJSProperty("valueIs", valueis ?? ("unclearable" satisfies ValueIs));
-
-            const options = page.getByRole("option", { includeHidden: true });
-            await expect(options.and(page.locator("[selected]"))).toHaveCount(0);
-
-            // Assertions
-            const selectedOption = page.getByRole("option", { selected: true, includeHidden: true });
-
-            if (valueis === "anyvalue" || valueis === "clearable") {
-              await expect(combobox).toHaveText("");
-              await expect(combobox).toHaveComboboxValue("", { form: true });
-              await expect(selectedOption).not.toBeAttached();
-            } else {
-              await expect(options.first().and(selectedOption)).toBeAttached();
-              await expect(combobox).toHaveSyncedComboboxValue(
-                { label: "Choose Something", value: "" },
-                { form: true, matchingLabel: true },
-              );
+            await expect(combobox).toHaveAttribute("id", "combobox");
+            await expect(combobox).toHaveAttribute("name", "my-name");
+            await expect(combobox).toHaveAttribute("required", "");
+            await expect(combobox).toHaveAttribute("disabled", "");
+            if (mode === "Filterable") {
+              await expect(combobox).toHaveAttribute("filter", "");
+              await expect(combobox).toHaveAttribute("valueis", "unclearable");
             }
+          });
+
+          it("Properly creates `option`s from the provided <option>s, preserving all relevant data", async ({
+            page,
+          }) => {
+            /* ---------- Setup ---------- */
+            await page.goto(url);
+            await page.evaluate((m) => {
+              const app = document.getElementById("app") as HTMLDivElement;
+
+              // NOTE: <option>s are created dynamically to account for preservation of the `Option.selected` _property_
+              const optionsContainer = document.createElement("template");
+              optionsContainer.innerHTML = `
+                <option label="1st" value="1" disabled selected>First</option>
+                <option>Second</option>
+                <option value="3" disabled>Third</option>
+              `;
+
+              (optionsContainer.content.lastElementChild as HTMLOptionElement).selected = true;
+
+              const form = document.createElement("form");
+              form.setAttribute("aria-label", "Test Form");
+
+              const selectEnhancer = form.appendChild(document.createElement("select-enhancer"));
+              const select = selectEnhancer.appendChild(document.createElement("select"));
+              select.replaceChildren(...optionsContainer.content.children);
+              select.setAttribute("name", "my-combobox");
+              if (m === "Filterable") {
+                select.setAttribute("filter", "");
+                select.setAttribute("valueis", "unclearable");
+              }
+
+              app.replaceChildren(form);
+            }, mode);
+
+            /* ---------- Assertions ---------- */
+            // Display options (for test-writing convenience)
+            const combobox = page.getByRole("combobox");
+            await combobox.click();
+
+            // Option with All Attributes
+            const optionAllAttributes = page.getByRole("option", { name: "1st" });
+            await expect(optionAllAttributes).toHaveText("1st");
+            await expect(optionAllAttributes).toHaveJSProperty("label", "1st");
+
+            await expect(optionAllAttributes).toHaveAttribute("value", "1");
+            await expect(optionAllAttributes).toHaveJSProperty("value", "1");
+
+            await expect(optionAllAttributes).toHaveAttribute("aria-disabled", String(true));
+            await expect(optionAllAttributes).not.toHaveAttribute("disabled");
+            await expect(optionAllAttributes).toHaveJSProperty("disabled", true);
+
+            await expect(optionAllAttributes).toHaveAttribute("selected", "");
+            await expect(optionAllAttributes).toHaveJSProperty("defaultSelected", true);
+
+            await expect(optionAllAttributes).toHaveJSProperty("selected", false);
+            await expect(combobox).not.toHaveSyncedComboboxValue(
+              { label: "1st", value: "1" },
+              { form: true, matchingLabel: true },
+            );
+
+            // Option with No Attributes
+            const optionWithoutAttributes = page.getByRole("option", { name: "Second" });
+            await expect(optionWithoutAttributes).toHaveText("Second");
+            await expect(optionWithoutAttributes).toHaveJSProperty("label", "Second");
+
+            await expect(optionWithoutAttributes).not.toHaveAttribute("value");
+            await expect(optionWithoutAttributes).toHaveJSProperty("value", "Second");
+
+            await expect(optionWithoutAttributes).not.toHaveAttribute("aria-disabled");
+            await expect(optionWithoutAttributes).not.toHaveAttribute("disabled");
+            await expect(optionWithoutAttributes).toHaveJSProperty("disabled", false);
+
+            await expect(optionWithoutAttributes).not.toHaveAttribute("selected", "");
+            await expect(optionWithoutAttributes).toHaveJSProperty("defaultSelected", false);
+
+            await expect(optionWithoutAttributes).toHaveJSProperty("selected", false);
+            await expect(combobox).not.toHaveSyncedComboboxValue(
+              { label: "Second" },
+              { form: true, matchingLabel: true },
+            );
+
+            // Pre-Selected Option (via DOM manipulation _pre-mount_)
+            const selectedOption = page.getByRole("option", { name: "Third", selected: true });
+            await expect(selectedOption).toHaveText("Third");
+            await expect(selectedOption).toHaveJSProperty("label", "Third");
+
+            await expect(selectedOption).toHaveAttribute("value", "3");
+            await expect(selectedOption).toHaveJSProperty("value", "3");
+
+            await expect(selectedOption).toHaveAttribute("aria-disabled", String(true));
+            await expect(selectedOption).not.toHaveAttribute("disabled");
+            await expect(selectedOption).toHaveJSProperty("disabled", true);
+
+            await expect(selectedOption).not.toHaveAttribute("selected");
+            await expect(selectedOption).toHaveJSProperty("defaultSelected", false);
+
+            await expect(selectedOption).toHaveJSProperty("selected", true);
+            await expect(combobox).toHaveSyncedComboboxValue(
+              { label: "Third", value: "3" },
+              { form: true, matchingLabel: true },
+            );
+          });
+        });
+
+        Object.values(selectEnhancerModes).forEach((selectEnhancerMode) => {
+          it.describe(selectEnhancerMode, () => {
+            const InvalidChildrenHandling =
+              selectEnhancerMode === "Select Enhancing Mode"
+                ? "Replaces only the provided <select> element and ignores everything else"
+                : "Ignores invalid children, and removes invalid `listbox` children";
+
+            // NOTE: This is important for developers to be able to add "Cancel Buttons" or "Caret Icons" seamlessly
+            it(InvalidChildrenHandling, async ({ page }) => {
+              // Setup
+              const dataIgnoredAttr = "data-ignored";
+              const dataRejectedAttr = "data-rejected";
+
+              await page.goto(url);
+              await renderHTMLToPage(page)`
+                <select-enhancer>
+                  <span role="option" ${dataIgnoredAttr}>I am ignored even though I have a "recognized" role</span>
+
+                  ${
+                    selectEnhancerMode === "Select Enhancing Mode"
+                      ? `
+                        <select ${getFilterAttrs("unclearable")}>
+                          <option>Choose Me!!!</option>
+                          <div ${dataRejectedAttr}>Rejected due to not being a valid option</div>
+                        </select>
+                      `
+                      : `
+                        <combobox-field ${getFilterAttrs("unclearable")}></combobox-field>
+                        <combobox-listbox>
+                          <combobox-option>Choose Me!!!</combobox-option>
+                          <div ${dataRejectedAttr}>Rejected due to not being a valid option</div>
+                        </combobox-listbox>
+                      `
+                  }
+
+                  <div role="listbox" ${dataIgnoredAttr}>I am ignored even though a \`listbox\` will be generated</div>
+                  <button ${dataIgnoredAttr}>I am ignored</button>
+                </select-enhancer>
+              `;
+
+              // The <select> field is replaced (if it existed). And invalid `option`s were removed.
+              const container = page.locator("select-enhancer");
+              await expect(container.locator("select, option")).toHaveCount(0);
+              await expect(container.locator("combobox-field")).toHaveCount(1);
+              await expect(container.getByRole("listbox", { includeHidden: true }).locator("*")).toHaveCount(1);
+              await expect(
+                container.getByRole("listbox", { includeHidden: true }).locator("combobox-option"),
+              ).toHaveCount(1);
+
+              await expect(page.locator(`[${dataRejectedAttr}]`)).toHaveCount(0);
+
+              // But the other elements are left alone
+              await expect(container.locator(`[${dataIgnoredAttr}]`)).toHaveCount(3);
+              await expect(container.getByRole("listbox", { includeHidden: true })).toHaveCount(2);
+              await expect(page.getByRole("combobox")).toHaveSyncedComboboxValue(
+                { label: "Choose Me!!!" },
+                { matchingLabel: true },
+              );
+            });
+
+            createFilterTypeDescribeBlocks(["anyvalue", "clearable", "unclearable"], "both", (valueis) => {
+              const Default =
+                valueis === "anyvalue" || valueis === "clearable" ? "an empty string" : "the first `option`";
+
+              it(`Defaults the \`combobox\` value to ${Default} if there is no default \`option\``, async ({
+                page,
+              }) => {
+                // Setup
+                const name = "my-combobox";
+                const tag = selectEnhancerMode === "Select Enhancing Mode" ? "select" : "combobox-field";
+                await page.goto(url);
+
+                if (tag === "select") {
+                  await renderHTMLToPage(page)`
+                    <form aria-label="Test Form">
+                      <select-enhancer>
+                        <${tag} name="${name}" ${getFilterAttrs(valueis)}>
+                          <option value="">Choose Something</option>
+                          ${testOptions.map((o) => `<option>${o}</option>`).join("")}
+                        </${tag}>
+                      </select-enhancer>
+                    </form>
+                  `;
+                } else {
+                  await renderHTMLToPage(page)`
+                    <form aria-label="Test Form">
+                      <select-enhancer>
+                        <${tag} name="${name}" ${getFilterAttrs(valueis)}></${tag}>
+                        <combobox-listbox>
+                          <combobox-option value="">Choose Something</combobox-option>
+                          ${testOptions.map((o) => `<combobox-option>${o}</combobox-option>`).join("")}
+                        </combobox-listbox>
+                      </select-enhancer>
+                    </form>
+                  `;
+                }
+
+                const combobox = page.getByRole("combobox");
+                await expect(combobox).toHaveJSProperty("valueIs", valueis ?? ("unclearable" satisfies ValueIs));
+
+                const options = page.getByRole("option", { includeHidden: true });
+                await expect(options.and(page.locator("[selected]"))).toHaveCount(0);
+
+                // Assertions
+                const selectedOption = page.getByRole("option", { selected: true, includeHidden: true });
+
+                if (valueis === "anyvalue" || valueis === "clearable") {
+                  await expect(combobox).toHaveText("");
+                  await expect(combobox).toHaveComboboxValue("", { form: true });
+                  await expect(selectedOption).not.toBeAttached();
+                } else {
+                  await expect(options.first().and(selectedOption)).toBeAttached();
+                  await expect(combobox).toHaveSyncedComboboxValue(
+                    { label: "Choose Something", value: "" },
+                    { form: true, matchingLabel: true },
+                  );
+                }
+              });
+
+              const ValueWithoutOptions = valueis === "anyvalue" ? "an empty string" : "`null`";
+              it(`Leaves the \`combobox\` value as ${ValueWithoutOptions} if no \`option\`s exist`, async ({
+                page,
+              }) => {
+                const tag = selectEnhancerMode === "Select Enhancing Mode" ? "select" : "combobox-field";
+                await page.goto(url);
+                await renderHTMLToPage(page)`
+                  <form aria-label="Test Form">
+                    <select-enhancer>
+                      <${tag} name="my-combobox" ${getFilterAttrs(valueis)}></${tag}>
+                      ${tag === "combobox-field" ? "<combobox-listbox></combobox-listbox>" : ""}
+                    </select-enhancer>
+                  </form>
+                `;
+
+                const combobox = page.getByRole("combobox");
+                await expect(combobox).toHaveText("");
+                await expect(combobox).toHaveComboboxValue(valueis === "anyvalue" ? "" : null, { form: true });
+                await expect(page.getByRole("option", { includeHidden: true })).toHaveCount(0);
+              });
+            });
           });
         });
       });

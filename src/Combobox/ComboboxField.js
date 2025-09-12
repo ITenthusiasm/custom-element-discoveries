@@ -320,7 +320,7 @@ class ComboboxField extends HTMLElement {
 
     // Require a Corresponding `listbox`
     if (!(this.listbox instanceof ComboboxListbox) || this.listbox.getAttribute("role") !== "listbox") {
-      throw new Error(`The ${this.constructor.name} must point to a valid \`[role="listbox"]\` with \`aria-controls\``);
+      throw new Error(`The ${this.constructor.name} must be placed before a valid \`[role="listbox"]\` element.`);
     }
 
     // Setup Mutation Observers
