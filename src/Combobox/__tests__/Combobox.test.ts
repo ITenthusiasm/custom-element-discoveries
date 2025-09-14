@@ -8237,7 +8237,7 @@ for (const { mode } of testConfigs) {
           page.on("pageerror", trackErrors);
 
           /** Some browsers need some extra time to detect our mounting errors. That's what this timeout is for. */
-          const timeout = 100;
+          const timeout = 50;
           const filterAttrs = getFilterAttrs("unclearable");
           const selectEnhancerSetupError =
             "SelectEnhancer must contain one (and only one) <select> element." +
