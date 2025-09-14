@@ -1061,7 +1061,7 @@ class ComboboxField extends HTMLElement {
    */
   static #handleDelegatedOptionHover(event) {
     const listbox = /** @type {HTMLElement} */ (event.currentTarget);
-    const option = /** @type {HTMLElement} */ (event.target).closest("combobox-option");
+    const option = /** @type {HTMLElement} */ (event.target).closest("[role='option']");
     if (!option) return; // We hovered the `listbox`, not an `option`
 
     const combobox = /** @type {ComboboxField} */ (listbox.previousElementSibling);
@@ -1074,7 +1074,9 @@ class ComboboxField extends HTMLElement {
    */
   static #handleDelegatedOptionClick(event) {
     const listbox = /** @type {HTMLElement} */ (event.currentTarget);
-    const option = /** @type {HTMLElement} */ (event.target).closest("combobox-option");
+    const option = /** @type {ComboboxOption | null} */ (
+      /** @type {HTMLElement} */ (event.target).closest("[role='option']")
+    );
     if (!option) return; // We clicked the `listbox`, not an `option`
     if (option.disabled) return;
 

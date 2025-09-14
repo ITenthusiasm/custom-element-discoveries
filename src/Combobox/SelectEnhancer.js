@@ -4,9 +4,8 @@ import ComboboxOption from "./ComboboxOption.js";
 
 class SelectEnhancer extends HTMLElement {
   // Internals
-  // TODO: Enable devs to change the `combobox`/`listbox` components when replacing a `select` element.
-  /** @readonly */ #combobox = document.createElement("combobox-field");
-  /** @readonly */ #listbox = document.createElement("combobox-listbox");
+  /** @type {ComboboxField | undefined} */ #combobox;
+  /** @type {ComboboxListbox | undefined} */ #listbox;
   #mounted = false;
 
   /** "On Mount" for Custom Elements @returns {void} */
@@ -38,10 +37,20 @@ class SelectEnhancer extends HTMLElement {
         throw new TypeError(`${line1}\n${line2}`);
       }
 
-      const select = selects.at(0);
-      if (!select) {
-        /** @type {any} */ (this).#combobox = comboboxes.at(0);
-        /** @type {any} */ (this).#listbox = listboxes.at(0);
+      const select = /** @type {HTMLSelectElement | undefined} */ (selects[0]);
+      if (select) {
+        this.#combobox = /** @type {ComboboxField} */ (document.createElement(this.comboboxTag));
+        if (!(this.#combobox instanceof ComboboxField)) {
+          throw new TypeError(`<${this.comboboxTag}> is not registered as a \`${ComboboxField.name}\``);
+        }
+
+        this.#listbox = /** @type {ComboboxListbox} */ (document.createElement(this.listboxTag));
+        if (!(this.#listbox instanceof ComboboxListbox)) {
+          throw new TypeError(`<${this.listboxTag}> is not registered as a \`${ComboboxListbox.name}\``);
+        }
+      } else {
+        [this.#combobox] = comboboxes;
+        [this.#listbox] = listboxes;
       }
 
       /* -------------------- Setup Elements -------------------- */
@@ -87,9 +96,16 @@ class SelectEnhancer extends HTMLElement {
       // `SelectEnhancer` is meant to enhance/replace a single `<select>` instead
       else {
         let defaultOptionExists = false;
+        const { optionTag } = this;
+        const OptionConstructor = customElements.get(optionTag);
+        if (OptionConstructor !== ComboboxOption && !(OptionConstructor?.prototype instanceof ComboboxOption)) {
+          throw new TypeError(`<${optionTag}> is not registered as a \`${ComboboxOption.name}\``);
+        }
+
         for (let i = 0; i < select.options.length; i++) {
           const option = select.options[i];
-          const comboboxOption = this.#listbox.appendChild(document.createElement("combobox-option"));
+          const comboboxOption = /** @type {ComboboxOption} */ (document.createElement(optionTag));
+          this.#listbox.appendChild(comboboxOption);
 
           comboboxOption.textContent = option.label;
           comboboxOption.defaultSelected = option.defaultSelected;
@@ -111,6 +127,45 @@ class SelectEnhancer extends HTMLElement {
 
       this.#mounted = true;
     }
+  }
+
+  /**
+   * Determines the {@link ComboboxField} element that will be created when the component is mounted in
+   * "Select Enhancing Mode" (i.e., with a `<select>` element). Defaults to `combobox-field`.
+   * @returns {string}
+   */
+  get comboboxTag() {
+    return this.getAttribute("comboboxtag") ?? "combobox-field";
+  }
+
+  set comboboxTag(value) {
+    this.setAttribute("comboboxtag", value);
+  }
+
+  /**
+   * Determines the {@link ComboboxListbox} element that will be created when the component is mounted in
+   * "Select Enhancing Mode" (i.e., with a `<select>` element). Defaults to `combobox-listbox`.
+   * @returns {string}
+   */
+  get listboxTag() {
+    return this.getAttribute("listboxtag") ?? "combobox-listbox";
+  }
+
+  set listboxTag(value) {
+    this.setAttribute("listboxtag", value);
+  }
+
+  /**
+   * Determines the {@link ComboboxOption} element(s) that will be created when the component is mounted in
+   * "Select Enhancing Mode" (i.e., with a `<select>` element). Defaults to `combobox-option`.
+   * @returns {string}
+   */
+  get optionTag() {
+    return this.getAttribute("optiontag") ?? "combobox-option";
+  }
+
+  set optionTag(value) {
+    this.setAttribute("optiontag", value);
   }
 }
 

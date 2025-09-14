@@ -8,6 +8,7 @@ import type { Page, Locator, MatcherReturnType } from "@playwright/test";
 import type SelectEnhancer from "../SelectEnhancer.js";
 import type ComboboxField from "../ComboboxField.js";
 import type ComboboxOption from "../ComboboxOption.js";
+import type ComboboxListbox from "../ComboboxListbox.js";
 
 /*
  * NOTE: It seems that the accessibility requirements for the `Combobox` Web Component are now taken care of.
@@ -421,7 +422,7 @@ for (const { mode } of testConfigs) {
           await baseExpect(combobox).toHaveRole("combobox", { timeout });
         } catch (error) {
           const { matcherResult } = error as { matcherResult: MatcherReturnType };
-          return { ...matcherResult, name, pass: this.isNot };
+          return { ...matcherResult, name, pass: this.isNot, message: () => String(matcherResult.message) };
         }
 
         const listboxId = (await combobox.getAttribute("aria-controls", { timeout })) ?? "";
@@ -445,7 +446,7 @@ for (const { mode } of testConfigs) {
           return { name, pass: !this.isNot, message: () => "" };
         } catch (error) {
           const { matcherResult } = error as { matcherResult: MatcherReturnType };
-          return { ...matcherResult, name, pass: this.isNot };
+          return { ...matcherResult, name, pass: this.isNot, message: () => String(matcherResult.message) };
         }
       },
       /** Asserts that the `combobox`'s currently-selected `option` is the one having the specified `label` (and `value`) */
@@ -8542,6 +8543,180 @@ for (const { mode } of testConfigs) {
                 { matchingLabel: true },
               );
             });
+
+            it("Works with child instances of the Web Component Segments of the Combobox", async ({ page }) => {
+              /* ---------- Setup ---------- */
+              await page.goto(url);
+
+              // Create extensions of the original Combobox Component Parts
+              await page.evaluate(() => {
+                const ComboboxFieldConstructor = customElements.get("combobox-field") as typeof ComboboxField;
+                class CustomizedComboboxField extends ComboboxFieldConstructor {
+                  /** @override */
+                  optionMatchesFilter(option: ComboboxOption): boolean {
+                    const search = this.text.data;
+                    return option.label.toLowerCase().endsWith(search.toLowerCase());
+                  }
+                }
+
+                const ComboboxListboxConstructor = customElements.get("combobox-listbox") as typeof ComboboxListbox;
+                class CustomizedComboboxListbox extends ComboboxListboxConstructor {
+                  // eslint-disable-next-line class-methods-use-this
+                  get customProp() {
+                    return "customization";
+                  }
+                }
+
+                const ComboboxOptionConstructor = customElements.get("combobox-option") as typeof ComboboxOption;
+                class CustomizedComboboxOption extends ComboboxOptionConstructor {
+                  connectedCallback() {
+                    super.connectedCallback();
+                    this.setAttribute("customized-option-attribute", "DOPE");
+                  }
+                }
+
+                customElements.define("customized-combobox-field", CustomizedComboboxField);
+                customElements.define("customized-combobox-listbox", CustomizedComboboxListbox);
+                customElements.define("customized-combobox-option", CustomizedComboboxOption);
+
+                return Promise.all([
+                  customElements.whenDefined("customized-combobox-field").then((c) => c.name),
+                  customElements.whenDefined("customized-combobox-listbox").then((c) => c.name),
+                  customElements.whenDefined("customized-combobox-option").then((c) => c.name),
+                ]);
+              });
+
+              if (selectEnhancerMode === "Select Enhancing Mode") {
+                await renderHTMLToPage(page)`
+                  <form aria-label="form">
+                    <select-enhancer 
+                      comboboxtag="customized-combobox-field"
+                      listboxtag="customized-combobox-listbox"
+                      optiontag="customized-combobox-option"
+                    >
+                      <select name="test" ${getFilterAttrs("unclearable")}>
+                        ${testOptions.map((o) => `<option>${o}</option>`).join("")}
+                      </select>
+                    </select-enhancer>
+                  </form>
+                `;
+              } else {
+                await renderHTMLToPage(page)`
+                  <form aria-label="Test Form">
+                    <select-enhancer>
+                      <customized-combobox-field name="test" ${getFilterAttrs("unclearable")}></customized-combobox-field>
+                      <customized-combobox-listbox>
+                        ${testOptions.map((o) => `<customized-combobox-option>${o}</customized-combobox-option>`).join("")}
+                      </customized-combobox-listbox>
+                    </select-enhancer>
+                  </form>
+                `;
+              }
+
+              const [first, second, third, , , , , , ninth, tenth] = testOptions;
+              const combobox = page.getByRole("combobox");
+              await expect(combobox).toHaveSyncedComboboxValue({ label: first }, { form: true, matchingLabel: true });
+
+              /* ---------- Assertions ---------- */
+              // Choose an `option` with a Mouse
+              await combobox.click();
+              await expect(combobox).toBeExpanded();
+
+              const options = page.getByRole("option");
+              await options.nth(2).hover();
+              await expect(combobox).toHaveActiveOption(third);
+
+              await options.nth(2).click();
+              await expect(combobox).not.toBeExpanded();
+              await expect(combobox).toHaveSyncedComboboxValue({ label: third }, { form: true, matchingLabel: true });
+              await expect(combobox).not.toHaveSyncedComboboxValue(
+                { label: first },
+                { form: true, matchingLabel: true },
+              );
+
+              // Search for an `option`. (Behavior should be new for `filter`able, `CustomizedComboboxField`)
+              await combobox.blur();
+              await combobox.press("D");
+              await expect(combobox).toHaveText(mode === "Filterable" ? "D" : third);
+              await expect(options).toHaveCount(mode === "Filterable" ? 2 : testOptions.length);
+              await expect(page.getByRole("option", { name: second })).toBeVisible();
+              await expect(page.getByRole("option", { name: third })).toBeVisible();
+
+              // Test the Active `option` Logic
+              await expect(combobox).toHaveActiveOption(mode === "Filterable" ? second : third);
+              await combobox.press("End");
+              await expect(combobox).toHaveActiveOption(mode === "Filterable" ? third : tenth);
+              await combobox.press("ArrowUp");
+              await expect(combobox).toHaveActiveOption(mode === "Filterable" ? second : ninth);
+
+              await combobox.press("Enter");
+              await expect(combobox).toHaveSyncedComboboxValue(
+                { label: mode === "Filterable" ? second : ninth },
+                { form: true, matchingLabel: true },
+              );
+
+              // Verify that the other customized Web Components have their own unique data
+              const listbox = page.getByRole("listbox", { includeHidden: true });
+              await expect(listbox).toHaveJSProperty("customProp", "customization");
+
+              const allOptions = page.getByRole("option", { includeHidden: true });
+              await expect(allOptions).toHaveCount(testOptions.length);
+              await expect(allOptions.and(page.locator("[customized-option-attribute='DOPE']"))).toHaveCount(
+                testOptions.length,
+              );
+            });
+
+            if (selectEnhancerMode === "Select Enhancing Mode") {
+              it("Rejects invalid Web Component Parts during <select> setup", async ({ page }) => {
+                /* ---------- Setup ---------- */
+                await page.goto(url);
+                const errors: Error[] = [];
+                const trackErrors = (error: Error) => errors.push(error);
+                page.on("pageerror", trackErrors);
+
+                /** Some browsers need some extra time to detect our mounting errors. That's what this timeout is for. */
+                const timeout = 50;
+                const filterAttrs = getFilterAttrs("unclearable");
+
+                /* ---------- Assertions ---------- */
+                // Bad `<combobox-field>`
+                await renderHTMLToPage(page)`
+                  <select-enhancer comboboxtag="input">
+                    <select ${filterAttrs}>
+                      <option>Option</option>
+                    </select>
+                  </select-enhancer>
+                `;
+                await page.waitForTimeout(timeout);
+                expect(errors).toHaveLength(1);
+                expect(errors[0].toString()).toBe("TypeError: <input> is not registered as a `ComboboxField`");
+
+                // Bad `<combobox-option>`
+                await renderHTMLToPage(page)`
+                  <select-enhancer optiontag="li">
+                    <select ${filterAttrs}>
+                      <option>Option</option>
+                    </select>
+                  </select-enhancer>
+                `;
+                await page.waitForTimeout(timeout);
+                expect(errors).toHaveLength(2);
+                expect(errors[1].toString()).toBe("TypeError: <li> is not registered as a `ComboboxOption`");
+
+                // Bad `<combobox-field>`
+                await renderHTMLToPage(page)`
+                  <select-enhancer listboxtag="ul">
+                    <select ${filterAttrs}>
+                      <option>Option</option>
+                    </select>
+                  </select-enhancer>
+                `;
+                await page.waitForTimeout(timeout);
+                expect(errors).toHaveLength(3);
+                expect(errors[2].toString()).toBe("TypeError: <ul> is not registered as a `ComboboxListbox`");
+                page.off("pageerror", trackErrors);
+              });
+            }
 
             createFilterTypeDescribeBlocks(["anyvalue", "clearable", "unclearable"], "both", (valueis) => {
               const Default =
