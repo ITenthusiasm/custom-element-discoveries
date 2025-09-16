@@ -933,6 +933,10 @@ class ComboboxField extends HTMLElement {
     const combobox = /** @type {ComboboxField} */ (event.currentTarget);
     setAttributeFor(combobox, attrs["aria-expanded"], String(false));
 
+    // Remove text selection from `combobox` if needed
+    const selection = /** @type {Selection} */ (document.getSelection());
+    if (selection.containsNode(combobox.text)) selection.empty();
+
     // Determine if a `change` event should be dispatched (for `clearable` and `anyvalue` mode only)
     const { [valueOnFocusKey]: valueOnFocus, [editingKey]: editing } = combobox;
     if (valueOnFocus !== combobox.value && editing && combobox.value !== null) {

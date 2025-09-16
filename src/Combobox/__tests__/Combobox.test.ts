@@ -225,7 +225,7 @@ for (const { mode } of testConfigs) {
     const expect = baseExpect.extend({
       async toHaveTextSelection(
         locator: Locator,
-        expected: "start" | "end" | "full" | { anchor: number; focus: number },
+        expected?: "start" | "end" | "full" | { anchor: number; focus: number },
         options?: { timeout?: number },
       ) {
         const name = "toHaveTextSelection";
@@ -248,7 +248,7 @@ for (const { mode } of testConfigs) {
               this.utils.matcherHint(name, "locator", "expected", { isNot: this.isNot, promise: this.promise }) +
               "\n\n" +
               `Locator: ${locator}\n` +
-              `Expected: Selection ${this.utils.printExpected(expected)}\n` +
+              `Expected: Selection${expected ? ` ${this.utils.printExpected(expected)}` : ""}\n` +
               `Received: ${matcherResult.actual}\n` +
               `Call log:\n${matcherResult.log?.join("\n")}`,
           };
@@ -280,9 +280,10 @@ for (const { mode } of testConfigs) {
 
             let pass: boolean;
             if (!hasSelection) pass = false;
+            else if (e === undefined) pass = true;
             else if (e === "start") pass = selection.anchorOffset === 0 && selection.isCollapsed;
             else if (e === "end") pass = selection.anchorOffset === text.length && selection.isCollapsed;
-            else if (e === "full") pass = selection.anchorOffset === 0 && selection.focusOffset === text.length;
+            else if (e === "full") pass = Math.abs(selection.focusOffset - selection.anchorOffset) === text.length;
             else pass = selection.anchorOffset === e.anchor && selection.focusOffset === e.focus;
 
             return { pass, hasSelection, anchor: selection.anchorOffset, focus: selection.focusOffset };
@@ -296,6 +297,7 @@ for (const { mode } of testConfigs) {
 
         let expectedString: string;
         if (!hasSelection) expectedString = `Expected: Element${not} containing Document's \`Selection\`\n`;
+        else if (!expected) expectedString = `Expected: Element${not} containing Document's \`Selection\`\n`;
         else if (expected === "start") expectedString = `Expected: Selection${not} collapsed to start of element\n`;
         else if (expected === "end") expectedString = `Expected: Selection${not} collapsed to end of element\n`;
         else if (expected === "full") expectedString = `Expected: Selection${not} of element's entire text content\n`;
@@ -780,6 +782,53 @@ for (const { mode } of testConfigs) {
             await expect(combobox).toHaveTextSelection({ anchor: cursorOffset, focus: cursorOffset });
           });
         }
+
+        it("Clears the `Selection` that contains its text content when blurred", async ({ page, browserName }) => {
+          await page.goto(url);
+          await renderHTMLToPage(page)`
+            <select-enhancer>
+              <select ${getFilterAttrs("unclearable")}>
+                ${testOptions.map((o) => `<option>${o}</option>`).join("")}
+              </select>
+            </select-enhancer>
+            <button type="button">Another Focusable Element</button>
+          `;
+
+          const first = testOptions[0];
+          const combobox = page.getByRole("combobox");
+          await expect(combobox).toHaveSyncedComboboxValue({ label: first }, { matchingLabel: true });
+
+          // Blurring an expanded `combobox` with partially-selected text
+          const after5thLetter = await getLocationOf(combobox, first.length);
+          await page.mouse.move(after5thLetter.x, after5thLetter.y);
+          await page.mouse.down({ button: "left" });
+
+          const before3rdLetter = await getLocationOf(combobox, 2);
+          await page.mouse.move(before3rdLetter.x, before3rdLetter.y);
+          await page.mouse.up({ button: "left" });
+          await expect(combobox).toBeExpanded();
+          await expect(combobox).toHaveTextSelection({ anchor: 5, focus: 2 });
+
+          await combobox.blur();
+          await expect(combobox).not.toBeFocused();
+          await expect(combobox).not.toBeExpanded();
+          await expect(combobox).not.toHaveTextSelection();
+
+          // Blurring a collapsed `combobox` with fully-selected text
+          await page.mouse.move(after5thLetter.x, after5thLetter.y);
+          await page.mouse.down({ button: "left" });
+
+          await page.mouse.move(0, after5thLetter.y);
+          await page.mouse.up({ button: "left" });
+          if (browserName === "firefox") await expect(combobox).toBeExpanded();
+          else await expect(combobox).not.toBeExpanded();
+          await expect(combobox).toHaveTextSelection("full");
+
+          await combobox.blur();
+          await expect(combobox).not.toBeFocused();
+          await expect(combobox).not.toBeExpanded();
+          await expect(combobox).not.toHaveTextSelection();
+        });
       });
 
       it.describe("Keyboard Interactions", () => {
@@ -812,6 +861,43 @@ for (const { mode } of testConfigs) {
             await page.keyboard.press("Tab");
             await expect(combobox).toBeFocused();
             await expect(combobox).toHaveTextSelection("full");
+          });
+
+          it("Clears the `Selection` that contains its text content when blurred", async ({ page }) => {
+            await page.goto(url);
+            await renderHTMLToPage(page)`
+              <select-enhancer>
+                <select ${getFilterAttrs("unclearable")}>
+                  ${testOptions.map((o) => `<option>${o}</option>`).join("")}
+                </select>
+              </select-enhancer>
+              <button type="button">Another Focusable Element</button>
+            `;
+
+            // Blurring an expanded `combobox` with fully-selected text
+            const combobox = page.getByRole("combobox");
+            await combobox.press("Alt+ArrowDown");
+            await expect(combobox).toBeExpanded();
+            await expect(combobox).toHaveTextSelection("full");
+
+            await combobox.press("Tab");
+            await expect(combobox).not.toBeFocused();
+            await expect(combobox).not.toBeExpanded();
+            await expect(combobox).not.toHaveTextSelection();
+
+            // Blurring a collapsed `combobox` with partially-selected text
+            await combobox.press("Escape");
+            await expect(combobox).not.toBeExpanded();
+            await expect(combobox).toHaveTextSelection("full");
+
+            await combobox.press("ArrowLeft");
+            for (let i = 0; i < 3; i++) await combobox.press("Shift+ArrowRight");
+            await expect(combobox).toHaveTextSelection({ anchor: 0, focus: 3 });
+
+            await combobox.press("Tab");
+            await expect(combobox).not.toBeFocused();
+            await expect(combobox).not.toBeExpanded();
+            await expect(combobox).not.toHaveTextSelection();
           });
         }
 
