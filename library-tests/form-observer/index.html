@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="../../src/Combobox/Combobox.css" />
+    <link rel="stylesheet" href="./form-observer.css" />
+    <title>FormValidityObserver Test</title>
+  </head>
+
+  <body>
+    <form novalidate>
+      <h1>Example Form</h1>
+      <div class="form-field">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" required aria-describedby="email-error" />
+        <div id="email-error" role="alert"></div>
+      </div>
+
+      <div class="form-field">
+        <label for="password">Password</label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          required
+          pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}"
+          maxlength="99"
+          aria-describedby="password-error"
+        />
+        <div id="password-error" role="alert"></div>
+      </div>
+
+      <div class="form-field">
+        <label for="confirm-password">Confirm Password</label>
+        <input
+          id="confirm-password"
+          name="confirm-password"
+          type="password"
+          required
+          aria-describedby="confirm-password-error"
+        />
+        <div id="confirm-password-error" role="alert"></div>
+      </div>
+
+      <div class="form-field">
+        <label for="types">Preferred Type System</label>
+        <select-enhancer>
+          <combobox-field id="types" name="types" required aria-describedby="types-error"></combobox-field>
+          <combobox-listbox>
+            <combobox-option value="">Choose One</combobox-option>
+            <combobox-option value="jsdocs">JSDocs</combobox-option>
+            <combobox-option value="ts">TypeScript</combobox-option>
+            <combobox-option value="anarchy">I Hate Types</combobox-option>
+            <combobox-option value="kotowaru">I Hate JavaScript</combobox-option>
+          </combobox-listbox>
+        </select-enhancer>
+        <div id="types-error" role="alert"></div>
+      </div>
+
+      <div class="form-field">
+        <label for="sport">Best Sport</label>
+        <select-enhancer>
+          <select id="sport" name="sport" filter valueis="unclearable" required aria-describedby="sport-error">
+            <option value="" selected>Nothing</option>
+            <option value="football">Football</option>
+            <option value="basketball">Basketball</option>
+            <option value="softball">Softball</option>
+            <option value="hockey">Hockey</option>
+            <option value="baseball">Baseball</option>
+            <option value="skating">Figure Skating</option>
+            <option value="swimming">Swimming</option>
+            <option value="horses">Horse Racing</option>
+            <option value="socker">Socker</option>
+          </select>
+        </select-enhancer>
+        <div id="sport-error" role="alert"></div>
+      </div>
+
+      <div class="form-field">
+        <label for="fruit">Most Eaten Fruit</label>
+        <select-enhancer>
+          <combobox-field id="fruit" name="fruit" filter required aria-describedby="fruit-error"></combobox-field>
+          <combobox-listbox>
+            <combobox-option value="">Select a Fruit</combobox-option>
+            <combobox-option value="mulberry">Mulberry</combobox-option>
+            <combobox-option value="banana">Banana</combobox-option>
+            <combobox-option value="peach">Peach</combobox-option>
+            <combobox-option value="blackberry">Blackberry</combobox-option>
+            <combobox-option value="pineapple">Pineapple</combobox-option>
+            <combobox-option value="mango">Mango</combobox-option>
+            <combobox-option value="blueberry">Blueberry</combobox-option>
+            <combobox-option value="melon">Melon</combobox-option>
+            <combobox-option value="pear">Pair</combobox-option>
+          </combobox-listbox>
+        </select-enhancer>
+        <div id="fruit-error" role="alert"></div>
+      </div>
+
+      <div class="form-field">
+        <label for="job">Dream Job</label>
+        <select-enhancer>
+          <select id="job" name="job" filter valueis="anyvalue" required aria-describedby="job-error">
+            <option value="">Sleeping</option>
+            <option value="oss">Open Source Maintainer</option>
+            <option value="coding">Software Engineer</option>
+            <option value="ceo">CEO</option>
+            <option value="meche">Mechanical Engineer</option>
+            <option value="food">Chef</option>
+            <option value="tournaments">Gaming</option>
+          </select>
+        </select-enhancer>
+        <div id="job-error" role="alert"></div>
+      </div>
+
+      <fieldset class="form-field" role="radiogroup" aria-describedby="framework-error">
+        <legend>Favorite Framework</legend>
+
+        <div>
+          <input id="svelte" name="framework" type="radio" value="svelte" required />
+          <label for="svelte">Svelte</label>
+
+          <input id="vue" name="framework" type="radio" value="vue" />
+          <label for="vue">Vue</label>
+
+          <input id="solid" name="framework" type="radio" value="solid" />
+          <label for="solid">Solid</label>
+
+          <input id="react" name="framework" type="radio" value="react" />
+          <label for="react">React</label>
+        </div>
+
+        <div id="framework-error" role="alert"></div>
+      </fieldset>
+
+      <div class="form-field">
+        <label for="bio">Autobiography</label>
+        <textarea id="bio" name="bio" minlength="80" maxlength="150" aria-describedby="bio-error"></textarea>
+        <div id="bio-error" role="alert"></div>
+      </div>
+
+      <button type="submit">Sign Up</button>
+    </form>
+
+    <script type="module" src="./form-observer.ts"></script>
+  </body>
+</html>

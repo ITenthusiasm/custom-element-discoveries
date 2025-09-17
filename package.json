@@ -13,6 +13,7 @@
     "format": "prettier --ignore-path .gitignore --write ."
   },
   "devDependencies": {
+    "@form-observer/core": "^0.9.1",
     "@playwright/test": "^1.55.0",
     "@types/node": "^24.3.0",
     "@typescript-eslint/eslint-plugin": "^8.41.0",

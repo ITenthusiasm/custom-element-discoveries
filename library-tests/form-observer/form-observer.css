@@ -1,0 +1,114 @@
+/* These are just simple styles intended to make testing forms more convenient */
+/* -------------------- General Styles -------------------- */
+:root {
+  --color: rgba(255, 255, 255, 0.87);
+
+  color-scheme: light dark;
+  color: var(--color);
+  background-color: #242424;
+
+  @media (prefers-color-scheme: light) {
+    --color: #213547;
+    background-color: #ffffff;
+  }
+}
+
+body {
+  padding: 0;
+  margin: 0;
+
+  h1 {
+    margin: 0;
+    text-align: center;
+  }
+
+  ul {
+    margin-bottom: 0;
+  }
+}
+
+/* -------------------- Form Styles Styles -------------------- */
+form {
+  --gap: 24px;
+
+  display: flex;
+  flex-direction: column;
+  row-gap: var(--gap);
+
+  max-width: 300px;
+  padding: 50px 0;
+  margin: 0 auto;
+
+  .form-field {
+    display: inline-block;
+
+    > :is(label, legend) {
+      display: inline-block;
+      margin-bottom: calc(var(--gap) / 3);
+
+      &:where(label) + :is(input, textarea, select, select-enhancer) {
+        display: block;
+        box-sizing: border-box;
+        width: 100%;
+      }
+
+      &:where(label) + :is(input, textarea, select),
+      &:where(label) + select-enhancer > [role="combobox"] {
+        padding: 8px;
+        border-width: 1px;
+        border-style: solid;
+        border-radius: 4px;
+        text-align: left;
+
+        &:focus-visible {
+          border-color: dodgerblue;
+          outline: 1px solid dodgerblue;
+        }
+
+        &[aria-invalid="true"] {
+          border-color: red;
+          outline-color: red;
+        }
+      }
+    }
+
+    &:is(:has([aria-invalid="true"]), fieldset[aria-invalid="true"]) > [role="alert"]:not(:empty) {
+      margin-top: calc(var(--gap) / 3);
+      color: red;
+
+      ul > li[data-password-requirement-valid="false"] {
+        color: red;
+      }
+    }
+  }
+
+  textarea {
+    resize: none;
+    height: 6em;
+  }
+
+  select-enhancer :is([role="combobox"], [role="option"]) {
+    color: fieldtext;
+    background-color: field;
+  }
+
+  fieldset {
+    padding: 0;
+    border: 0;
+    margin: 0;
+
+    > legend {
+      padding: 0;
+    }
+
+    > :has(> input[type="radio"]) {
+      display: flex;
+      flex-flow: row wrap;
+      gap: calc(var(--gap) / 2) calc(var(--gap) / 3);
+
+      > input[type="radio"] {
+        margin: 0;
+      }
+    }
+  }
+}
