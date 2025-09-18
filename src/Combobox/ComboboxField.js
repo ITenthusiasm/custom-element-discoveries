@@ -281,7 +281,7 @@ class ComboboxField extends HTMLElement {
         this.setAttribute("aria-autocomplete", "list");
         this.setAttribute("contenteditable", String(!this.disabled));
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- This is due to our own TS Types. :\
-        this.#matchingOptions ??= Array.from(this.listbox.children);
+        this.#matchingOptions ??= Array.from(this.listbox?.children ?? []);
 
         if (this.isConnected) {
           if (/** @type {Document | ShadowRoot} */ (this.getRootNode()).activeElement === this) {
