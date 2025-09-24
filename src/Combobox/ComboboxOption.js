@@ -1,4 +1,5 @@
 /** @import ComboboxField from "./ComboboxField.js" */
+/** @import ComboboxListbox from "./ComboboxListbox.js" */
 
 // NOTE: The functionality here is similar to the regular `<select>` + `<option>` spec, with some minor deviations.
 /** @implements {Omit<HTMLOptionElement, "text">} */
@@ -16,14 +17,12 @@ class ComboboxOption extends HTMLElement {
    * @returns {void}
    */
   attributeChangedCallback(name, oldValue, newValue) {
-    if (!this.#mounted) return;
-
     if (name === "selected" && (newValue === null) !== (oldValue === null)) {
       this.selected = newValue !== null;
       return;
     }
 
-    if (name === "value" && newValue !== oldValue) {
+    if (name === "value" && this.#combobox && newValue !== oldValue) {
       this.id = `${this.#combobox.id}-option-${newValue ?? this.textContent}`;
       return this.#syncWithCombobox();
     }
@@ -33,17 +32,19 @@ class ComboboxOption extends HTMLElement {
   connectedCallback() {
     if (!this.isConnected) return;
 
+    // Require a Corresponding `listbox` + `combobox`
+    if (!this.#listbox) {
+      throw new TypeError(`A ${this.constructor.name} must be placed inside a valid \`[role="listbox"]\` element.`);
+    }
+    if (!this.#combobox) {
+      throw new TypeError(`A ${this.constructor.name}'s \`listbox\` must be controlled by a valid \`combobox\``);
+    }
+
     if (!this.#mounted) {
       if (!this.id) this.setAttribute("id", `${this.#combobox.id}-option-${this.value}`);
       this.setAttribute("role", "option");
       this.setAttribute("aria-selected", String(this.selected));
       this.#mounted = true;
-    }
-
-    // Require a Corresponding `listbox`
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Verification needed on mount
-    if (!this.#listbox) {
-      throw new Error(`A ${this.constructor.name} must be placed inside a valid \`[role="listbox"]\` element.`);
     }
   }
 
@@ -94,26 +95,28 @@ class ComboboxOption extends HTMLElement {
   // NOTE: This approach might not work anymore if we want to support `group`ed `option`s in the future (unlikely)
   /** The position of the option within the list of options that it belongs to. */
   get index() {
-    return Array.prototype.indexOf.call(this.#listbox.children, this);
+    // NOTE: Defaulting to `0` in lieu of an owning `listbox` mimics what the native `<select>` does.
+    return this.#listbox ? Array.prototype.indexOf.call(this.#listbox.children, this) : 0;
   }
 
   /** The `HTMLFormElement` that owns the `combobox` associated with this element */
   get form() {
-    return this.#combobox.form;
+    return this.#combobox?.form ?? null;
   }
 
-  /** Retrieves the `listbox` that owns this `option` @returns {HTMLElement} */
+  /** Retrieves the `listbox` that owns this `option` @returns {ComboboxListbox | null} */
   get #listbox() {
-    return /** @type {HTMLElement} */ (this.closest("[role='listbox']"));
+    return /** @type {ComboboxListbox | null} */ (this.closest("[role='listbox']"));
   }
 
-  /** Retrives the `combobox` that this `option` belongs to @returns {ComboboxField} */
+  /** Retrives the `combobox` that this `option` belongs to @returns {ComboboxField | null | undefined} */
   get #combobox() {
-    return /** @type {ComboboxField} */ (this.#listbox.previousElementSibling);
+    return /** @type {ComboboxField | null | undefined} */ (this.#listbox?.previousElementSibling);
   }
 
   /** @returns {void} */
   #syncWithCombobox() {
+    if (!this.#combobox) return;
     const combobox = this.#combobox;
 
     if (this.selected && combobox.value !== this.value) combobox.value = this.value;

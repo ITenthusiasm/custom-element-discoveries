@@ -81,21 +81,30 @@ class SelectEnhancer extends HTMLElement {
       // `SelectEnhancer` was initialized with pre-supplied `combobox` and `listbox` Web Components
       if (!select) {
         let defaultOptionExists = false;
-        for (let child = this.#listbox.firstElementChild; child; child = child.nextElementSibling) {
-          if (!(child instanceof ComboboxOption)) child.remove();
+        /** @type {Element[]} */ const invalidChildren = [];
+        /** @type {ComboboxOption | undefined | null} */ let selectedOption;
+        for (let child = this.#listbox.lastElementChild; child; child = child.previousElementSibling) {
+          if (!(child instanceof ComboboxOption)) invalidChildren.push(child);
           else {
+            if (selectedOption) child.selected = false; // NOTE: Would not work if we want to support `multiple` mode
             if (child.defaultSelected) defaultOptionExists = true;
+            if (child.selected && !selectedOption) selectedOption = child;
             child.id = `${this.#combobox.id}-option-${child.value}`;
           }
         }
 
-        // Force `combobox` out of `null` state if possible. Then check if it should be cleared.
-        this.#combobox.formResetCallback();
+        invalidChildren.forEach((c) => c.remove());
+        selectedOption ??= /** @type {ComboboxOption | null} */ (this.#listbox.firstElementChild);
+        if (selectedOption) this.#combobox.value = selectedOption.value;
+
+        // NOTE: Might override an `option` that is `selected` but not `defaultSelected`. However, this behavior matches
+        // `Select Enhancing Mode`, and it can be resolved by explicitly setting `defaultSelected`, which is encouraged.
         if (!defaultOptionExists && this.#combobox.acceptsValue("")) this.#combobox.forceEmptyValue();
       }
       // `SelectEnhancer` is meant to enhance/replace a single `<select>` instead
       else {
         let defaultOptionExists = false;
+        /** @type {ComboboxOption | undefined} */ let selectedOption;
         const { optionTag } = this;
         const OptionConstructor = customElements.get(optionTag);
         if (OptionConstructor !== ComboboxOption && !(OptionConstructor?.prototype instanceof ComboboxOption)) {
@@ -116,7 +125,11 @@ class SelectEnhancer extends HTMLElement {
           // NOTE: `value` MUST be set BEFORE `id`, which is set BEFORE `selected`. (Due to A11y and Value Selection Logic.)
           comboboxOption.setAttribute("id", `${this.#combobox.id}-option-${comboboxOption.value}`);
           comboboxOption.selected = option.selected;
+          if (comboboxOption.selected) selectedOption = comboboxOption;
         }
+
+        // `selectedOption` is only guaranteed to exist if `<select>` had at least one `<option>`
+        if (selectedOption) this.#combobox.value = selectedOption.value;
 
         // Enable `clearable`/`anyvalue` `combobox`es without a default value to start out as an empty field
         if (!defaultOptionExists && this.#combobox.acceptsValue("")) this.#combobox.forceEmptyValue();

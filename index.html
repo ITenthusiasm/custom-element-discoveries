@@ -82,9 +82,10 @@
 
         <div>
           <label for="combobox">Rating</label>
-          <select-enhancer>
-            <select id="combobox" name="rating">
+          <select-enhancer comboboxtag="combobox-field">
+            <select id="combobox" name="rating" required>
               <option value="">Select a Rating</option>
+              <option value="fake-1">Choose 1 Thing Only</option>
               <option value="001">1</option>
               <option>2</option>
               <option>3</option>
@@ -96,6 +97,18 @@
               <option>9</option>
               <option>10</option>
             </select>
+          </select-enhancer>
+        </div>
+
+        <div>
+          <label for="combobox-manual">Manual</label>
+          <select-enhancer>
+            <combobox-field id="combobox-manual"></combobox-field>
+            <combobox-listbox>
+              <combobox-option value="1st">First</combobox-option>
+              <combobox-option value="2nd">Second</combobox-option>
+              <combobox-option selected>Third</combobox-option>
+            </combobox-listbox>
           </select-enhancer>
         </div>
 

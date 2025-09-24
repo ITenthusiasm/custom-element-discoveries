@@ -8466,112 +8466,128 @@ for (const { mode } of testConfigs) {
               await expect(combobox).toHaveAttribute("valueis", "unclearable");
             }
           });
-
-          it("Properly creates `option`s from the provided <option>s, preserving all relevant data", async ({
-            page,
-          }) => {
-            /* ---------- Setup ---------- */
-            await page.goto(url);
-            await page.evaluate((m) => {
-              const app = document.getElementById("app") as HTMLDivElement;
-
-              // NOTE: <option>s are created dynamically to account for preservation of the `Option.selected` _property_
-              const optionsContainer = document.createElement("template");
-              optionsContainer.innerHTML = `
-                <option label="1st" value="1" disabled selected>First</option>
-                <option>Second</option>
-                <option value="3" disabled>Third</option>
-              `;
-
-              (optionsContainer.content.lastElementChild as HTMLOptionElement).selected = true;
-
-              const form = document.createElement("form");
-              form.setAttribute("aria-label", "Test Form");
-
-              const selectEnhancer = form.appendChild(document.createElement("select-enhancer"));
-              const select = selectEnhancer.appendChild(document.createElement("select"));
-              select.replaceChildren(...optionsContainer.content.children);
-              select.setAttribute("name", "my-combobox");
-              if (m === "Filterable") {
-                select.setAttribute("filter", "");
-                select.setAttribute("valueis", "unclearable");
-              }
-
-              app.replaceChildren(form);
-            }, mode);
-
-            /* ---------- Assertions ---------- */
-            // Display options (for test-writing convenience)
-            const combobox = page.getByRole("combobox");
-            await combobox.click();
-
-            // Option with All Attributes
-            const optionAllAttributes = page.getByRole("option", { name: "1st" });
-            await expect(optionAllAttributes).toHaveText("1st");
-            await expect(optionAllAttributes).toHaveJSProperty("label", "1st");
-
-            await expect(optionAllAttributes).toHaveAttribute("value", "1");
-            await expect(optionAllAttributes).toHaveJSProperty("value", "1");
-
-            await expect(optionAllAttributes).toHaveAttribute("aria-disabled", String(true));
-            await expect(optionAllAttributes).not.toHaveAttribute("disabled");
-            await expect(optionAllAttributes).toHaveJSProperty("disabled", true);
-
-            await expect(optionAllAttributes).toHaveAttribute("selected", "");
-            await expect(optionAllAttributes).toHaveJSProperty("defaultSelected", true);
-
-            await expect(optionAllAttributes).toHaveJSProperty("selected", false);
-            await expect(combobox).not.toHaveSyncedComboboxValue(
-              { label: "1st", value: "1" },
-              { form: true, matchingLabel: true },
-            );
-
-            // Option with No Attributes
-            const optionWithoutAttributes = page.getByRole("option", { name: "Second" });
-            await expect(optionWithoutAttributes).toHaveText("Second");
-            await expect(optionWithoutAttributes).toHaveJSProperty("label", "Second");
-
-            await expect(optionWithoutAttributes).not.toHaveAttribute("value");
-            await expect(optionWithoutAttributes).toHaveJSProperty("value", "Second");
-
-            await expect(optionWithoutAttributes).not.toHaveAttribute("aria-disabled");
-            await expect(optionWithoutAttributes).not.toHaveAttribute("disabled");
-            await expect(optionWithoutAttributes).toHaveJSProperty("disabled", false);
-
-            await expect(optionWithoutAttributes).not.toHaveAttribute("selected", "");
-            await expect(optionWithoutAttributes).toHaveJSProperty("defaultSelected", false);
-
-            await expect(optionWithoutAttributes).toHaveJSProperty("selected", false);
-            await expect(combobox).not.toHaveSyncedComboboxValue(
-              { label: "Second" },
-              { form: true, matchingLabel: true },
-            );
-
-            // Pre-Selected Option (via DOM manipulation _pre-mount_)
-            const selectedOption = page.getByRole("option", { name: "Third", selected: true });
-            await expect(selectedOption).toHaveText("Third");
-            await expect(selectedOption).toHaveJSProperty("label", "Third");
-
-            await expect(selectedOption).toHaveAttribute("value", "3");
-            await expect(selectedOption).toHaveJSProperty("value", "3");
-
-            await expect(selectedOption).toHaveAttribute("aria-disabled", String(true));
-            await expect(selectedOption).not.toHaveAttribute("disabled");
-            await expect(selectedOption).toHaveJSProperty("disabled", true);
-
-            await expect(selectedOption).not.toHaveAttribute("selected");
-            await expect(selectedOption).toHaveJSProperty("defaultSelected", false);
-
-            await expect(selectedOption).toHaveJSProperty("selected", true);
-            await expect(combobox).toHaveSyncedComboboxValue(
-              { label: "Third", value: "3" },
-              { form: true, matchingLabel: true },
-            );
-          });
         });
 
         Object.values(selectEnhancerModes).forEach((selectEnhancerMode) => {
           it.describe(selectEnhancerMode, () => {
+            const CorrectlyInitializesOptions =
+              selectEnhancerMode === "Manual Setup Mode"
+                ? "Properly initializes the provided `ComboboxOption`s based on their data"
+                : "Properly creates `option`s from the provided <option>s, preserving all relevant data";
+
+            it(CorrectlyInitializesOptions, async ({ page }) => {
+              /* ---------- Setup ---------- */
+              await page.goto(url);
+              await page.evaluate(
+                ({ testMode, manualSetup }) => {
+                  // NOTE: `option`s are created dynamically to account for preservation of the `selected` _property_
+                  type HTMLTag = keyof HTMLElementTagNameMap;
+                  const OptionTag = (manualSetup ? "combobox-option" : "option") satisfies HTMLTag;
+                  const disabledAttr = manualSetup ? (`aria-disabled="${true}"` as const) : "disabled";
+                  const template = document.createElement("template");
+                  template.innerHTML = `
+                    <${OptionTag} label="1st" value="1" ${disabledAttr} selected>First</${OptionTag}>
+                    <${OptionTag}>Second</${OptionTag}>
+                    <${OptionTag} value="3" ${disabledAttr}>Third</${OptionTag}>
+                  `;
+                  const optionsContainer = document.importNode(template.content, true);
+                  (optionsContainer.lastElementChild as HTMLOptionElement | ComboboxOption).selected = true;
+
+                  const form = document.createElement("form");
+                  form.setAttribute("aria-label", "Test Form");
+                  const selectEnhancer = form.appendChild(document.createElement("select-enhancer"));
+                  const combobox = document.createElement(manualSetup ? "combobox-field" : "select");
+
+                  const Field = customElements.get("combobox-field" satisfies HTMLTag) as typeof ComboboxField;
+                  const listbox = combobox instanceof Field ? document.createElement("combobox-listbox") : combobox;
+                  listbox.replaceChildren(optionsContainer);
+
+                  selectEnhancer.append(combobox, listbox);
+                  combobox.setAttribute("name", "my-combobox");
+                  if (testMode === "Filterable") {
+                    combobox.setAttribute("filter", "");
+                    combobox.setAttribute("valueis", "unclearable");
+                  }
+
+                  document.body.replaceChildren(form);
+                },
+                { testMode: mode, manualSetup: selectEnhancerMode === "Manual Setup Mode" } as const,
+              );
+
+              /* ---------- Assertions ---------- */
+              // Display options (for test-writing convenience)
+              const combobox = page.getByRole("combobox");
+              await combobox.click();
+
+              // Option with All Attributes
+              const optionAllAttributesLabel = selectEnhancerMode === "Manual Setup Mode" ? "First" : "1st";
+              const optionAllAttributes = page.getByRole("option", { name: optionAllAttributesLabel });
+              await expect(optionAllAttributes).toHaveText(optionAllAttributesLabel);
+              await expect(optionAllAttributes).toHaveJSProperty("label", optionAllAttributesLabel);
+
+              const comboboxId = await combobox.evaluate((node) => node.id);
+              await expect(optionAllAttributes).toHaveAttribute("value", "1");
+              await expect(optionAllAttributes).toHaveJSProperty("value", "1");
+              await expect(optionAllAttributes).toHaveAttribute("id", `${comboboxId}-option-1`);
+
+              await expect(optionAllAttributes).toHaveAttribute("aria-disabled", String(true));
+              await expect(optionAllAttributes).not.toHaveAttribute("disabled");
+              await expect(optionAllAttributes).toHaveJSProperty("disabled", true);
+
+              await expect(optionAllAttributes).toHaveAttribute("selected", "");
+              await expect(optionAllAttributes).toHaveJSProperty("defaultSelected", true);
+
+              await expect(optionAllAttributes).toHaveJSProperty("selected", false);
+              await expect(combobox).not.toHaveSyncedComboboxValue(
+                { label: optionAllAttributesLabel, value: "1" },
+                { form: true, matchingLabel: true },
+              );
+
+              // Option with No Attributes
+              const optionWithoutAttributes = page.getByRole("option", { name: "Second" });
+              await expect(optionWithoutAttributes).toHaveText("Second");
+              await expect(optionWithoutAttributes).toHaveJSProperty("label", "Second");
+
+              await expect(optionWithoutAttributes).not.toHaveAttribute("value");
+              await expect(optionWithoutAttributes).toHaveJSProperty("value", "Second");
+              await expect(optionWithoutAttributes).toHaveAttribute("id", `${comboboxId}-option-Second`);
+
+              await expect(optionWithoutAttributes).not.toHaveAttribute("aria-disabled");
+              await expect(optionWithoutAttributes).not.toHaveAttribute("disabled");
+              await expect(optionWithoutAttributes).toHaveJSProperty("disabled", false);
+
+              await expect(optionWithoutAttributes).not.toHaveAttribute("selected", "");
+              await expect(optionWithoutAttributes).toHaveJSProperty("defaultSelected", false);
+
+              await expect(optionWithoutAttributes).toHaveJSProperty("selected", false);
+              await expect(combobox).not.toHaveSyncedComboboxValue(
+                { label: "Second" },
+                { form: true, matchingLabel: true },
+              );
+
+              // Pre-Selected Option (via DOM manipulation _pre-mount_)
+              const selectedOption = page.getByRole("option", { name: "Third", selected: true });
+              await expect(selectedOption).toHaveText("Third");
+              await expect(selectedOption).toHaveJSProperty("label", "Third");
+
+              await expect(selectedOption).toHaveAttribute("value", "3");
+              await expect(selectedOption).toHaveJSProperty("value", "3");
+              await expect(selectedOption).toHaveAttribute("id", `${comboboxId}-option-3`);
+
+              await expect(selectedOption).toHaveAttribute("aria-disabled", String(true));
+              await expect(selectedOption).not.toHaveAttribute("disabled");
+              await expect(selectedOption).toHaveJSProperty("disabled", true);
+
+              await expect(selectedOption).not.toHaveAttribute("selected");
+              await expect(selectedOption).toHaveJSProperty("defaultSelected", false);
+
+              await expect(selectedOption).toHaveJSProperty("selected", true);
+              await expect(combobox).toHaveSyncedComboboxValue(
+                { label: "Third", value: "3" },
+                { form: true, matchingLabel: true },
+              );
+            });
+
             const InvalidChildrenHandling =
               selectEnhancerMode === "Select Enhancing Mode"
                 ? "Replaces only the provided <select> element and ignores everything else"
