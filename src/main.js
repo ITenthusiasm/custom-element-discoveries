@@ -17,9 +17,10 @@ customElements.define("select-enhancer", SelectEnhancer);
 /* -------------------- Handlers for Debugging -------------------- */
 document.querySelector("form")?.addEventListener("submit", handleSubmit);
 
-function handleSubmit(event: SubmitEvent) {
+/** @param {SubmitEvent} event */
+function handleSubmit(event) {
   event.preventDefault();
-  const form = event.currentTarget as HTMLFormElement;
+  const form = /** @type {HTMLFormElement} */ (event.currentTarget);
   console.log(Object.fromEntries(new FormData(form))); // eslint-disable-line no-console
   console.log(event); // eslint-disable-line no-console
 }
