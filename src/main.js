@@ -4,10 +4,6 @@ import ComboboxListbox from "./Combobox/ComboboxListbox.js";
 import ComboboxOption from "./Combobox/ComboboxOption.js";
 import SelectEnhancer from "./Combobox/SelectEnhancer.js";
 
-// Styles
-import "./Combobox/Combobox.css";
-import "./app.css";
-
 /* -------------------- "App Logic" -------------------- */
 customElements.define("combobox-listbox", ComboboxListbox);
 customElements.define("combobox-field", ComboboxField);
