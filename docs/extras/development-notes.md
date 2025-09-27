@@ -119,6 +119,328 @@ If the vast majority of the _performance hungry_ devs (whom are the target audie
 
 At the time of this writing, the `ComboboxField.#resetOptions()` method is not overridable (as evidenced by the fact that it is a private method). Its time complexity is also `O(n)`. However, it is only called in very specific scenarios (such as when the `combobox` is being collapsed); so it didn't seem to me like this method would be a real bottleneck of sorts. However, if this method does become a bottleneck, it should be simple enough to make it public and overridable. Similar to `getFilteredOptions()`, the overridable `resetOptions()` method would have a mandatory side effect that brings the `option`s' filtered-out states up-to-date.
 
+## The Order of Execution for Custom Elements' `connectedCallback()`s (2025-09-12)
+
+This topic was a huge/confusing headache for us when we made our very first iteration of this component, and it still continues to be such today. So I'm upgrading this discussion to a Development Note &mdash; specifically one that details why we use `customElements.upgrade()` in our `SelectEnhancer.connectedCallback()` (since that is discouraged by some people).
+
+The order in which Custom Elements are _constructed_ and considered _`isConnected`_ (for the sake of their `connectedCallback()`s) is typically not a big deal if your components are independent of each other. However, if your components depend on each other to the extent that the order in which they are "mounted" (i.e., the order in which the `connectedCallback()`s execute) matters, then you'll want to be careful to ensure that the _browser_ mounts the components in the correct order.
+
+### Using `document.createElement()`
+
+If `document.createElement()` is used to create a Custom Element _after_ it has already been [defined](https://developer.mozilla.org/en-US/docs/Web/API/CustomElementRegistry/define), then the element will always be [upraged](https://developer.mozilla.org/en-US/docs/Web/API/CustomElementRegistry/upgrade), meaning it will already have the behavior of the defined Custom Element. For example:
+
+```js
+customElements.define("combobox-field", ComboboxField);
+const combobox = document.createElement("combobox-field");
+console.log(combobox instanceof ComboboxField); // true
+```
+
+In this scenario, the `combobox` created by `document.createElement()` is already an instance of `ComboboxField` when it is created. However, if `document.createElement()` is called _before_ the Custom Element is defined, then the returned element will only be an instance of `HTMLElement`, _not_ `ComboboxField`. To make the element an instance of `ComboboxField`, it would have to be upgraded.
+
+```js
+const combobox = document.createElement("combobox-field");
+customElements.define("combobox-field", ComboboxField);
+console.log(combobox instanceof ComboboxField); // false
+
+customElements.upgrade(combobox);
+console.log(combobox instanceof ComboboxField); // true
+```
+
+Practically speaking, we can assume (or assert) that developers will always define our Custom Elements _before_ they (or JS Frameworks) start creating them with `document.createElement()`. So from now on, let's assume that all of our Custom Elements are already defined when they are instantiated with `document.createElement()`.
+
+#### Select Enhancing Mode
+
+Our `Select Enhancer` works in 2 modes: "Select Enhancing Mode" and "Manual Setup Mode". In the former case, the `<select-enhancer>` wraps a `<select>` element, which acts as a functional `combobox` in scenarios where users don't have access to JavaScript. If the user _does_ have access to JavaScript, then the `<select-enhancer>` replaces the `<select>` and `<option>` elements with `<combobox-field>`, `<combobox-listbox>`, and `<combobox-option>` elements, all of which can be used to provide a superior `combobox`/dropdown/searching UX.
+
+Here's an example to help you visualize things:
+
+```html
+<!-- Before Mounting (Select Enhancing Mode) -->
+<select-enhancer>
+  <select>
+    <!-- <option>s -->
+  </select>
+</select-enhancer>
+
+<!-- After Mounting (Select Enhancing Mode) -->
+<select-enhancer>
+  <combobox-field></combobox-field>
+  <combobox-listbox>
+    <!-- <combobox-option>s -->
+  </combobox-listbox>
+</select-enhancer>
+```
+
+If you were to watch the order in which the elements are constructed and mounted, it looks like this:
+
+```
+SelectEnhancer constructed
+SelectEnhancer connectedCallback
+
+ComboboxField constructed
+ComboboxListbox constructed
+ComboboxOption(s) constructed
+
+ComboboxField connectedCallback
+ComboboxListbox connectedCallback
+ComboboxOption(s) connectedCallback
+```
+
+This example is for _server-rendered_ markup. So, the HTML is parsed, and when the browser notices that `SelectEnhancer` is a Custom Element, it constructs the component _and_ calls its `connectedCallback()`, in that order. While the `SelectEnhancer.connectedCallback()` is running, it notices that it owns a singular `<select>` element, so it converts the form control into its Custom Element equivalent. This results in the `ComboboxField`, `ComboboxListbox` and `ComboboxOption`(s) getting constructed within a `DocumentFragment`. Since they haven't been connected to the DOM yet, only their `constructor`s are run.
+
+Once they are connected to the DOM simultaneously by `select.replaceWith(combobox, listbox)`, the `connectedCallback()`s of the Custom Elements are executed in the natural order that one would expect (that is, in tree order). The `ComboboxField` appears _before_ the `ComboboxListbox`, so its `connectedCallback()` gets called first. Then, the `ComboboxListbox` is a _parent_ of the `ComboboxOption`(s), so its `connectedCallback()` gets called next. Finally, the `connectedCallback()`(s) of the `ComboboxOption`(s) are run in order.
+
+> Note that if Select Enhancing Mode was used with _client-side_ rendering, the order of execution would look exactly the same. The `<select-enhancer>` would be constructed outside the DOM with a `<select>` as a child. Later, it gets added to the DOM, so its `connectedCallback()` is run. During the `connectedCallback()`, all Custom Elements are created, and they are later connected to the DOM simultaneously. So it really doesn't make a difference whether Select Enhancing Mode is initiated by SSR or by client-side logic.
+
+There are two factors that are key here:
+
+- **_All_** of the Custom Elements are already defined/upgraded by the time the `connectedCallback()`s are called.
+- The `connectedCallbacks()`s are called in the "natural order" (earlier elements before later elements, and parent elements before child elements, recursively).
+
+#### In Manual Setup Mode
+
+When the `SelectEnhancer` is used in Manual Setup Mode, the Custom Elements are provided _directly_ to the `<select-enhancer>` (instead of the `<select-enhancer>` wrapping a `<select>` element and then automatically replacing it when connected to the DOM).
+
+```html
+<!-- Mounting (Manual Setup Mode) -->
+<select-enhancer>
+  <combobox-field></combobox-field>
+  <combobox-listbox>
+    <!-- <combobox-option>s -->
+  </combobox-listbox>
+</select-enhancer>
+```
+
+As you'll see soon, this can lead to some unexpected behavior. **_However_**, if all of the elements are created and (properly) attached _before_ anything is connected to the DOM, then the execution order of the `connectedCallback()`s will still be correct, and everything will function as expected. Consider a situation where a developer is using pure JS:
+
+```js
+const wrapper = document.createElement("select-enhancer");
+const combobox = wrapper.appendChild(document.createElement("combobox-field"));
+const listbox = wrapper.appendChild(document.createElement("combobox-listbox"));
+const option = listbox.appendChild(document.createElement("combobox-option"));
+
+document.body.append(wrapper);
+```
+
+The execution order is the following:
+
+```
+SelectEnhancer constructed
+ComboboxField constructed
+ComboboxListbox constructed
+ComboboxOption(s) constructed
+
+SelectEnhancer connectedCallback
+ComboboxField connectedCallback
+ComboboxListbox connectedCallback
+ComboboxOption(s) connectedCallback
+```
+
+Now consider a situation where React (a JS Framework) is used instead:
+
+```jsx
+// Mounting (Manual Setup Mode)
+<select-enhancer>
+  <combobox-field></combobox-field>
+  <combobox-listbox>{/* <combobox-option>s */}</combobox-listbox>
+</select-enhancer>
+```
+
+Because React creates _children_ before it creates _parents_, the execution order will look like this instead:
+
+```
+ComboboxField constructed
+ComboboxOption(s) constructed
+ComboboxListbox constructed
+SelectEnhancer constructed
+
+SelectEnhancer connectedCallback
+ComboboxField connectedCallback
+ComboboxListbox connectedCallback
+ComboboxOption(s) connectedCallback
+```
+
+As you can see, although the elements are constructed in a different order, they are still connected to the DOM simultaneously with the correct tree structure. The conditions that we specified earlier are still met:
+
+- **_All_** of the Custom Elements are already defined/upgraded by the time the `connectedCallback()`s are called.
+- The `connectedCallbacks()`s are called in the "natural order" (earlier elements before later elements, and parent elements before child elements, recursively).
+
+### Using HTML Parsing
+
+The other primary way to create DOM Elements (including Custom Elements) is by parsing HTML. In this case, I'm not talking about parsing a string and making `document.createElement()` calls manually, as that would still ultimately be the developer making elements by calling `document.createElement()`. Instead, I'm referring to _browsers_ parsing HTML and creating elements from the HTML on which they operate. Understanding the order in which Custom Elements are constructed _and_ have their `connectedCallback()`s called is very important when it comes to HTML parsing. This is because many applications may choose to server render Custom Elements, meaning _browsers_ (not developers or client-side implementations of JS Frameworks) will be responsible for instantiating them when they parse the HTML.
+
+#### Parsing after _ALL_ Custom Elements Are Defined (Manual Setup Mode)
+
+Unsurprisingly, browsers instantiate _and_ uprgrade Custom Elements one-by-one in a natural order: earlier elements before later elements, and parent elements before child elements, recursively. So, assuming all Custom Elements are already defined, if a browser parses markup like this:
+
+```html
+<select-enhancer>
+  <combobox-field></combobox-field>
+  <combobox-listbox>
+    <!-- <combobox-option>s -->
+  </combobox-listbox>
+</select-enhancer>
+```
+
+Then the execution order will be the following:
+
+```
+SelectEnhancer constructed
+SelectEnhancer connectedCallback
+
+ComboboxField constructed
+ComboboxField connectedCallback
+
+ComboboxListbox constructed
+ComboboxListbox connectedCallback
+
+ComboboxOption(s) constructed
+ComboboxOption(s) connectedCallback
+```
+
+As you can see, all Custom Elements are constructed _and_ upgraded in order: Parents first, then their children from first to last, recursively. This scenario is encountered whenever a `setter` or method is called that causes the browser to parse a string as HTML (e.g., [`Element.innerHTML`](https://developer.mozilla.org/en-US/docs/Web/API/Element/innerHTML) or [`Element.insertAdjacentHTML()`](https://developer.mozilla.org/en-US/docs/Web/API/Element/insertAdjacentHTML)).
+
+```js
+document.body.innerHTML = `
+  <select-enhancer>
+    <combobox-field></combobox-field>
+    <combobox-listbox>
+      <!-- <combobox-option>s -->
+    </combobox-listbox>
+  </select-enhancer>
+`;
+```
+
+This scenario can also happen when a browser first loads the HTML on a page, but only if the Custom Elements are defined _before_ the main HTML is parsed.
+
+```html
+<!doctype html>
+<html>
+  <head>
+    <!-- This script blocks rendering, so it will be executed _before_ the HTML is parsed -->
+    <script>
+      class SelectEnhancer extends HTMLElement {
+        /* ... */
+      }
+      // DECLARE other Custom Element Classes ...
+
+      customElements.define("select-enhancer", SelectEnhancer);
+      // DEFINE other Custom Elements
+    </script>
+  </head>
+
+  <body>
+    <select-enhancer>
+      <combobox-field></combobox-field>
+      <combobox-listbox>
+        <!-- <combobox-option>s -->
+      </combobox-listbox>
+    </select-enhancer>
+  </body>
+</html>
+```
+
+Practically speaking, `<script>` tags are usually loaded _asynchronously_ in real web applications, meaning that the HTML is parsed _first_ and the script is executed _afterwards_. So let's address execution order for that scenario.
+
+#### Parsing before _ANY_ Custom Elements Are Defined (Manual Setup Mode)
+
+Typically, web applications use non-blocking scripts to define all of their components. This means that the HTML will always be parsed _before_ the Custom Elements are actually defined. What does this mean?
+
+Well, _before_ the Custom Elements are defined, all elements with custom [`tagName`s](https://developer.mozilla.org/en-US/docs/Web/API/Element/tagName) (e.g., the `<select-enhancer>` and friends) are just regular `HTMLElement`s. Since the tags haven't yet been associated with any real Custom Elements via `customElements.define()`, the browser doesn't know what to do with them; so it does nothing.
+
+What happens when the JS is finally loaded and it starts defining Custom Elements? Well, when a Custom Element is defined, the browser searches the current Document for all elements with the specified `tagName`. All such elements are immediately constructed _and_ upgraded in tree order &mdash; synchronously. If multiple Custom Elements are defined back-to-back, then browsers will finish setting up all elements of one type before moving to elements of another type, and Custom Elements which are defined first are given priority. Consider a scenario where we have the following two files:
+
+```html
+<!doctype html>
+<html>
+  <head>
+    <script type="module" src="/path/to/element/definitions.js"></script>
+  </head>
+
+  <body>
+    <select-enhancer>
+      <combobox-field id="first"></combobox-field>
+      <combobox-listbox>
+        <!-- <combobox-option>s -->
+      </combobox-listbox>
+    </select-enhancer>
+
+    <select-enhancer>
+      <combobox-field id="second"></combobox-field>
+      <combobox-listbox>
+        <!-- <combobox-option>s -->
+      </combobox-listbox>
+    </select-enhancer>
+  </body>
+</html>
+```
+
+```js
+/* /path/to/element/definitions.js */
+
+import ComboboxField from "./path/to/ComboboxField.js";
+import ComboboxListbox from "./path/to/ComboboxListbox.js";
+import ComboboxOption from "./path/to/ComboboxOption.js";
+import SelectEnhancer from "./path/to/SelectEnhancer.js";
+
+customElements.define("combobox-listbox", ComboboxListbox);
+customElements.define("combobox-field", ComboboxField);
+customElements.define("combobox-option", ComboboxOption);
+customElements.define("select-enhancer", SelectEnhancer);
+```
+
+In this scenario, the execution order would be what's seen below. Remember that our markup rendered _two_ instances of our Combobox Component:
+
+```
+ComboboxListbox constructed
+ComboboxListbox connectedCallback
+ComboboxListbox constructed
+ComboboxListbox connectedCallback
+
+ComboboxField constructed
+ComboboxField connectedCallback
+ComboboxField constructed
+ComboboxField connectedCallback
+
+ComboboxOption(s) constructed
+ComboboxOption(s) connectedCallback
+ComboboxOption(s) constructed
+ComboboxOption(s) connectedCallback
+
+SelectEnhancer constructed
+SelectEnhancer connectedCallback
+SelectEnhancer constructed
+SelectEnhancer connectedCallback
+```
+
+As you can see, this makes the order in which you define your Custom Elements very important! Of course, if your web components are independent of each other, then the ordering doesn't really matter at all.
+
+> This might be the reason why some libraries define a `register` function for you. Perhaps they guarantee that all Custom Elements are registered in the correct order without you having to think about it?
+
+#### What about Select Enhacing Mode?
+
+As we mentioned in the section on `document.createElement()`, the order in which Custom Elements are defined doesn't matter when using Select Enhancing Mode. Regardless of whether the `SelectEnhancer` is instantiated via HTML Parsing or via `document.createElement()`, it is the _only_ Custom Element (in our set of Combobox Component Parts) that is initially attached to the DOM. Thus, the `SelectEnhancer`'s constructor and `connectedCallback()` will always run first, and on their own. Then, _within its `connectedCallback()`_, the `SelectEnhancer` will use `document.createElement()` to create and connect all remaining Custom Elements in the proper order when it replaces the `<select>` element.
+
+Therefore, as long as all Custom Elements are already defined by the time the `SelectEnhancer.connectedCallback()` executes, everything will work fine.
+
+### Implications for Authoring Custom Elements
+
+Everything discussed here has implications for the _order_ in which you define your Custom Elements, as well as whether or not you'll need to reach for [`customElements.upgrade()`](https://developer.mozilla.org/en-US/docs/Web/API/CustomElementRegistry/upgrade) to manually upgrade one of your Custom Elements.
+
+1&rpar; If you only intend to create web components with `document.createElement()` (as would be the case in a JS Framework used without any SSR), then the order in which you define your Custom Elements _does not matter_. All that matters is that every Custom Element is defined before `document.createElement()` is called.
+
+2&rpar; If you intend to server render your web components (with _or_ without a JS Framework), then the order in which you define your Custom Elements _does_ matter. If Custom Element `A` depends on Custom Element `B` to be mounted properly, then `B` should always be defined first.
+
+3&rpar; If you or your consumers intend to create web components through means like `innerHTML` (or if for some insane reason either of you want to define the components _before_ the HTML is parsed on page load), and if Custom Element `A` depends on Custom Element `B`, then _the order in which your Custom Elements are defined **cannot** save you_ because the browser is always going to construct _and_ upgrade your elements in tree order. This means you will be forced to leverage `customElements.upgrade()` to ensure that all constructors and `connectedCallbacks()` are executed in the proper order.
+
+If you _must_ use `customElements.upgrade(node)`, note that `node` _and_ all of its children will be upgraded, _in tree order_. This occurs synchronously, so the function in which `customElements.upgrade()` is called will only continue _after_ all necessary elements have been upgraded. Elements that don't need to be upgraded (or that cannot yet be upgraded) are not impacted by this. In other words, constructors and `connectedCallback()`s will not be called for Custom Elements that are already upgraded or that cannot yet be upgraded. (For clarity, an element cannot be upgraded if it is not yet defined.)
+
+For this reason, if Custom Element `A` depends on `B`, and `B` depends on `C`, then `A` must call `upgrade` in its `connectedCallback()` to guarantee `B` is upgraded before any logic requiring an upgraded `B` is run, and `B` must call `upgrade` in its `connectedCallback()` to guarantee `C` is upgraded before any logic requiring an upgraded `C` is run. Obviously, whenever possible, you should avoid creating Custom Elements where parents depend on their children. (By contrast, having children depend on their parents doesn't introduce any complexity.) However, if you're writing something that mimics the `<select>` element, this may not always be possible.
+
+Also note that if you wish to support _all three_ scenarios decribed above, then the order in which you define your Custom Elements still matters. For the scenario involving SSR/initial page load, remember that Custom Elements are defined synchronously. So if Custom Element `A` is defined before Custom Element `B`, then all instances of `A` on the page will be constructed and will execute their `connectedCallback()`s _first_. Afterwards, `customElements.define("element-b", B)` will finally run, causing all instances of `B` found on the page to be constructed and to execute their `connectedCallback()`s. For this reason, manual upgrades _will not save you_ in this scenario. This is because at the moment you call `customElements.upgrade(nodeB)`, _`B` will not yet be defined_ and will therefore not be upgradable.
+
+Therefore, if you want to support _all three_ scenarios, then you **_must_** define all of your Custom Elements in the proper order (for SSR) **_and_** include manual upgrading logic as needed in parent components (for `innerHTML` and the like). This is exactly what the `SelectEnhancer` does. It's unfortunate that such a thing is necessary.
+
 ## Using an `::after` Pseudo-Element for Displaying the "No Matches" Message (2025-09-08)
 
 In the past, in order to display the "No Matches" Message (i.e., the message presented to users when no `option`s match their current filter), we appended an `inert`, `aria-hidden` element to the `listbox`. Since the element was hidden from the A11y Tree, it wouldn't confuse Screen Reader Users, and it would still provide useful information to Visual Users. (Screen Reader Users are already told if the `listbox` with which they're interacting is empty.) Seemed like a great idea! And it was! ... until we started adding logic for dynamic `option` handling.
