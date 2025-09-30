@@ -9207,6 +9207,265 @@ for (const { mode } of testConfigs) {
         it("Works with the Form Validity Observer", async ({ page }) => {
           await runFormValidationTests(page, "/library-tests/form-observer/index");
         });
+
+        it("Works with the Form Validity Observer's Optional React Integration", async ({ page }) => {
+          await runFormValidationTests(page, "/library-tests/form-observer/react/index");
+        });
+
+        /*
+         * NOTE: Because of how React Hook Form behaves, we had to write a test that is _slightly_ different
+         * from the one executed by `runFormValidationTests()`. The deviations are minor, but they still
+         * require breaking out a separate test.
+         */
+        it("Works with the React Hook Form", async ({ page }) => {
+          /* -------------------- Setup -------------------- */
+          /*
+           * TODO: Playwright does not yet seem to recognize that `formAssociated` controls are labeled
+           * by `<label>` elements which point to them. We'll add a manual workaround for this for now...
+           * but this is something that needs addressing in the future... We should open a GitHub Issue.
+           */
+          await page.goto(new URL("/library-tests/react-hook-form/index", url).toString());
+          const comboboxes = page.getByRole("combobox");
+
+          /** The `name` of {@link combobox1 `combobox1`} */
+          const name1 = "Preferred Type System";
+          /** A non-filtered `combobox` mounted in `Manual Setup Mode` */
+          // const combobox1 = page.getByRole("combobox", { name: name1, exact: true });
+          const combobox1 = comboboxes.nth(0);
+          expect(await combobox1.evaluate((c: ComboboxField) => c.labels[0].textContent)).toBe(name1);
+          await expect(combobox1).toHaveJSProperty("filter", false);
+          await expect(combobox1).toHaveSyncedComboboxValue(
+            { label: "Choose One", value: "" },
+            { form: true, matchingLabel: true },
+          );
+
+          /** The `name` of {@link combobox2 `combobox2`} */
+          const name2 = "Best Sport";
+          /** A filterable, unclearable `combobox` mounted in `Select Enhancing Mode` */
+          // const combobox2 = page.getByRole("combobox", { name: name2, exact: true });
+          const combobox2 = comboboxes.nth(1);
+          expect(await combobox2.evaluate((c: ComboboxField) => c.labels[0].textContent)).toBe(name2);
+          await expect(combobox2).toHaveJSProperty("filter", true);
+          await expect(combobox2).toHaveJSProperty("valueIs", "unclearable");
+          await expect(combobox2).toHaveSyncedComboboxValue(
+            { label: "Nothing", value: "" },
+            { form: true, matchingLabel: true },
+          );
+
+          /** The `name` of {@link combobox3 `combobox3`} */
+          const name3 = "Most Eaten Fruit";
+          /** A filterable, clearable `combobox` mounted in `Manual Setup Mode` */
+          // const combobox3 = page.getByRole("combobox", { name: name3, exact: true });
+          const combobox3 = comboboxes.nth(2);
+          expect(await combobox3.evaluate((c: ComboboxField) => c.labels[0].textContent)).toBe(name3);
+          await expect(combobox3).toHaveJSProperty("filter", true);
+          await expect(combobox3).toHaveJSProperty("valueIs", "clearable");
+          await expect(combobox3).toHaveComboboxValue("");
+          await expect(combobox3).toHaveText("");
+
+          /** The `name` of {@link combobox4 `combobox4`} */
+          const name4 = "Dream Job";
+          /** A filterable, anyvalue `combobox` mounted in `Select Enhancing Mode` */
+          // const combobox4 = page.getByRole("combobox", { name: name4, exact: true });
+          const combobox4 = comboboxes.nth(3);
+          expect(await combobox4.evaluate((c: ComboboxField) => c.labels[0].textContent)).toBe(name4);
+          await expect(combobox4).toHaveJSProperty("filter", true);
+          await expect(combobox4).toHaveJSProperty("valueIs", "anyvalue");
+          await expect(combobox4).toHaveComboboxValue("");
+          await expect(combobox4).toHaveText("");
+
+          // Track `alert`s caused by valid form submissions
+          let alerts = 0;
+          page.on("dialog", trackAlerts);
+          async function trackAlerts(dialog: Dialog): Promise<void> {
+            alerts += 1;
+            await dialog.dismiss();
+          }
+
+          /* -------------------- Assertions -------------------- */
+          /* ---------- Non-filtered Combobox (Manual Setup Mode) ---------- */
+          // Validation hasn't happened yet, so `input`-based revalidation shouldn't occur
+          await combobox1.press("End+Enter");
+          await combobox1.press("Home+Enter");
+          await expect(combobox1).toHaveComboboxValue("", { form: true });
+          await expect(combobox1).toHaveAttribute("aria-invalid", String(false));
+          await expect(combobox1).toHaveAccessibleDescription("");
+
+          // Validation should happen on `focusout`
+          await combobox1.press("Shift+Tab");
+          await expect(combobox1).not.toBeFocused();
+          await expect(combobox1).toHaveAttribute("aria-invalid", String(true));
+          await expect(combobox1).toHaveAccessibleDescription(`${name1} is required.`);
+
+          // RHF doesn't engage `revalidation` mode until after `submit`, so validation still happens only on `blur`
+          await combobox1.press("End+Enter");
+          await expect(combobox1).not.toHaveComboboxValue("", { form: true });
+          await expect(combobox1).toHaveAttribute("aria-invalid", String(true));
+          await expect(combobox1).toHaveAccessibleDescription(`${name1} is required.`);
+
+          await combobox1.blur();
+          await expect(combobox1).toHaveAttribute("aria-invalid", String(false));
+          await expect(combobox1).toHaveAccessibleDescription("");
+
+          /* ---------- Clearable Combobox (Manual Setup Mode) ---------- */
+          // Force entire form to undergo validation
+          const submitter = page.getByRole("button", { name: "Sign Up", exact: true });
+          await submitter.click();
+          expect(alerts).toBe(0);
+
+          // Clearable Combobox should be invalid
+          await expect(combobox3).toHaveAttribute("aria-invalid", String(true));
+          await expect(combobox3).toHaveAccessibleDescription(`${name3} is required.`);
+
+          // Since field validation has already happened, `input`-based revalidation should be active now
+          await combobox3.press("End+Enter");
+          await expect(combobox3).not.toHaveComboboxValue("", { form: true });
+          await expect(combobox3).toHaveAttribute("aria-invalid", String(false));
+          await expect(combobox3).toHaveAccessibleDescription("");
+
+          // Emptying the Clearable Combobox should also provoke form validation (via the `input` event)
+          await combobox3.press("ControlOrMeta+A");
+          await combobox3.press("Backspace");
+          await expect(combobox3).toHaveComboboxValue("", { form: true });
+          await expect(combobox3).toHaveAttribute("aria-invalid", String(true));
+          await expect(combobox3).toHaveAccessibleDescription(`${name3} is required.`);
+
+          // Fix error again
+          await combobox3.pressSequentially("Blue");
+          await expect(combobox3).toHaveComboboxValue("", { form: true });
+          await expect(combobox3).toHaveAttribute("aria-invalid", String(true));
+          await expect(combobox3).toHaveAccessibleDescription(`${name3} is required.`);
+
+          await combobox3.press("Enter");
+          await expect(combobox3).not.toHaveComboboxValue("", { form: true });
+          await expect(combobox3).toHaveAttribute("aria-invalid", String(false));
+          await expect(combobox3).toHaveAccessibleDescription("");
+
+          /* ---------- Unclearable Combobox (Select Enhancing Mode) ---------- */
+          // Unclearable Combobox should be invalid
+          await expect(combobox2).toHaveAttribute("aria-invalid", String(true));
+          await expect(combobox2).toHaveAccessibleDescription(`${name2} is required.`);
+
+          // Since field validation has already happened, `input`-based revalidation should be active now
+          await combobox2.press("End+Enter");
+          await expect(combobox2).not.toHaveComboboxValue("", { form: true });
+          await expect(combobox2).toHaveAttribute("aria-invalid", String(false));
+          await expect(combobox2).toHaveAccessibleDescription("");
+
+          // Clearing the Unclearable Combobox shouldn't change the field's value
+          await combobox2.press("ControlOrMeta+A");
+          await combobox2.press("Backspace");
+          await expect(combobox2).not.toHaveComboboxValue("", { form: true });
+          await expect(combobox2).toHaveAttribute("aria-invalid", String(false));
+          await expect(combobox2).toHaveAccessibleDescription("");
+
+          /* ---------- Anyvalue Combobox (Select Enhancing Mode) ---------- */
+          // Anyvalue Combobox should be invalid
+          await expect(combobox4).toHaveAttribute("aria-invalid", String(true));
+          await expect(combobox4).toHaveAccessibleDescription(`${name4} is required.`);
+
+          // Simply entering text should fix the error (via the `input` event)
+          await combobox4.press("S");
+          await expect(combobox4).toHaveComboboxValue("S", { form: true });
+          await expect(combobox4).toHaveAttribute("aria-invalid", String(false));
+          await expect(combobox4).toHaveAccessibleDescription("");
+
+          await combobox4.press("Enter");
+          await expect(combobox4).toHaveSyncedComboboxValue(
+            { label: "Software Engineer", value: "coding" },
+            { form: true, matchingLabel: true },
+          );
+          await expect(combobox4).toHaveAttribute("aria-invalid", String(false));
+          await expect(combobox4).toHaveAccessibleDescription("");
+
+          // Selecting the Empty String Option will re-introduce the error though
+          // NOTE: Something in RHF or React seems to be messing with Keystroke logic, but only in Playwright?
+          await combobox4.press("Home+Home+Enter");
+          await expect(combobox4).toHaveSyncedComboboxValue(
+            { label: "Sleeping", value: "" },
+            { form: true, matchingLabel: true },
+          );
+          await expect(combobox4).toHaveAttribute("aria-invalid", String(true));
+          await expect(combobox4).toHaveAccessibleDescription(`${name4} is required.`);
+
+          // But changing the text will fix everything
+          await combobox4.press("Backspace");
+          await expect(combobox4).toHaveComboboxValue("Sleepin", { form: true });
+          await expect(combobox4).toHaveAttribute("aria-invalid", String(false));
+          await expect(combobox4).toHaveAccessibleDescription("");
+
+          // And the component makes a distinction between the text content/value and the `option`s
+          await combobox4.press("g");
+          await expect(combobox4).not.toHaveComboboxValue("", { form: true });
+          await expect(combobox4).toHaveComboboxValue("Sleeping", { form: true });
+          await expect(combobox4).toHaveAttribute("aria-invalid", String(false));
+          await expect(combobox4).toHaveAccessibleDescription("");
+
+          // Custom validation is also supported
+          await combobox4.press("ControlOrMeta+A");
+          await combobox4.pressSequentially("Punching");
+          await expect(combobox4).toHaveComboboxValue("Punching", { form: true });
+          await expect(combobox4).toHaveAttribute("aria-invalid", String(true));
+          await expect(combobox4).toHaveAccessibleDescription("Don't choose this job.");
+
+          await combobox4.press("ControlOrMeta+A");
+          await combobox4.pressSequentially("Gam");
+          await combobox4.press("Enter");
+          await expect(combobox4).toHaveSyncedComboboxValue(
+            { label: "Gaming", value: "tournaments" },
+            { form: true, matchingLabel: true },
+          );
+          await expect(combobox4).toHaveAttribute("aria-invalid", String(true));
+          await expect(combobox4).toHaveAccessibleDescription("Don't choose this job.");
+
+          await combobox4.press("Backspace");
+          await expect(combobox4).toHaveComboboxValue("Gamin", { form: true });
+          await expect(combobox4).toHaveAttribute("aria-invalid", String(false));
+          await expect(combobox4).toHaveAccessibleDescription("");
+
+          /* ---------- Successful Form Submission ---------- */
+          // Fix all of the remaining form fields
+          /* Email */
+          const email = page.getByRole("textbox", { name: "Email", exact: true });
+          await expect(email).toHaveAttribute("aria-invalid", String(true));
+          await expect(email).toHaveAccessibleDescription("You MUST allow us to stalk you.");
+
+          await email.fill("person@example.com");
+          await expect(email).toHaveAttribute("aria-invalid", String(false));
+          await expect(email).toHaveAccessibleDescription("");
+
+          /* Password */
+          const password = page.getByRole("textbox", { name: "Password", exact: true });
+          await expect(password).toHaveAttribute("aria-invalid", String(true));
+          await expect(password).toHaveAccessibleDescription("Password is required.");
+
+          await password.fill("12345678A@c");
+          await expect(password).toHaveAttribute("aria-invalid", String(false));
+          await expect(password).toHaveAccessibleDescription("");
+
+          /* Confirm Password */
+          const confirmPassword = page.getByRole("textbox", { name: "Confirm Password", exact: true });
+          await expect(confirmPassword).toHaveAttribute("aria-invalid", String(true));
+          await expect(confirmPassword).toHaveAccessibleDescription("Confirm Password is required.");
+
+          await confirmPassword.fill(await password.inputValue());
+          await expect(confirmPassword).toHaveAttribute("aria-invalid", String(false));
+          await expect(confirmPassword).toHaveAccessibleDescription("");
+
+          /* Favorite Framework */
+          const frameworks = page.getByRole("radiogroup", { name: "Favorite Framework", exact: true });
+          await expect(frameworks).toHaveAttribute("aria-invalid", String(true));
+          await expect(frameworks).toHaveAccessibleDescription("Favorite Framework is required.");
+
+          await page.getByRole("radio", { name: "Svelte", exact: true }).click();
+          await expect(frameworks).toHaveAttribute("aria-invalid", String(false));
+          await expect(frameworks).toHaveAccessibleDescription("");
+
+          /* Submit Form */
+          await submitter.click();
+          expect(alerts).toBe(1);
+          page.off("dialog", trackAlerts);
+        });
       });
     }
   });
