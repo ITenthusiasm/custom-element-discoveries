@@ -1,3 +1,4 @@
+/** @jsxImportSource react */
 import { StrictMode, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { useForm } from "react-hook-form";
@@ -93,7 +94,9 @@ function ReactHookFormTest() {
           />
 
           <combobox-listbox>
-            <combobox-option value="">Choose One</combobox-option>
+            <combobox-option value="" defaultSelected>
+              Choose One
+            </combobox-option>
             <combobox-option value="jsdocs">JSDocs</combobox-option>
             <combobox-option value="ts">TypeScript</combobox-option>
             <combobox-option value="anarchy">I Hate Types</combobox-option>
@@ -314,10 +317,10 @@ declare module "react" {
   // eslint-disable-next-line @typescript-eslint/no-namespace -- Necessary for type declaration merging
   namespace JSX {
     interface IntrinsicElements {
+      "select-enhancer": React.DetailedHTMLProps<React.SelectEnhancerHTMLAttributes<SelectEnhancer>, SelectEnhancer>;
       "combobox-field": React.DetailedHTMLProps<React.ComboboxFieldHTMLAttributes<ComboboxField>, ComboboxField>;
       "combobox-listbox": React.DetailedHTMLProps<React.HTMLAttributes<ComboboxListbox>, ComboboxListbox>;
       "combobox-option": React.DetailedHTMLProps<React.ComboboxOptionHTMLAttributes<ComboboxOption>, ComboboxOption>;
-      "select-enhancer": React.DetailedHTMLProps<React.SelectEnhancerHTMLAttributes<SelectEnhancer>, SelectEnhancer>;
     }
   }
 }

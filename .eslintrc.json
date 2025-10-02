@@ -1,12 +1,13 @@
 {
-  "env": { "browser": true, "node": true, "jest": true },
+  "env": { "browser": true, "node": true },
   // TODO: Add `eslint-plugin-playwright`
   "extends": ["airbnb-base", "plugin:@typescript-eslint/recommended", "prettier"],
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
     "ecmaVersion": "latest",
     "sourceType": "module",
-    "project": "tsconfig.json"
+    "project": "tsconfig.json",
+    "jsx": true
   },
   "settings": {
     "import/resolver": {
@@ -69,6 +70,14 @@
         "import/no-extraneous-dependencies": ["error", { "devDependencies": true }]
       }
     },
-    { "files": ["library-tests/**"], "rules": { "no-alert": "off" } }
+    { "files": ["library-tests/**"], "rules": { "no-alert": "off" } },
+    {
+      "files": ["library-tests/form-observer/solid/**"],
+      "plugins": ["solid"],
+      "rules": {
+        "solid/jsx-uses-vars": "error",
+        "solid/jsx-no-undef": "error"
+      }
+    }
   ]
 }

@@ -1,10 +1,11 @@
+/** @jsxImportSource react */
 import { StrictMode, useState, useMemo } from "react";
 import { createRoot } from "react-dom/client";
 import { createFormValidityObserver } from "@form-observer/react";
 import type { ValidatableField } from "@form-observer/react";
 import { ComboboxField, ComboboxListbox, ComboboxOption, SelectEnhancer } from "../../../src/Combobox/index.js";
 
-function ReactHookFormTest() {
+function FormValidityObserverReactTest() {
   type ErrorMessage = React.ReactElement | string | null;
   const [errors, setErrors] = useState<Record<string, ErrorMessage>>({});
 
@@ -115,7 +116,9 @@ function ReactHookFormTest() {
         <select-enhancer>
           <combobox-field id="types" name="types" required aria-describedby="types-error" />
           <combobox-listbox>
-            <combobox-option value="">Choose One</combobox-option>
+            <combobox-option value="" defaultSelected>
+              Choose One
+            </combobox-option>
             <combobox-option value="jsdocs">JSDocs</combobox-option>
             <combobox-option value="ts">TypeScript</combobox-option>
             <combobox-option value="anarchy">I Hate Types</combobox-option>
@@ -132,7 +135,15 @@ function ReactHookFormTest() {
       <div className="form-field">
         <label htmlFor="sport">Best Sport</label>
         <select-enhancer>
-          <select id="sport" name="sport" filter="" valueis="unclearable" required aria-describedby="sport-error">
+          <select
+            id="sport"
+            name="sport"
+            filter=""
+            valueis="unclearable"
+            defaultValue=""
+            required
+            aria-describedby="sport-error"
+          >
             <option value="">Nothing</option>
             <option value="football">Football</option>
             <option value="basketball">Basketball</option>
@@ -246,7 +257,7 @@ if (!customElements.get("select-enhancer")) customElements.define("select-enhanc
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <ReactHookFormTest />
+    <FormValidityObserverReactTest />
   </StrictMode>,
 );
 
@@ -283,10 +294,10 @@ declare module "react" {
   // eslint-disable-next-line @typescript-eslint/no-namespace -- Necessary for type declaration merging
   namespace JSX {
     interface IntrinsicElements {
+      "select-enhancer": React.DetailedHTMLProps<React.SelectEnhancerHTMLAttributes<SelectEnhancer>, SelectEnhancer>;
       "combobox-field": React.DetailedHTMLProps<React.ComboboxFieldHTMLAttributes<ComboboxField>, ComboboxField>;
       "combobox-listbox": React.DetailedHTMLProps<React.HTMLAttributes<ComboboxListbox>, ComboboxListbox>;
       "combobox-option": React.DetailedHTMLProps<React.ComboboxOptionHTMLAttributes<ComboboxOption>, ComboboxOption>;
-      "select-enhancer": React.DetailedHTMLProps<React.SelectEnhancerHTMLAttributes<SelectEnhancer>, SelectEnhancer>;
     }
   }
 }
