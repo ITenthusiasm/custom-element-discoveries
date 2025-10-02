@@ -1,11 +1,13 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import solid from "vite-plugin-solid";
+import { svelte } from "@sveltejs/vite-plugin-svelte";
 
 export default defineConfig({
   plugins: [
     react({ include: ["library-tests/form-observer/react/**", "library-tests/react-hook-form/**"] }),
     solid({ include: "library-tests/form-observer/solid/**" }),
+    svelte({ include: "library-tests/form-observer/svelte/**.svelte" }),
   ],
   server: {
     headers: {
