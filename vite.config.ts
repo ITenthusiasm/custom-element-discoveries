@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import solid from "vite-plugin-solid";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import vue from "@vitejs/plugin-vue";
+import preact from "@preact/preset-vite";
 
 export default defineConfig({
   plugins: [
@@ -13,6 +14,7 @@ export default defineConfig({
       include: "library-tests/form-observer/vue/**.vue",
       template: { compilerOptions: { isCustomElement: (tag) => tag.includes("-") } },
     }),
+    preact({ include: "library-tests/form-observer/preact/**" }),
   ],
   server: {
     headers: {
