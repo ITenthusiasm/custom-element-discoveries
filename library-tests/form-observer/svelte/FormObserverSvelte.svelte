@@ -146,7 +146,6 @@
     <div id="fruit-error" role="alert"></div>
   </div>
 
-
   <div class="form-field">
     <label for="job">Dream Job</label>
     <select-enhancer>
