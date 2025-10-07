@@ -9220,6 +9220,10 @@ for (const { mode } of testConfigs) {
           await runFormValidationTests(page, "/library-tests/form-observer/svelte/index");
         });
 
+        it("Works with the Form Validity Observer's Optional Vue Integration", async ({ page }) => {
+          await runFormValidationTests(page, "/library-tests/form-observer/vue/index");
+        });
+
         /*
          * NOTE: Because of how React Hook Form behaves, we had to write a test that is _slightly_ different
          * from the one executed by `runFormValidationTests()`. The deviations are minor, but they still
