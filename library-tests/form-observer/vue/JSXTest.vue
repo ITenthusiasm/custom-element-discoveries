@@ -9,7 +9,7 @@ export default defineComponent({
         <div class="form-field">
           <label for="numbers">Numbers</label>
           <select-enhancer>
-            <combobox-field id="numbers" name="numbers" valueis="anyvalue" onFilterchange={(e) => e} />
+            <combobox-field id="numbers" name="numbers" valueis="anyvalue" onFilterchange={console.log} />
             <combobox-listbox>
               <combobox-option value="1">One</combobox-option>
               <combobox-option value="2">Two</combobox-option>
