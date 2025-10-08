@@ -1,5 +1,5 @@
 import type { EventHandler } from "svelte/elements";
-import type { SelectEnhancer, ComboboxField, ComboboxListbox, ComboboxOption } from "../../../src/Combobox/index.js";
+import type { SelectEnhancer, ComboboxField, ComboboxListbox, ComboboxOption } from "../index.js";
 
 declare module "svelte/elements" {
   interface SvelteHTMLElements {

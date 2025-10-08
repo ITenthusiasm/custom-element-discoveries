@@ -1,4 +1,4 @@
-import type { SelectEnhancer, ComboboxField, ComboboxListbox, ComboboxOption } from "../../../src/Combobox/index.js";
+import type { SelectEnhancer, ComboboxField, ComboboxListbox, ComboboxOption } from "../index.js";
 
 declare module "solid-js" {
   // eslint-disable-next-line @typescript-eslint/no-namespace -- Necessary for type declaration merging

@@ -1,7 +1,4 @@
-import type SelectEnhancer from "../SelectEnhancer.js";
-import type ComboboxField from "../ComboboxField.js";
-import type ComboboxListbox from "../ComboboxListbox.js";
-import type ComboboxOption from "../ComboboxOption.js";
+import type { ComboboxField, ComboboxListbox, ComboboxOption, SelectEnhancer } from "../index.js";
 
 declare global {
   interface HTMLElementTagNameMap {

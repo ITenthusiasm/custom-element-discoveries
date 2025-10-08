@@ -1,4 +1,4 @@
-import type { ComboboxField, ComboboxListbox, ComboboxOption, SelectEnhancer } from "../../../src/Combobox/index.js";
+import type { ComboboxField, ComboboxListbox, ComboboxOption, SelectEnhancer } from "../index.js";
 
 declare module "react" {
   interface SelectEnhancerHTMLAttributes<T> extends HTMLAttributes<T> {

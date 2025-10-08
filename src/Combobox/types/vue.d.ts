@@ -1,5 +1,5 @@
 import type { HTMLAttributes, PublicProps, EmitFn } from "vue";
-import type { SelectEnhancer, ComboboxField, ComboboxListbox, ComboboxOption } from "../../../src/Combobox/index.js";
+import type { SelectEnhancer, ComboboxField, ComboboxListbox, ComboboxOption } from "../index.js";
 
 declare module "vue" {
   // Helper Types

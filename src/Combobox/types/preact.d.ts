@@ -1,4 +1,4 @@
-import type { ComboboxField, ComboboxListbox, ComboboxOption, SelectEnhancer } from "../../../src/Combobox/index.js";
+import type { ComboboxField, ComboboxListbox, ComboboxOption, SelectEnhancer } from "../index.js";
 
 declare module "preact" {
   // eslint-disable-next-line @typescript-eslint/no-namespace -- Necessary for type declaration merging
