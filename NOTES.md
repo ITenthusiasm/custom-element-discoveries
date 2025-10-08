@@ -81,3 +81,25 @@
   - See [Stack Overflow](https://stackoverflow.com/questions/67901731/cannot-focus-button-using-tab-key-navigation-on-safari/67901876#67901876) for additional details.
 - In `@playwright/test@1.54.1`, the [`Locator.fill()`](https://playwright.dev/docs/api/class-locator#locator-fill) method does not work in Firefox when used on a `[contenteditable]` element whose text content and cursor location are modified by a `beforeinput` event. (See [microsoft/playwright#36715](https://github.com/microsoft/playwright/issues/36715) and [Playwright Issue Firefox Fill](https://github.com/ITenthusiasm/playwright-issue-firefox-fill).) In such a scenario, Playwright will duplicate the provided text when running against Firefox. This issue does not happen during manual testing, nor does it happen if Playwright is run against Chrome or Safari. (We discovered this bug on a MacOS machine. Not sure how other machines behave.) Moreover, this issue does not occur when using [`Locator.press()`](https://playwright.dev/docs/api/class-locator#locator-press) or [`Page.keyboard.press()`](https://playwright.dev/docs/api/class-keyboard#keyboard-press). It's not clear why the `Locator.fill()` bug exists; but for now, if it becomes a problem, you can circumvent the issue by sticking to Keyboard Pressing instead of Locator Filling. Doing so is just as reliable (if not more reliable), but it's slightly less convenient.
 - Apparently, valid CSS identifiers [cannot start with an unescaped number](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Global_attributes/id). When working with unique [IDs](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Global_attributes/id) in JavaScript, this is basically never a concern because `document.getElementById()`, which accepts IDs starting with unescaped numbers (since they constitute valid IDs), is always preferred over `document.querySelector()` for performance reasons. However, this concern **_does_** matter in Playwright, since it tends to use `document.querySelector*()` for its `page.locator()` method. Note that although `document.querySelector("#123")` is invalid, `document.querySelector("[id='123']")` is perfectly acceptable (_notice the intentional use of quotation marks_), so the latter is **_ALWAYS_** to be preferred over the former _in Playwright Tests_.
+
+## Custom Element Integration with JS Frameworks:
+
+- React:
+  - https://react.dev/blog/2024/04/25/react-19-upgrade-guide#the-jsx-namespace-in-typescript
+  - https://react-typescript-cheatsheet.netlify.app/docs/advanced/types_react_api/#adding-non-standard-attributes
+  - https://react.dev/reference/react-dom/components#custom-html-elements
+- Svelte:
+  - https://svelte.dev/docs/svelte/typescript#Enhancing-built-in-DOM-types
+  - https://svelte.dev/docs/svelte/custom-elements
+- Solid
+  - https://docs.solidjs.com/reference/jsx-attributes/use#typescript-support
+  - https://github.com/solidjs/solid/discussions/1123#discussioncomment-3163029
+  - https://docs.solidjs.com/concepts/components/event-handlers
+  - https://docs.solidjs.com/reference/jsx-attributes/on_
+  - https://docs.solidjs.com/reference/jsx-attributes/on
+- Vue:
+  - https://vuejs.org/guide/extras/web-components#non-vue-web-components-and-typescript
+- Preact:
+  - https://preactjs.com/guide/v10/typescript/#extending-built-in-jsx-types
+  - https://preactjs.com/guide/v10/web-components/
+  - [Don't call `render` from inside a component file](https://github.com/preactjs/preact/issues/3393#issuecomment-1005019205)

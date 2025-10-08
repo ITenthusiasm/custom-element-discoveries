@@ -207,3 +207,81 @@ There are only two limitations that we can think of here:
 2. Having to style things through `::before` means that the label of the `<combobox-optgroup>` can only be text. Devs won't be able to do something ridiculously fancy like use a `ul > li` to label that `group`. However, users don't _need_ a ton of flexibility with the `group` label, just like they don't need a ton of flexibility with `<legend>`. The fact that `<optgroup>` only supports the `label` and `disabled` attributes is fine; a group doesn't really have much it needs to do. I'm sure no one has been upset that they can only provide regular text to `HTMLOptGroupElement.label`. The only issue with `<optgroup>` is that its label can't be styled, and our idea for the `ComboboxOptGroup` component would easily solve that problem with the aforementioned solution.
 
 Since these two limitations don't seem to produce any real problems, this seems like a great path forward to supporting `group`s in the `combobox`. Thankfully, the solution is not complicated.
+
+## Properly Typing Delegated Custom-Event Handlers in JavaScript Frameworks
+
+Currently, our Combobox Web Component supports delegated event listeners in JavaScript and in all JavaScript frameworks. However, the TypeScript types that JS Frameworks ship with typically don't know (and can't know) about the Custom Events that Web Components provide. For example, Solid's `JSX`-namespaced TypeScript types don't know anything about the `ComboboxField`'s `filterchange` event; so we have to define that event handler ourselves in `types/solid.d.ts`.
+
+Although we've defined the `filterchange` event handler in Solid (and in other JS Frameworks), we've only defined the event handler _on the Custom Element itself_. This means that the following is allowed by TypeScript:
+
+```tsx
+/* Solid */
+<div>
+  <select-enhancer>
+    <combobox-field filter onFilterchange={console.log} />
+    <combobox-listbox>{/* ... */}</combobox-listbox>
+  </select-enhancer>
+</div>
+```
+
+But this is not allowed:
+
+```tsx
+/* Solid */
+<div onFilterchange={console.log}>
+  <select-enhancer>
+    <combobox-field filter />
+    <combobox-listbox>{/* ... */}</combobox-listbox>
+  </select-enhancer>
+</div>
+```
+
+Sure, both approaches are allowed if you're just using JavaScript. But if you're using TypeScript, the TS compiler will complain with the 2nd code sample even though it is perfectly valid.
+
+The solution to this problem is to augment the JS Framework's _global_ event handler types. In Solid, that might look something like this:
+
+```ts
+declare module "solid-js" {
+  namespace JSX {
+    interface CustomEventHandlersCamelCase<T> {
+      onFilterchange?: EventHandlerUnion<T, Event>;
+    }
+
+    interface CustomEventHandlersLowerCase<T> {
+      onfilterchange?: EventHandlerUnion<T, Event>;
+    }
+
+    interface CustomEventHandlersNamespaced<T> {
+      "on:filterchange"?: EventHandlerWithOptionsUnion<T, Event>;
+    }
+  }
+}
+```
+
+Then we could remove our custom event handler types from the `HTMLComboboxFieldAttributes<T>` interface since the handler is already defined globally for all elements. We could even take things one step further by enforcing that the event handler's `target` type should always be a `ComboboxField`. (This is more or less what Solid does for events like the `input` event.) Overall, this sounds great, but there are some caveates to this approach.
+
+Although we can augment a framework's global event handler types to help TypeScript understand that custom events can be delegated, such augmentations introduce type pollution. If a user introduces too many type augmentations (or libraries which themselves augment types) into their application, they can end up running into situations where the various type augmentations clash and cause compile-time errors.
+
+We'd like to think that the probability of such a problem is fairly low, especially since many people do not yet know how to write robust, well-typed Custom Elements (as of 2025-10-08). But this might become a problem in the future, and it isn't one that we want to ignore either way.
+
+The ideal path forward might be to provide a core set of types so that TypeScript knows what the Custom Elements are and which custom events these elements support. Then, we could provide a _separate_ file that augments the types _globally_ &mdash; for all elements used in a JS Framework (i.e., not just the Custom Elements themselves). So in our library, we'd have a file structure like the following:
+
+```
+types/
+  solid/
+    elements.d.ts
+    events.d.ts
+    index.d.ts
+```
+
+Or we could provide
+
+```
+types/
+  solid.d.ts
+  solid-events.d.ts
+```
+
+Since I haven't asked anyone yet, it's hard to know how many people would only reach for the barrel file instead of reaching for the individual files. If we went with the first example, it's likely that `elements.d.ts` and `index.d.ts` (which would export both `elements.d.ts` and `events.d.ts`) would be used the most.
+
+All that said, it isn't an _immediate_ priority to add these _global_ event handler type augmentations. This is because it's highly unlikely (in our estimation) that the `filterchange` event will ever _need_ to be delegated. Today's TS type augmentations already permit users to attach the event listener directly to the `<combobox-field>`; people probably won't want or need to attach the listener anywhere else. Thus, there isn't much motivation to tackle this at the moment. However, if others show this to be a genuine need or interest, we can easily solve the problem in the future, as shown above.
