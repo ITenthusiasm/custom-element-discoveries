@@ -3364,6 +3364,58 @@ for (const { mode } of testConfigs) {
     it.describe("API", () => {
       it.describe("Combobox Field (Web Component Part)", () => {
         it.describe("Exposed Properties and Attributes", () => {
+          it.describe("id (Attribute)", () => {
+            it("Synchronizes the IDs of its `listbox` and `option`s with itself", async ({ page }) => {
+              /* ---------- Setup ---------- */
+              await page.goto(url);
+              await renderHTMLToPage(page)`
+                <select-enhancer>
+                  <select ${getFilterAttrs("unclearable")}>
+                    <option value="">Choose Something</option>
+                    <option>First</option>
+                    <option value="2">Second</option>
+                    <option value="san!" disabled>Third</option>
+                  </select>
+                </select-enhancer>
+              `;
+
+              const combobox = page.getByRole("combobox");
+              const listbox = page.getByRole("listbox");
+              const options = page.getByRole("option");
+
+              /* ---------- Assertions ---------- */
+              // Display the `option`s to facilitate testing
+              await combobox.press("Alt+ArrowDown");
+
+              // `combobox` should have automatically generated (and synchronized) an ID since none was given to it
+              const id = await combobox.evaluate((node) => node.id);
+              expect(id).not.toBe("");
+
+              await expect(listbox).toHaveId(`${id}-listbox`);
+              await Promise.all(
+                (await options.all()).map(async (o) => {
+                  const value = await o.evaluate((node: ComboboxOption) => node.value);
+                  return expect(o).toHaveId(`${id}-option-${value}`);
+                }),
+              );
+
+              // When `combobox` ID is changed, it should synchronize its ID with the `listbox` and `option`s
+              const newId = String(Math.random());
+              expect(newId).not.toBe(id);
+              await combobox.evaluate((node, ni) => (node.id = ni), newId);
+
+              // Component parts should have updated IDs
+              await expect(combobox).toHaveId(newId);
+              await expect(listbox).toHaveId(`${newId}-listbox`);
+              await Promise.all(
+                (await options.all()).map(async (o) => {
+                  const value = await o.evaluate((node: ComboboxOption) => node.value);
+                  return expect(o).toHaveId(`${newId}-option-${value}`);
+                }),
+              );
+            });
+          });
+
           it.describe("disabled (Property)", () => {
             it("Exposes the underlying `disabled` attribute", async ({ page }) => {
               /* ---------- Setup ---------- */

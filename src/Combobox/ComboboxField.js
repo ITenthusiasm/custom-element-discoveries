@@ -44,7 +44,7 @@ class ComboboxField extends HTMLElement {
   }
 
   static get observedAttributes() {
-    return /** @type {const} */ (["required", "filter", "valueis", "nomatchesmessage", "valuemissingerror"]);
+    return /** @type {const} */ (["id", "required", "filter", "valueis", "nomatchesmessage", "valuemissingerror"]);
   }
 
   /* ------------------------------ Internals ------------------------------ */
@@ -201,6 +201,13 @@ class ComboboxField extends HTMLElement {
    * @returns {void}
    */
   attributeChangedCallback(name, oldValue, newValue) {
+    if (name === "id" && newValue !== oldValue) {
+      this.listbox.id = `${this.id}-listbox`;
+      for (let option = this.listbox.firstElementChild; option; option = /** @type {any} */ (option.nextElementSibling))
+        option.id = `${this.id}-option-${option.value}`;
+
+      return;
+    }
     if (name === "required") return this.#validateRequiredConstraint();
     if (name === "nomatchesmessage" && newValue !== oldValue) {
       return this.listbox.setAttribute(name, newValue ?? ComboboxField.defaultNoMatchesMessage);
