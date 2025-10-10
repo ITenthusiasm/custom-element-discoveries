@@ -104,6 +104,19 @@ class ComboboxOption extends HTMLElement {
     return this.#combobox?.form ?? null;
   }
 
+  /**
+   * Provides the implementation for how the `option` will be marked/read as filtered out when
+   * the `combobox` performs its {@link ComboboxField.getFilteredOptions filtering logic}.
+   * @returns {boolean}
+   */
+  get filteredOut() {
+    return this.hasAttribute("data-filtered-out");
+  }
+
+  set filteredOut(value) {
+    this.toggleAttribute("data-filtered-out", value);
+  }
+
   /** Retrieves the `listbox` that owns this `option` @returns {ComboboxListbox | null} */
   get #listbox() {
     return /** @type {ComboboxListbox | null} */ (this.closest("[role='listbox']"));

@@ -3,7 +3,7 @@
 - [ ] Add Test Coverage to Playwright Tests if Possible
 - [ ] Some of the notes in this "Filterable/Searchable `combobox`" section below really need to be `Notes` or `Development Notes`. Please update them **_as soon as possible_** to reduce the clutter here without losing any of the important information on design decisions. Feel free to open a `Design Decisions` file if you feel it's necessary as well.
 - [ ] When do we want to consider a `searchable` Combobox -- if ever? Should it be its own component? Or should the `ComboboxField` simply be configurable?
-  - [ ] **IMPORTANT**: Do we need to remove/reset all `data-filtered-out` attributes once a value is selected (or the `combobox` is otherwise collapsed?)
+  - [ ] Inform developers that `ComboboxOption.filteredOut` **_IS NOT_** to be used whenever one pleases. Instead, it allows developers to override how the _`ComboboxField`_ marks `option`s as filtered out. This property should _only_ be toggled/read while the `ComboboxField` is actively resetting its filter or performing its filtering logic (whether with its own implementation or with a developer's overriding implementation).
   - [ ] Document the difference between `required` and `unclearable`/`clearable` _clearly_.
   - [ ] Document why we always attach `handleSearch` as a listener, and right at the beginning. (Wanting to make sure we can call `event.stopImmediatePropagation` in time.) **EDIT**: I think this is irrelevant now.
   - [ ] Document that developers who don't want to show a "No Options" message to their end users can simply hide the entire `listbox` with CSS if all `option`s are `[data-filtered-out]` (i.e., `[role="listbox"]:not(:has([role="option"]:not([data-filtered-out])))`).

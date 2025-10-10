@@ -8339,6 +8339,80 @@ for (const { mode } of testConfigs) {
               expect(await option.evaluate((n: ComboboxOption) => n.form instanceof HTMLFormElement)).toBe(true);
             });
           });
+
+          if (mode === "Filterable") {
+            it.describe("filteredOut (Property)", () => {
+              it('Can be overridden to customize how `option`s are marked/read as "filtered out"', async ({ page }) => {
+                /* ---------- Setup ---------- */
+                await page.goto(url);
+                await page.evaluate(() => {
+                  const ComboboxOptionConstructor = customElements.get("combobox-option") as typeof ComboboxOption;
+                  class CustomizedComboboxOption extends ComboboxOptionConstructor {
+                    /** @override */
+                    get filteredOut() {
+                      return !this.hasAttribute("data-matches-filter");
+                    }
+
+                    set filteredOut(value) {
+                      this.toggleAttribute("data-matches-filter", !value);
+                    }
+                  }
+
+                  // Create a customized `option` element (with accompanying styles)
+                  customElements.define("customized-combobox-option", CustomizedComboboxOption);
+
+                  const stylesheet = new CSSStyleSheet();
+                  document.adoptedStyleSheets.push(stylesheet);
+                  stylesheet.insertRule(`
+                    [role="option"] {
+                      display: none !important;
+                      visibility: hidden !important;
+
+                      &[data-matches-filter] {
+                        display: block !important;
+                        visibility: visible !important;
+                      }
+                    }
+                  `);
+                });
+
+                await renderHTMLToPage(page)`
+                  <select-enhancer optiontag="customized-combobox-option">
+                    <select ${getFilterAttrs("unclearable")}>
+                      ${testOptions.map((o) => `<option>${o}</option>`).join("")}
+                    </select>
+                  </select-enhancer>
+                `;
+
+                /* ---------- Assertions ---------- */
+                const [, second, , , , sixth, seventh] = testOptions;
+                const S = second.charAt(0) as "S";
+
+                const combobox = page.getByRole("combobox");
+                await combobox.press(S);
+                await expect(combobox).toHaveActiveOption(second);
+
+                const options = page.getByRole("option", { includeHidden: true });
+                await Promise.all(
+                  (await options.all()).map(async (o) => {
+                    const visible = (await o.evaluate((node: ComboboxOption) => node.label)).startsWith(S);
+                    if (visible) await expect(o).toHaveAttribute("data-matches-filter");
+                    else await expect(o).not.toHaveAttribute("data-matches-filter");
+                    await expect(o).not.toHaveAttribute("data-filtered-out");
+
+                    await expect(o).toHaveJSProperty("filteredOut", !visible);
+                    return expect(o).toBeVisible({ visible });
+                  }),
+                );
+
+                const visibleOptions = page.getByRole("option");
+                await expect(visibleOptions).toHaveCount(3);
+                await expect(visibleOptions.nth(0)).toHaveAccessibleName(second);
+                await expect(visibleOptions.nth(1)).toHaveAccessibleName(sixth);
+                await expect(visibleOptions.nth(2)).toHaveAccessibleName(seventh);
+              });
+            });
+          }
         });
       });
 

@@ -78,7 +78,6 @@ class ComboboxField extends HTMLElement {
       const mutation = mutations[i];
       const combobox = /** @type {ComboboxField} */ (mutation.target);
       const expanded = combobox.getAttribute(attrs["aria-expanded"]) === String(true);
-      const { listbox } = combobox;
 
       // Open Combobox
       if (expanded) {
@@ -92,9 +91,9 @@ class ComboboxField extends HTMLElement {
         if (combobox.getAttribute(attrs["aria-activedescendant"]) !== "") return;
 
         /** @type {ComboboxOption | null} */
-        const activeOption =
-          listbox.querySelector(":scope [role='option'][aria-selected='true']:not([data-filtered-out])") ??
-          listbox.querySelector(":scope [role='option']:not([data-filtered-out])");
+        const selectedOption = combobox.value == null ? null : combobox.getOptionByValue(combobox.value);
+        let activeOption = selectedOption ?? combobox.listbox.firstElementChild;
+        if (combobox.filter && activeOption?.filteredOut) [activeOption] = this.#matchingOptions;
 
         if (combobox.filter) {
           this.#autoselectableOption = null;
@@ -509,7 +508,7 @@ class ComboboxField extends HTMLElement {
   }
 
   /**
-   * Updates the `[data-filtered-out]` attribute for all of the `option`s,
+   * Updates the {@link ComboboxOption.filteredOut `filteredOut`} property for all of the `option`s,
    * then returns the `option`s that match the user's current filter.
    *
    * @returns {GetFilteredOptionsReturnType}
@@ -523,11 +522,11 @@ class ComboboxField extends HTMLElement {
     // NOTE: The responsibility of setting `autoselectableOption` to a non-null `option` belongs to this method ONLY.
     //       However, what is _done_ with said `option` is ultimately up to the developer, not this component.
     for (let option = this.listbox.firstElementChild; option; option = /** @type {any} */ (option.nextElementSibling)) {
-      if (!this.optionMatchesFilter(option)) option.toggleAttribute("data-filtered-out", true);
+      if (!this.optionMatchesFilter(option)) option.filteredOut = true;
       else {
         if (option.textContent === search) autoselectableOption = option;
 
-        option.removeAttribute("data-filtered-out");
+        option.filteredOut = false;
         this.#matchingOptions[matches++] = option;
       }
     }
@@ -571,7 +570,7 @@ class ComboboxField extends HTMLElement {
   #resetOptions() {
     let i = 0;
     for (let option = this.listbox.firstElementChild; option; option = /** @type {any} */ (option.nextElementSibling)) {
-      option.removeAttribute("data-filtered-out");
+      option.filteredOut = false;
       this.#matchingOptions[i++] = option;
     }
 
