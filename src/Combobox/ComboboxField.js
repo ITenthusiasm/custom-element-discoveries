@@ -73,113 +73,8 @@ class ComboboxField extends HTMLElement {
 
   /** @readonly */ #textNodeObserver = new MutationObserver(ComboboxField.#preserveTextNode);
   /** @readonly */ #activeDescendantObserver = new MutationObserver(ComboboxField.#watchActiveDescendant);
-  /** @readonly */ #expansionObserver = new MutationObserver((mutations) => {
-    for (let i = 0; i < mutations.length; i++) {
-      const mutation = mutations[i];
-      const combobox = /** @type {ComboboxField} */ (mutation.target);
-      const expanded = combobox.getAttribute(attrs["aria-expanded"]) === String(true);
-
-      // Open Combobox
-      if (expanded) {
-        /*
-         * NOTE: If the user opens the `combobox` with search/typeahead, then `aria-activedescendant` will already
-         * exist and this expansion logic will be irrelevant. Remember that `MutationObserver` callbacks are run
-         * asynchronously, so this check would happen AFTER the search/typeahead handler completed. It's also
-         * possible for this condition to be met if we redundantly set `aria-expanded`. Although we should be
-         * be able to avoid that, we can't prevent Developers from accidentally doing that themselves.
-         */
-        if (combobox.getAttribute(attrs["aria-activedescendant"]) !== "") return;
-
-        /** @type {ComboboxOption | null} */
-        const selectedOption = combobox.value == null ? null : combobox.getOptionByValue(combobox.value);
-        let activeOption = selectedOption ?? combobox.listbox.firstElementChild;
-        if (combobox.filter && activeOption?.filteredOut) [activeOption] = this.#matchingOptions;
-
-        if (combobox.filter) {
-          this.#autoselectableOption = null;
-          this.#activeIndex = activeOption ? this.#matchingOptions.indexOf(activeOption) : -1;
-        }
-
-        if (activeOption) combobox.setAttribute(attrs["aria-activedescendant"], activeOption.id);
-      }
-      // Close Combobox
-      else {
-        combobox.setAttribute(attrs["aria-activedescendant"], "");
-        this.#searchString = "";
-
-        // See if logic _exclusive_ to `filter`ed `combobox`es needs to be run
-        if (!combobox.filter || combobox.value == null) return;
-        this.#resetOptions();
-
-        // Reset `combobox` display if needed
-        // NOTE: `option` CAN be `null` or unselected if `combobox` is `clearable`, empty, and `collapsed` with a non-empty filter
-        const textNode = combobox.text;
-        if (!combobox.acceptsValue(textNode.data)) {
-          const option = combobox.getOptionByValue(combobox.value);
-          if (combobox.valueIs === "clearable" && !combobox.value && !option?.selected) textNode.data = "";
-          else if (textNode.data !== option?.textContent) textNode.data = /** @type {string} */ (option?.textContent);
-        }
-
-        // Reset cursor if `combobox` is still `:focus`ed
-        if (/** @type {Document | ShadowRoot} */ (combobox.getRootNode()).activeElement !== combobox) return;
-
-        const selection = /** @type {Selection} */ (combobox.ownerDocument.getSelection());
-        selection.setBaseAndExtent(textNode, textNode.length, textNode, textNode.length);
-      }
-    }
-  });
-
-  /** @readonly */ #optionNodesObserver = new MutationObserver((mutations) => {
-    const textNode = this.text;
-    const nullable = this.valueIs !== "anyvalue";
-
-    if (!this.listbox.children.length) {
-      if (!nullable) this.value = textNode.data;
-      else {
-        this.#value = null;
-        this.#internals.setFormValue(null);
-        textNode.data = "";
-        this.#validateRequiredConstraint();
-      }
-
-      if (this.filter) this.#filterOptions(); // Clean up internal data and show "No Matches" Message
-      return;
-    }
-
-    for (let i = 0; i < mutations.length; i++) {
-      const mutation = mutations[i];
-
-      // Handle added nodes first. This keeps us from running redundant Deselect Logic if a newly-added node is `selected`.
-      mutation.addedNodes.forEach((node, j) => {
-        if (!(node instanceof ComboboxOption)) return node.parentNode?.removeChild(node);
-
-        if (node.defaultSelected) this.value = node.value;
-        else if (nullable && this.#value === null && j === 0) {
-          if (this.valueIs !== "clearable") this.value = node.value;
-          else {
-            this.#value = "";
-            this.forceEmptyValue();
-          }
-        }
-      });
-
-      mutation.removedNodes.forEach((node) => {
-        if (!(node instanceof ComboboxOption)) return;
-        if (this.#autoselectableOption === node) this.#autoselectableOption = null;
-        if (node.selected) {
-          if (nullable) this.formResetCallback();
-          else this.value = textNode.data;
-        }
-      });
-    }
-
-    if (!this.filter) return;
-
-    // NOTE: This can produce a confusing UX if the `combobox` is expanded but a filter was NOT applied yet.
-    // However, such a scenario is unlikely and impractical. So we're keeping this logic to help with async loading.
-    if (this.getAttribute(attrs["aria-expanded"]) === String(true)) this.#filterOptions();
-    else this.#resetOptions();
-  });
+  /** @readonly */ #expansionObserver = new MutationObserver(this.#watchExpansion.bind(this));
+  /** @readonly */ #optionNodesObserver = new MutationObserver(this.#watchOptionNodes.bind(this));
 
   /**
    * @type {string | null} The Custom Element's internal value. If you are updating the `combobox`'s value to anything
@@ -1123,6 +1018,66 @@ class ComboboxField extends HTMLElement {
    * @param {MutationRecord[]} mutations
    * @returns {void}
    */
+  #watchExpansion(mutations) {
+    for (let i = 0; i < mutations.length; i++) {
+      const mutation = mutations[i];
+      const combobox = /** @type {ComboboxField} */ (mutation.target);
+      const expanded = combobox.getAttribute(attrs["aria-expanded"]) === String(true);
+
+      // Open Combobox
+      if (expanded) {
+        /*
+         * NOTE: If the user opens the `combobox` with search/typeahead, then `aria-activedescendant` will already
+         * exist and this expansion logic will be irrelevant. Remember that `MutationObserver` callbacks are run
+         * asynchronously, so this check would happen AFTER the search/typeahead handler completed. It's also
+         * possible for this condition to be met if we redundantly set `aria-expanded`. Although we should be
+         * be able to avoid that, we can't prevent Developers from accidentally doing that themselves.
+         */
+        if (combobox.getAttribute(attrs["aria-activedescendant"]) !== "") return;
+
+        /** @type {ComboboxOption | null} */
+        const selectedOption = combobox.value == null ? null : combobox.getOptionByValue(combobox.value);
+        let activeOption = selectedOption ?? combobox.listbox.firstElementChild;
+        if (combobox.filter && activeOption?.filteredOut) [activeOption] = this.#matchingOptions;
+
+        if (combobox.filter) {
+          this.#autoselectableOption = null;
+          this.#activeIndex = activeOption ? this.#matchingOptions.indexOf(activeOption) : -1;
+        }
+
+        if (activeOption) combobox.setAttribute(attrs["aria-activedescendant"], activeOption.id);
+      }
+      // Close Combobox
+      else {
+        combobox.setAttribute(attrs["aria-activedescendant"], "");
+        this.#searchString = "";
+
+        // See if logic _exclusive_ to `filter`ed `combobox`es needs to be run
+        if (!combobox.filter || combobox.value == null) return;
+        this.#resetOptions();
+
+        // Reset `combobox` display if needed
+        // NOTE: `option` CAN be `null` or unselected if `combobox` is `clearable`, empty, and `collapsed` with a non-empty filter
+        const textNode = combobox.text;
+        if (!combobox.acceptsValue(textNode.data)) {
+          const option = combobox.getOptionByValue(combobox.value);
+          if (combobox.valueIs === "clearable" && !combobox.value && !option?.selected) textNode.data = "";
+          else if (textNode.data !== option?.textContent) textNode.data = /** @type {string} */ (option?.textContent);
+        }
+
+        // Reset cursor if `combobox` is still `:focus`ed
+        if (/** @type {Document | ShadowRoot} */ (combobox.getRootNode()).activeElement !== combobox) return;
+
+        const selection = /** @type {Selection} */ (combobox.ownerDocument.getSelection());
+        selection.setBaseAndExtent(textNode, textNode.length, textNode, textNode.length);
+      }
+    }
+  }
+
+  /**
+   * @param {MutationRecord[]} mutations
+   * @returns {void}
+   */
   static #watchActiveDescendant(mutations) {
     for (let i = 0; i < mutations.length; i++) {
       const mutation = mutations[i];
@@ -1165,6 +1120,62 @@ class ComboboxField extends HTMLElement {
         }
       }
     }
+  }
+
+  /**
+   * @param {MutationRecord[]} mutations
+   * @returns {void}
+   */
+  #watchOptionNodes(mutations) {
+    const textNode = this.text;
+    const nullable = this.valueIs !== "anyvalue";
+
+    if (!this.listbox.children.length) {
+      if (!nullable) this.value = textNode.data;
+      else {
+        this.#value = null;
+        this.#internals.setFormValue(null);
+        textNode.data = "";
+        this.#validateRequiredConstraint();
+      }
+
+      if (this.filter) this.#filterOptions(); // Clean up internal data and show "No Matches" Message
+      return;
+    }
+
+    for (let i = 0; i < mutations.length; i++) {
+      const mutation = mutations[i];
+
+      // Handle added nodes first. This keeps us from running redundant Deselect Logic if a newly-added node is `selected`.
+      mutation.addedNodes.forEach((node, j) => {
+        if (!(node instanceof ComboboxOption)) return node.parentNode?.removeChild(node);
+
+        if (node.defaultSelected) this.value = node.value;
+        else if (nullable && this.#value === null && j === 0) {
+          if (this.valueIs !== "clearable") this.value = node.value;
+          else {
+            this.#value = "";
+            this.forceEmptyValue();
+          }
+        }
+      });
+
+      mutation.removedNodes.forEach((node) => {
+        if (!(node instanceof ComboboxOption)) return;
+        if (this.#autoselectableOption === node) this.#autoselectableOption = null;
+        if (node.selected) {
+          if (nullable) this.formResetCallback();
+          else this.value = textNode.data;
+        }
+      });
+    }
+
+    if (!this.filter) return;
+
+    // NOTE: This can produce a confusing UX if the `combobox` is expanded but a filter was NOT applied yet.
+    // However, such a scenario is unlikely and impractical. So we're keeping this logic to help with async loading.
+    if (this.getAttribute(attrs["aria-expanded"]) === String(true)) this.#filterOptions();
+    else this.#resetOptions();
   }
 }
 
