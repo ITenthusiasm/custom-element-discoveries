@@ -332,7 +332,6 @@ class ComboboxField extends HTMLElement {
     // Setup Mutation Observers
     this.#optionNodesObserver.observe(this.listbox, { childList: true });
     this.#textNodeObserver.observe(this, { childList: true });
-    // TODO: Change these 2 MutationObservers to `attributeChangedCallback` implementations instead
     this.#expansionObserver.observe(this, { attributes: true, attributeFilter: [attrs["aria-expanded"]] });
     this.#activeDescendantObserver.observe(this, {
       attributes: true,
